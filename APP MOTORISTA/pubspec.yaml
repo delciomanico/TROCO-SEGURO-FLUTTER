@@ -1,0 +1,47 @@
+name: 'troco_seguro_motorista'
+description: Aplicativo do Motorista - Troco Seguro - Pagamento digital para táxis em Luanda, Angola
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  shared_preferences: ^2.2.2
+  intl: ^0.18.1
+  flutter_secure_storage: ^9.2.2
+  local_auth: ^2.1.7
+  crypto: ^3.0.3
+  uuid: ^4.5.2
+  qr_flutter: ^4.1.0
+  share_plus: ^7.2.1
+  path_provider: ^2.1.1
+  screenshot: ^3.0.0
+  http: ^1.6.0
+  dio: ^5.9.1
+  mobile_scanner: ^5.1.1
+  google_fonts: any
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+  
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo_padded.png"
+  adaptive_icon_background: "#f5f5f5"
+  adaptive_icon_foreground: "assets/images/logo_padded.png"
+  adaptive_icon_foreground_inset: 24
+  remove_alpha_ios: true

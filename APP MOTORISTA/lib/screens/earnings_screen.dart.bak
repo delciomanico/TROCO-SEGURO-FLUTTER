@@ -1,0 +1,519 @@
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_motorista/models/driver_user.dart';
+import 'package:troco_seguro_motorista/models/earnings.dart';
+import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
+import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:intl/intl.dart';
+
+class EarningsScreen extends StatefulWidget {
+  final DriverUser driver;
+
+  const EarningsScreen({Key? key, required this.driver}) : super(key: key);
+
+  @override
+  State<EarningsScreen> createState() => _EarningsScreenState();
+}
+
+class _EarningsScreenState extends State<EarningsScreen> {
+  String selectedPeriod = 'today';
+  Earnings earnings = Earnings.empty();
+  bool isLoading = true;
+  final ApiService _api = ApiService();
+
+  // ========== MODO MOCK (DESENVOLVIMENTO) ==========
+  static const bool useMockData = true;
+  // =================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEarnings();
+  }
+
+  Future<void> _loadEarnings() async {
+    setState(() => isLoading = true);
+
+    // ========== MODO MOCK ==========
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      setState(() {
+        earnings = Earnings(
+          todayAmount: 12500,
+          todayTrips: 5,
+          weekAmount: 78500,
+          weekTrips: 32,
+          monthAmount: 320000,
+          monthTrips: 128,
+          totalAmount: 1250000,
+          totalTrips: 520,
+          averageRating: 4.8,
+          dailyHistory: [
+            DailyEarning(date: 'Seg', amount: 15000, trips: 6),
+            DailyEarning(date: 'Ter', amount: 18500, trips: 7),
+            DailyEarning(date: 'Qua', amount: 12000, trips: 5),
+            DailyEarning(date: 'Qui', amount: 22000, trips: 9),
+            DailyEarning(date: 'Sex', amount: 19500, trips: 8),
+            DailyEarning(date: 'Sáb', amount: 25000, trips: 10),
+            DailyEarning(date: 'Dom', amount: 8000, trips: 3),
+          ],
+        );
+        isLoading = false;
+      });
+      return;
+    }
+    // ================================
+
+    await _api.loadTokens();
+    final result = await _api.getEarnings();
+
+    if (result.isSuccess && result.data != null) {
+      setState(() {
+        earnings = result.data!;
+        isLoading = false;
+      });
+    } else {
+      // Usar dados mock se API falhar
+      setState(() {
+        earnings = Earnings(
+          todayAmount: 12500,
+          todayTrips: 5,
+          weekAmount: 78500,
+          weekTrips: 32,
+          monthAmount: 320000,
+          monthTrips: 128,
+          totalAmount: 1250000,
+          totalTrips: 520,
+          averageRating: 4.8,
+          dailyHistory: [],
+        );
+        isLoading = false;
+      });
+    }
+  }
+
+  String _formatCurrency(int amount) {
+    final format = NumberFormat('#,##0', 'pt_AO');
+    return '${format.format(amount)} Kz';
+  }
+
+  int get currentAmount {
+    switch (selectedPeriod) {
+      case 'today':
+        return earnings.todayAmount;
+      case 'week':
+        return earnings.weekAmount;
+      case 'month':
+        return earnings.monthAmount;
+      case 'total':
+        return earnings.totalAmount;
+      default:
+        return 0;
+    }
+  }
+
+  int get currentTrips {
+    switch (selectedPeriod) {
+      case 'today':
+        return earnings.todayTrips;
+      case 'week':
+        return earnings.weekTrips;
+      case 'month':
+        return earnings.monthTrips;
+      case 'total':
+        return earnings.totalTrips;
+      default:
+        return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.darkBlue,
+          ),
+        ),
+        foregroundColor: Colors.white,
+        toolbarHeight: responsive.scaledHeight(70),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(8)),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.accent.withOpacity(0.6),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.trending_up_rounded,
+                size: responsive.scaledWidth(20),
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Text(
+              'Ganhos',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(20),
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadEarnings,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: responsive.responsiveAllPadding(),
+                children: [
+                  // Period selector
+                  _buildPeriodSelector(responsive),
+                  SizedBox(height: responsive.scaledHeight(24)),
+                  // Main earnings card
+                  _buildEarningsCard(responsive),
+                  SizedBox(height: responsive.scaledHeight(24)),
+                  // Stats grid
+                  _buildStatsGrid(responsive),
+                  SizedBox(height: responsive.scaledHeight(24)),
+                  // Performance tips
+                  _buildPerformanceTips(responsive),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildPeriodSelector(ResponsiveHelper responsive) {
+    final periods = [
+      {'key': 'today', 'label': 'Hoje'},
+      {'key': 'week', 'label': 'Semana'},
+      {'key': 'month', 'label': 'Mês'},
+      {'key': 'total', 'label': 'Total'},
+    ];
+
+    return Container(
+      padding: EdgeInsets.all(responsive.responsiveSpacing() / 2),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: periods.map((period) {
+          final isSelected = selectedPeriod == period['key'];
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => selectedPeriod = period['key']!),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(
+                  vertical: responsive.scaledHeight(12),
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.darkBlue : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  period['label']!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(12),
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEarningsCard(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding() * 1.5),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF6B415), Color(0xFFF9C846)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.monetization_on_rounded,
+                color: Colors.white.withOpacity(0.8),
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                _getPeriodLabel(),
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(14),
+                  color: Colors.white.withOpacity(0.9),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          Text(
+            _formatCurrency(currentAmount),
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(40),
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: responsive.scaledWidth(16),
+              vertical: responsive.scaledHeight(8),
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.local_taxi_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                SizedBox(width: responsive.scaledWidth(6)),
+                Text(
+                  '$currentTrips viagens',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getPeriodLabel() {
+    switch (selectedPeriod) {
+      case 'today':
+        return 'Ganhos de Hoje';
+      case 'week':
+        return 'Ganhos da Semana';
+      case 'month':
+        return 'Ganhos do Mês';
+      case 'total':
+        return 'Ganhos Totais';
+      default:
+        return 'Ganhos';
+    }
+  }
+
+  Widget _buildStatsGrid(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Estatísticas',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(16),
+              fontWeight: FontWeight.w800,
+              color: AppColors.text,
+            ),
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  responsive,
+                  'Média por viagem',
+                  currentTrips > 0
+                      ? _formatCurrency((currentAmount / currentTrips).round())
+                      : '0 Kz',
+                  Icons.receipt_long_rounded,
+                  AppColors.darkBlue,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: _buildStatItem(
+                  responsive,
+                  'Avaliação Média',
+                  '${earnings.averageRating.toStringAsFixed(1)} ★',
+                  Icons.star_rounded,
+                  Colors.amber,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(12)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  responsive,
+                  'Total de viagens',
+                  '${earnings.totalTrips}',
+                  Icons.local_taxi_rounded,
+                  AppColors.accent,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: _buildStatItem(
+                  responsive,
+                  'Saldo atual',
+                  _formatCurrency(widget.driver.balance),
+                  Icons.account_balance_wallet_rounded,
+                  Colors.blue,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    ResponsiveHelper responsive,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsiveSpacing()),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(16),
+              fontWeight: FontWeight.w800,
+              color: AppColors.text,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(10),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerformanceTips(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: AppColors.darkBlue.withOpacity(0.05),
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.darkBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.lightbulb_outline_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Melhore seus ganhos',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(14),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.darkBlue,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(12)),
+          _buildTipItem(responsive, '🕐',
+              'Trabalhe nos horários de pico (7h-9h e 17h-19h)'),
+          _buildTipItem(
+              responsive, '⭐', 'Mantenha uma boa avaliação para mais clientes'),
+          _buildTipItem(responsive, '📍',
+              'Fique próximo a zonas comerciais e residenciais'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTipItem(ResponsiveHelper responsive, String emoji, String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(4)),
+      child: Row(
+        children: [
+          Text(emoji, style: TextStyle(fontSize: 16)),
+          SizedBox(width: responsive.scaledWidth(8)),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                color: AppColors.text,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

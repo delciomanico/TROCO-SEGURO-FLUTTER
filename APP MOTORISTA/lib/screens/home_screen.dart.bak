@@ -1,0 +1,1297 @@
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_motorista/models/driver_user.dart';
+import 'package:troco_seguro_motorista/models/qr_config.dart';
+import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
+import 'package:troco_seguro_motorista/widgets/qr_display_modal.dart';
+import 'package:troco_seguro_motorista/widgets/qr_scanner_modal.dart';
+import 'package:troco_seguro_motorista/widgets/qr_config_modal.dart';
+import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_motorista/screens/routes_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+
+class HomeScreen extends StatefulWidget {
+  final DriverUser driver;
+  final bool isOnline;
+  final VoidCallback onToggleOnline;
+
+  const HomeScreen({
+    Key? key,
+    required this.driver,
+    required this.isOnline,
+    required this.onToggleOnline,
+  }) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool showBalance = true;
+  int todayEarnings = 0;
+  int todayTrips = 0;
+  final ApiService _api = ApiService();
+  QrConfig? _qrConfig;
+
+  // ========== MODO MOCK (DESENVOLVIMENTO) ==========
+  static const bool useMockData = true;
+  // =================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayStats();
+    _loadQrConfig();
+  }
+
+  Future<void> _loadQrConfig() async {
+    // Carregar configuração existente ou criar nova
+    var config = await QrConfig.load();
+    if (config == null) {
+      final token =
+          await QrConfig.generateDriverToken(widget.driver.id ?? 'driver_001');
+      config = QrConfig(driverToken: token);
+      await config.save();
+    }
+    setState(() => _qrConfig = config);
+  }
+
+  Future<void> _loadTodayStats() async {
+    // ========== MODO MOCK ==========
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      setState(() {
+        todayEarnings = 12500;
+        todayTrips = 5;
+      });
+      return;
+    }
+    // ================================
+
+    await _api.loadTokens();
+    final result = await _api.getEarnings();
+    if (result.isSuccess && result.data != null) {
+      setState(() {
+        todayEarnings = result.data!.todayAmount;
+        todayTrips = result.data!.todayTrips;
+      });
+    }
+  }
+
+  String _formatCurrency(int amount) {
+    final format = NumberFormat('#,##0', 'pt_AO');
+    return '${format.format(amount)} Kz';
+  }
+
+  void _showQRCode() {
+    if (_qrConfig == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Carregando configuração...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    // Gerar dados do QR Code usando a configuração
+    final qrData = _qrConfig!.generateQrData();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => QrDisplayModal(
+        qrData: qrData,
+        amount: _qrConfig!.currentFare > 0 ? _qrConfig!.currentFare : null,
+        driverName: widget.driver.fullName,
+        routeName: _qrConfig!.activeRouteName,
+        onClose: () {},
+      ),
+    );
+  }
+
+  void _showQRConfig() {
+    if (_qrConfig == null) return;
+
+    QrConfigModal.show(
+      context,
+      currentConfig: _qrConfig!,
+      onConfigSaved: (newConfig) async {
+        await newConfig.save();
+        setState(() => _qrConfig = newConfig);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      newConfig.activeRouteName != null
+                          ? 'QR atualizado: ${newConfig.activeRouteName} - ${_formatCurrency(newConfig.currentFare)}'
+                          : 'Configuração salva!',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.accent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  void _scanPassengerQR() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => QRScannerModal(
+        onQRScanned: (scannedData) {
+          Navigator.pop(context);
+          _processScannedQR(scannedData);
+        },
+        onCancel: () {},
+      ),
+    );
+  }
+
+  void _processScannedQR(String scannedData) {
+    // Processar os dados do QR escaneado do passageiro
+    // Formato esperado: troco_seguro:passenger:userId:amount ou similar
+
+    debugPrint('QR Escaneado: $scannedData');
+
+    // Extrair informações do QR
+    final parts = scannedData.split(':');
+
+    String passengerName = 'Passageiro';
+    int amount = 0;
+    String passengerId = '';
+
+    if (scannedData.startsWith('troco_seguro:')) {
+      if (parts.length >= 3) {
+        passengerId = parts[2];
+      }
+      if (parts.length >= 4) {
+        amount = int.tryParse(parts[3]) ?? 0;
+      }
+      if (parts.length >= 5) {
+        passengerName = parts[4];
+      }
+    }
+
+    // Mostrar confirmação de pagamento
+    _showPaymentConfirmation(
+      passengerName: passengerName,
+      passengerId: passengerId,
+      amount: amount,
+      rawData: scannedData,
+    );
+  }
+
+  void _showPaymentConfirmation({
+    required String passengerName,
+    required String passengerId,
+    required int amount,
+    required String rawData,
+  }) {
+    final responsive = ResponsiveHelper(context);
+    final amountController = TextEditingController(
+      text: amount > 0 ? amount.toString() : '',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(responsive.responsivePadding()),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(20)),
+              Container(
+                padding: EdgeInsets.all(responsive.scaledWidth(16)),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_outline,
+                  size: responsive.scaledWidth(48),
+                  color: AppColors.accent,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(16)),
+              Text(
+                'CARTÃO VIRTUAL DETECTADO',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.accent,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(8)),
+              Text(
+                passengerName,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(18),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(24)),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(32),
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.darkBlue,
+                ),
+                decoration: InputDecoration(
+                  hintText: '0',
+                  suffixText: 'Kz',
+                  suffixStyle: TextStyle(
+                    fontSize: responsive.responsiveFontSize(20),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkBlue,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: AppColors.cardBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: AppColors.accent, width: 2),
+                  ),
+                  labelText: 'Valor da corrida',
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(24)),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(
+                          vertical: responsive.scaledHeight(16),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade400),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'CANCELAR',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(14),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(12)),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final tripAmount =
+                            int.tryParse(amountController.text) ?? 0;
+                        if (tripAmount <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Digite um valor válido'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.pop(context);
+                        _confirmPayment(passengerId, passengerName, tripAmount);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: EdgeInsets.symmetric(
+                          vertical: responsive.scaledHeight(16),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'COBRAR',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(16),
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: responsive.scaledHeight(16)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmPayment(String passengerId, String passengerName, int amount) {
+    // TODO: Integrar com API para processar pagamento
+    // Por enquanto, apenas simular sucesso
+
+    final responsive = ResponsiveHelper(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(20)),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle,
+                size: responsive.scaledWidth(64),
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(20)),
+            Text(
+              'PAGAMENTO RECEBIDO!',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(18),
+                fontWeight: FontWeight.w900,
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(12)),
+            Text(
+              _formatCurrency(amount),
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(32),
+                fontWeight: FontWeight.w900,
+                color: AppColors.darkBlue,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(8)),
+            Text(
+              'de $passengerName',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(14),
+                color: Colors.grey.shade600,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(24)),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _loadTodayStats(); // Atualizar estatísticas
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  padding: EdgeInsets.symmetric(
+                    vertical: responsive.scaledHeight(14),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'FECHAR',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        toolbarHeight: responsive.scaledHeight(70),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.darkBlue,
+          ),
+        ),
+        foregroundColor: Colors.white,
+        title: const DriverBrandingHeader(subtitle: 'Luanda, Angola'),
+        actions: [
+          // Status indicator
+          Padding(
+            padding: EdgeInsets.only(right: responsive.scaledWidth(16)),
+            child: GestureDetector(
+              onTap: widget.onToggleOnline,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.scaledWidth(12),
+                  vertical: responsive.scaledHeight(6),
+                ),
+                decoration: BoxDecoration(
+                  color: widget.isOnline
+                      ? AppColors.online.withOpacity(0.2)
+                      : AppColors.offline.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color:
+                        widget.isOnline ? AppColors.online : AppColors.offline,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: widget.isOnline
+                            ? AppColors.online
+                            : AppColors.offline,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    SizedBox(width: responsive.scaledWidth(6)),
+                    Text(
+                      widget.isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(12),
+                        fontWeight: FontWeight.w700,
+                        color: widget.isOnline
+                            ? AppColors.online
+                            : AppColors.offline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadTodayStats,
+        child: ListView(
+          padding: responsive.responsiveAllPadding(),
+          children: [
+            // Card de Saldo
+            _buildBalanceCard(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            // Botões de QR Code
+            _buildQRButtons(responsive),
+            SizedBox(height: responsive.scaledHeight(16)),
+            // Card de Rotas
+            _buildRoutesCard(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            // Estatísticas do dia
+            _buildTodayStats(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            // Dicas
+            _buildTipsSection(responsive),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceCard(ResponsiveHelper responsive) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            AppColors.darkBlue,
+            AppColors.darkBlueSurface,
+            Color(0xFF2A4A6C),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius() * 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.darkBlue.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Decoração
+          Positioned(
+            top: -30,
+            right: -30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -50,
+            left: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+          ),
+          // Conteúdo
+          Padding(
+            padding: EdgeInsets.all(responsive.responsivePadding() * 1.2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: responsive.scaledWidth(16),
+                              color: AppColors.accent,
+                            ),
+                            SizedBox(width: responsive.scaledWidth(6)),
+                            Text(
+                              'Saldo disponível',
+                              style: TextStyle(
+                                fontSize: responsive.responsiveFontSize(11),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: responsive.scaledHeight(10)),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            showBalance
+                                ? _formatCurrency(widget.driver.balance)
+                                : '••••••••',
+                            key: ValueKey(showBalance),
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(36),
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        onPressed: () {
+                          setState(() => showBalance = !showBalance);
+                        },
+                        icon: Icon(
+                          showBalance ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: responsive.scaledHeight(20)),
+                Container(
+                  height: 1,
+                  color: Colors.white.withOpacity(0.2),
+                ),
+                SizedBox(height: responsive.scaledHeight(16)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatItem(
+                        responsive,
+                        'Hoje',
+                        _formatCurrency(todayEarnings),
+                        Icons.trending_up,
+                        AppColors.accent,
+                      ),
+                    ),
+                    SizedBox(width: responsive.scaledWidth(12)),
+                    Expanded(
+                      child: _buildStatItem(
+                        responsive,
+                        'Viagens',
+                        '$todayTrips',
+                        Icons.local_taxi,
+                        Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    ResponsiveHelper responsive,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsiveSpacing()),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          SizedBox(width: responsive.scaledWidth(8)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(10),
+                  color: Colors.white60,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(13),
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQRButtons(ResponsiveHelper responsive) {
+    return Column(
+      children: [
+        // Botão ESCANEAR QR DO PASSAGEIRO (Principal)
+        GestureDetector(
+          onTap: widget.isOnline ? _scanPassengerQR : null,
+          child: Container(
+            padding: EdgeInsets.all(responsive.responsivePadding() * 1.5),
+            decoration: BoxDecoration(
+              gradient: widget.isOnline
+                  ? const LinearGradient(
+                      colors: [Color(0xFFF6B415), Color(0xFFF9C846)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: widget.isOnline ? null : Colors.grey.shade300,
+              borderRadius:
+                  BorderRadius.circular(responsive.responsiveBorderRadius()),
+              boxShadow: widget.isOnline
+                  ? [
+                      BoxShadow(
+                        color: AppColors.accent.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(responsive.scaledWidth(10)),
+                  decoration: BoxDecoration(
+                    color:
+                        Colors.white.withOpacity(widget.isOnline ? 0.2 : 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.qr_code_scanner,
+                    size: responsive.scaledWidth(36),
+                    color: widget.isOnline ? Colors.white : Colors.grey,
+                  ),
+                ),
+                SizedBox(width: responsive.scaledWidth(16)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.isOnline
+                            ? 'ESCANEAR CARTÃO VIRTUAL'
+                            : 'FIQUE ONLINE',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(16),
+                          fontWeight: FontWeight.w900,
+                          color: widget.isOnline ? Colors.white : Colors.grey,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        widget.isOnline
+                            ? 'Escaneie o QR do passageiro para cobrar'
+                            : 'Ative o status online para receber',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(12),
+                          color: widget.isOnline ? Colors.white70 : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: responsive.scaledWidth(18),
+                  color: widget.isOnline ? Colors.white70 : Colors.grey,
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(12)),
+
+        // Card de configuração atual do QR
+        if (_qrConfig != null &&
+            (_qrConfig!.activeRouteName != null || _qrConfig!.currentFare > 0))
+          Container(
+            margin: EdgeInsets.only(bottom: responsive.scaledHeight(12)),
+            padding: EdgeInsets.all(responsive.responsivePadding()),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.1),
+              borderRadius:
+                  BorderRadius.circular(responsive.responsiveBorderRadius()),
+              border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColors.accent,
+                  size: responsive.scaledWidth(20),
+                ),
+                SizedBox(width: responsive.scaledWidth(12)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'QR Code configurado:',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        _qrConfig!.activeRouteName != null
+                            ? '${_qrConfig!.activeRouteName} • ${_formatCurrency(_qrConfig!.currentFare)}'
+                            : _formatCurrency(_qrConfig!.currentFare),
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(13),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.text,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                GestureDetector(
+                  onTap: _showQRConfig,
+                  child: Container(
+                    padding: EdgeInsets.all(responsive.scaledWidth(8)),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.edit_rounded,
+                      color: AppColors.accent,
+                      size: responsive.scaledWidth(18),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Botões de QR
+        Row(
+          children: [
+            // Botão MOSTRAR MEU QR
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: widget.isOnline ? _showQRCode : null,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.responsivePadding(),
+                    vertical: responsive.responsivePadding() * 0.8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isOnline
+                        ? AppColors.darkBlue.withOpacity(0.1)
+                        : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(
+                        responsive.responsiveBorderRadius()),
+                    border: Border.all(
+                      color: widget.isOnline
+                          ? AppColors.darkBlue
+                          : Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.qr_code_2_rounded,
+                        size: responsive.scaledWidth(24),
+                        color:
+                            widget.isOnline ? AppColors.darkBlue : Colors.grey,
+                      ),
+                      SizedBox(width: responsive.scaledWidth(8)),
+                      Text(
+                        'MEU QR CODE',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(12),
+                          fontWeight: FontWeight.w700,
+                          color: widget.isOnline
+                              ? AppColors.darkBlue
+                              : Colors.grey,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            // Botão CONFIGURAR QR
+            Expanded(
+              child: GestureDetector(
+                onTap: widget.isOnline ? _showQRConfig : null,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.responsivePadding() * 0.5,
+                    vertical: responsive.responsivePadding() * 0.8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: widget.isOnline
+                        ? LinearGradient(
+                            colors: [
+                              AppColors.accent,
+                              AppColors.accent.withOpacity(0.8)
+                            ],
+                          )
+                        : null,
+                    color: widget.isOnline ? null : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(
+                        responsive.responsiveBorderRadius()),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.settings_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: widget.isOnline ? Colors.white : Colors.grey,
+                      ),
+                      SizedBox(width: responsive.scaledWidth(6)),
+                      Text(
+                        'CONFIG',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          fontWeight: FontWeight.w700,
+                          color: widget.isOnline ? Colors.white : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQRCodeButton(ResponsiveHelper responsive) {
+    return GestureDetector(
+      onTap: widget.isOnline ? _showQRCode : null,
+      child: Container(
+        padding: EdgeInsets.all(responsive.responsivePadding() * 1.5),
+        decoration: BoxDecoration(
+          gradient: widget.isOnline
+              ? const LinearGradient(
+                  colors: [Color(0xFFF6B415), Color(0xFFF9C846)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: widget.isOnline ? null : Colors.grey.shade300,
+          borderRadius:
+              BorderRadius.circular(responsive.responsiveBorderRadius()),
+          boxShadow: widget.isOnline
+              ? [
+                  BoxShadow(
+                    color: AppColors.accent.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.qr_code_2_rounded,
+              size: responsive.scaledWidth(48),
+              color: widget.isOnline ? Colors.white : Colors.grey,
+            ),
+            SizedBox(width: responsive.scaledWidth(16)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.isOnline ? 'MOSTRAR QR CODE' : 'FIQUE ONLINE',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(18),
+                    fontWeight: FontWeight.w900,
+                    color: widget.isOnline ? Colors.white : Colors.grey,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.isOnline
+                      ? 'Toque para receber pagamento'
+                      : 'Ative o status online para receber',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(12),
+                    color: widget.isOnline ? Colors.white70 : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayStats(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.insights_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Resumo de Hoje',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  responsive,
+                  'Ganhos',
+                  _formatCurrency(todayEarnings),
+                  Icons.attach_money_rounded,
+                  AppColors.accent,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: _buildStatCard(
+                  responsive,
+                  'Viagens',
+                  '$todayTrips',
+                  Icons.local_taxi_rounded,
+                  AppColors.darkBlue,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: _buildStatCard(
+                  responsive,
+                  'Avaliação',
+                  widget.driver.rating?.toStringAsFixed(1) ?? '5.0',
+                  Icons.star_rounded,
+                  Colors.amber,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    ResponsiveHelper responsive,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsiveSpacing()),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(14),
+              fontWeight: FontWeight.w800,
+              color: AppColors.text,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(10),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoutesCard(ResponsiveHelper responsive) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const RoutesScreen()),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(responsive.responsivePadding()),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.darkBlue,
+              AppColors.darkBlueSurface,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius:
+              BorderRadius.circular(responsive.responsiveBorderRadius()),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.darkBlue.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(12)),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.route_rounded,
+                color: AppColors.accent,
+                size: responsive.scaledWidth(28),
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(16)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ver Rotas',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(16),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: responsive.scaledHeight(4)),
+                  Text(
+                    'Trânsito, táxis ativos e mais',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(12),
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(8)),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white70,
+                size: responsive.scaledWidth(16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipsSection(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withOpacity(0.1),
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.tips_and_updates_rounded,
+                color: AppColors.accent,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Dica',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(14),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.accent,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Text(
+            'Mantenha seu status "Online" enquanto estiver disponível para corridas. '
+            'Isso permite que passageiros encontrem seu QR Code e façam pagamentos.',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(12),
+              color: AppColors.text,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

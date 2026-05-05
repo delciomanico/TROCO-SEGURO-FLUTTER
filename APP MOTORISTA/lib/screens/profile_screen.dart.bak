@@ -1,0 +1,862 @@
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_motorista/models/driver_user.dart';
+import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
+import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_motorista/services/theme_controller.dart';
+import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
+import 'package:troco_seguro_motorista/security/pin_guard.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:local_auth/local_auth.dart';
+import 'dart:convert';
+
+class ProfileScreen extends StatefulWidget {
+  final VoidCallback? onLogout;
+
+  const ProfileScreen({Key? key, this.onLogout}) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  DriverUser? driver;
+  bool notificationsEnabled = true;
+  bool biometricsEnabled = false;
+  bool darkModeEnabled = false;
+  bool isLoading = false;
+  final ApiService _api = ApiService();
+
+  // ========== MODO MOCK (DESENVOLVIMENTO) ==========
+  static const bool useMockData = true;
+  // =================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // ========== MODO MOCK ==========
+    if (useMockData) {
+      final prefs = await SharedPreferences.getInstance();
+      final bioPref = prefs.getBool('ts_bio_enabled') ?? false;
+      final themePref = prefs.getString('ts_driver_theme_mode');
+
+      setState(() {
+        driver = Constants.mockDriver;
+        biometricsEnabled = bioPref;
+        darkModeEnabled = themePref == 'dark';
+      });
+      return;
+    }
+    // ================================
+
+    await _api.loadTokens();
+
+    final prefs = await SharedPreferences.getInstance();
+    final driverJson = prefs.getString('ts_driver');
+    final bioPref = prefs.getBool('ts_bio_enabled') ?? false;
+    final themePref = prefs.getString('ts_driver_theme_mode');
+
+    setState(() {
+      biometricsEnabled = bioPref;
+      darkModeEnabled = themePref == 'dark';
+      if (driverJson != null) {
+        driver = DriverUser.fromJson(json.decode(driverJson));
+      }
+    });
+
+    // Atualizar com dados da API
+    final profileResult = await _api.getProfile();
+    if (profileResult.isSuccess && profileResult.data != null) {
+      setState(() => driver = profileResult.data!);
+      await prefs.setString('ts_driver', json.encode(driver!.toJson()));
+    }
+  }
+
+  void _showEditDialog(String field) {
+    if (driver == null) return;
+
+    String initialValue = '';
+    String title = '';
+    TextInputType keyboardType = TextInputType.text;
+
+    switch (field) {
+      case 'name':
+        initialValue = driver!.fullName;
+        title = 'Editar nome';
+        break;
+      case 'email':
+        initialValue = driver!.email ?? '';
+        title = 'Editar email';
+        keyboardType = TextInputType.emailAddress;
+        break;
+      case 'licensePlate':
+        initialValue = driver!.licensePlate ?? '';
+        title = 'Editar matrícula';
+        break;
+      case 'vehicleModel':
+        initialValue = driver!.vehicleModel ?? '';
+        title = 'Editar modelo do veículo';
+        break;
+      case 'bankAccount':
+        initialValue = driver!.bankAccount ?? '';
+        title = 'Editar conta bancária';
+        keyboardType = TextInputType.number;
+        break;
+    }
+
+    final controller = TextEditingController(text: initialValue);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _updateField(field, controller.text);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateField(String field, String value) async {
+    final result = await _api.updateProfile(
+      fullName: field == 'name' ? value : null,
+      email: field == 'email' ? value : null,
+      licensePlate: field == 'licensePlate' ? value : null,
+      vehicleModel: field == 'vehicleModel' ? value : null,
+      bankAccount: field == 'bankAccount' ? value : null,
+    );
+
+    if (result.isSuccess && result.data != null) {
+      setState(() => driver = result.data!);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('ts_driver', json.encode(driver!.toJson()));
+      _showSnack('Perfil atualizado com sucesso');
+    } else {
+      _showSnack('Erro ao atualizar: ${result.error}');
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _toggleBiometrics(bool enabled) async {
+    if (enabled) {
+      final auth = LocalAuthentication();
+      final canAuth = await auth.canCheckBiometrics;
+      if (!canAuth) {
+        _showSnack('Biometria não disponível neste dispositivo');
+        return;
+      }
+      final didAuth = await auth.authenticate(
+        localizedReason: 'Ative a biometria para desbloquear o app',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (!didAuth) return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('ts_bio_enabled', enabled);
+    setState(() => biometricsEnabled = enabled);
+  }
+
+  Future<void> _toggleDarkMode(bool enabled) async {
+    await ThemeController.instance.setDark(enabled);
+    setState(() => darkModeEnabled = enabled);
+  }
+
+  void _showChangePinDialog() {
+    final currentPinController = TextEditingController();
+    final newPinController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alterar PIN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: 'PIN atual',
+              ),
+            ),
+            TextField(
+              controller: newPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: 'Novo PIN',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final isValid = await PinGuard.validatePin(
+                scope: 'global',
+                enteredPin: currentPinController.text,
+                readExpectedPin: () => SecureStorageService().readPin(),
+              );
+
+              if (isValid) {
+                await SecureStorageService().savePin(newPinController.text);
+                Navigator.pop(context);
+                _showSnack('PIN alterado com sucesso');
+              } else {
+                _showSnack('PIN atual incorreto');
+              }
+            },
+            child: const Text('Alterar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sair da conta'),
+        content: const Text('Tem certeza que deseja sair?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onLogout?.call();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.darkBlue,
+          ),
+        ),
+        foregroundColor: Colors.white,
+        toolbarHeight: responsive.scaledHeight(70),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(8)),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.accent.withOpacity(0.6),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.person_rounded,
+                size: responsive.scaledWidth(20),
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Text(
+              'Perfil',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(20),
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: responsive.responsiveAllPadding(),
+        child: Column(
+          children: [
+            _buildProfileHeader(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            _buildVehicleInfo(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            _buildPersonalInfo(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            _buildSecuritySettings(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            _buildAppSettings(responsive),
+            SizedBox(height: responsive.scaledHeight(24)),
+            _buildSupportSection(responsive),
+            SizedBox(height: responsive.scaledHeight(32)),
+            _buildLogoutButton(responsive),
+            SizedBox(height: responsive.scaledHeight(40)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(ResponsiveHelper responsive) {
+    return Column(
+      children: [
+        Container(
+          width: responsive.scaledWidth(80),
+          height: responsive.scaledWidth(80),
+          decoration: BoxDecoration(
+            color: AppColors.darkBlue,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.accent,
+              width: 3,
+            ),
+          ),
+          child: Icon(
+            Icons.person_rounded,
+            size: responsive.scaledWidth(40),
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(16)),
+        Text(
+          driver?.fullName ?? 'Motorista',
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(20),
+            fontWeight: FontWeight.w900,
+            color: AppColors.text,
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(4)),
+        Text(
+          driver?.phoneNumber ?? '',
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(14),
+            color: AppColors.textSecondary,
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(8)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.scaledWidth(12),
+                vertical: responsive.scaledHeight(4),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    driver?.rating?.toStringAsFixed(1) ?? '5.0',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(12),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.scaledWidth(12),
+                vertical: responsive.scaledHeight(4),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.local_taxi, color: AppColors.accent, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    '${driver?.totalTrips ?? 0} viagens',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(12),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (driver?.isVerified == true)
+          Padding(
+            padding: EdgeInsets.only(top: responsive.scaledHeight(8)),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.scaledWidth(12),
+                vertical: responsive.scaledHeight(4),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified, color: AppColors.success, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Verificado',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(12),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVehicleInfo(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.directions_car_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Veículo',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          _buildInfoRow(
+            responsive,
+            'Matrícula',
+            driver?.licensePlate ?? 'Não informado',
+            Icons.confirmation_number_outlined,
+            onTap: () => _showEditDialog('licensePlate'),
+          ),
+          _buildInfoRow(
+            responsive,
+            'Modelo',
+            driver?.vehicleModel ?? 'Não informado',
+            Icons.car_rental_outlined,
+            onTap: () => _showEditDialog('vehicleModel'),
+          ),
+          if (driver?.vehicleColor != null)
+            _buildInfoRow(
+              responsive,
+              'Cor',
+              driver!.vehicleColor!,
+              Icons.palette_outlined,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfo(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.person_outline_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Informações Pessoais',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          _buildInfoRow(
+            responsive,
+            'Nome',
+            driver?.fullName ?? '',
+            Icons.badge_outlined,
+            onTap: () => _showEditDialog('name'),
+          ),
+          _buildInfoRow(
+            responsive,
+            'Telefone',
+            driver?.phoneNumber ?? '',
+            Icons.phone_outlined,
+          ),
+          _buildInfoRow(
+            responsive,
+            'Email',
+            driver?.email ?? 'Adicionar email',
+            Icons.email_outlined,
+            onTap: () => _showEditDialog('email'),
+          ),
+          _buildInfoRow(
+            responsive,
+            'Conta Bancária',
+            driver?.bankAccount ?? 'Adicionar conta',
+            Icons.account_balance_outlined,
+            onTap: () => _showEditDialog('bankAccount'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecuritySettings(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.security_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Segurança',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          _buildSwitchRow(
+            responsive,
+            'Biometria',
+            'Desbloquear com digital ou face',
+            Icons.fingerprint,
+            biometricsEnabled,
+            (value) => _toggleBiometrics(value),
+          ),
+          _buildInfoRow(
+            responsive,
+            'Alterar PIN',
+            'Modificar PIN de acesso',
+            Icons.pin_outlined,
+            onTap: _showChangePinDialog,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppSettings(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.settings_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Preferências',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          _buildSwitchRow(
+            responsive,
+            'Notificações',
+            'Receber alertas de pagamentos',
+            Icons.notifications_outlined,
+            notificationsEnabled,
+            (value) => setState(() => notificationsEnabled = value),
+          ),
+          _buildSwitchRow(
+            responsive,
+            'Modo Escuro',
+            'Tema escuro para o aplicativo',
+            Icons.dark_mode_outlined,
+            darkModeEnabled,
+            (value) => _toggleDarkMode(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportSection(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.help_outline_rounded,
+                color: AppColors.darkBlue,
+                size: responsive.scaledWidth(20),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Suporte',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(16),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          _buildInfoRow(
+            responsive,
+            'Central de Ajuda',
+            'Perguntas frequentes',
+            Icons.question_answer_outlined,
+          ),
+          _buildInfoRow(
+            responsive,
+            'Falar com Suporte',
+            'Atendimento via WhatsApp',
+            Icons.chat_outlined,
+          ),
+          _buildInfoRow(
+            responsive,
+            'Sobre o App',
+            'Versão 1.0.0',
+            Icons.info_outline,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    ResponsiveHelper responsive,
+    String label,
+    String value,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(8)),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 20),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(10),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(14),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow(
+    ResponsiveHelper responsive,
+    String title,
+    String subtitle,
+    IconData icon,
+    bool value,
+    Function(bool) onChanged,
+  ) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(8)),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textSecondary, size: 20),
+          SizedBox(width: responsive.scaledWidth(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(10),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.accent,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(ResponsiveHelper responsive) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _showLogoutConfirmation,
+        icon: const Icon(Icons.logout_rounded),
+        label: const Text('SAIR DA CONTA'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red,
+          side: const BorderSide(color: Colors.red),
+          padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(responsive.responsiveBorderRadius()),
+          ),
+        ),
+      ),
+    );
+  }
+}

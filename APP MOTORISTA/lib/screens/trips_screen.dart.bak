@@ -1,0 +1,497 @@
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_motorista/models/trip.dart';
+import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
+import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:intl/intl.dart';
+
+class TripsScreen extends StatefulWidget {
+  const TripsScreen({Key? key}) : super(key: key);
+
+  @override
+  State<TripsScreen> createState() => _TripsScreenState();
+}
+
+class _TripsScreenState extends State<TripsScreen> {
+  List<Trip> trips = [];
+  String activeFilter = 'all';
+  String searchQuery = '';
+  bool isLoading = true;
+  final ApiService _api = ApiService();
+
+  // ========== MODO MOCK (DESENVOLVIMENTO) ==========
+  static const bool useMockData = true;
+  // =================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+  }
+
+  Future<void> _loadTrips() async {
+    setState(() => isLoading = true);
+
+    // ========== MODO MOCK ==========
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      setState(() {
+        trips = Constants.mockTrips;
+        isLoading = false;
+      });
+      return;
+    }
+    // ================================
+
+    await _api.loadTokens();
+
+    final tripsResult = await _api.getTrips();
+    if (tripsResult.isSuccess && tripsResult.data != null) {
+      setState(() => trips = tripsResult.data!);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('ts_driver_trips',
+          json.encode(trips.map((t) => t.toJson()).toList()));
+    } else {
+      // Fallback: cache local ou dados mock
+      final prefs = await SharedPreferences.getInstance();
+      final tripsJson = prefs.getString('ts_driver_trips');
+      if (tripsJson != null) {
+        setState(() {
+          trips = (json.decode(tripsJson) as List)
+              .map((trip) => Trip.fromJson(trip))
+              .toList();
+        });
+      } else {
+        // Usar dados mock
+        setState(() => trips = Constants.mockTrips);
+      }
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  List<Trip> get filteredTrips {
+    return trips.where((trip) {
+      final matchesType = activeFilter == 'all' || trip.status == activeFilter;
+      final matchesSearch = trip.destination
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase()) ||
+          trip.passengerName.toLowerCase().contains(searchQuery.toLowerCase());
+      return matchesType && matchesSearch;
+    }).toList();
+  }
+
+  String _formatCurrency(int amount) {
+    final format = NumberFormat('#,##0', 'pt_AO');
+    return '${format.format(amount)} Kz';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'completed':
+        return AppColors.success;
+      case 'cancelled':
+        return AppColors.error;
+      case 'in_progress':
+        return AppColors.warning;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'completed':
+        return 'Concluída';
+      case 'cancelled':
+        return 'Cancelada';
+      case 'in_progress':
+        return 'Em andamento';
+      default:
+        return 'Desconhecido';
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'completed':
+        return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
+      case 'in_progress':
+        return Icons.schedule;
+      default:
+        return Icons.help;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.darkBlue,
+          ),
+        ),
+        foregroundColor: Colors.white,
+        toolbarHeight: responsive.scaledHeight(70),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(responsive.scaledWidth(8)),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.accent.withOpacity(0.6),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.local_taxi_rounded,
+                size: responsive.scaledWidth(20),
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Text(
+              'Viagens',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(20),
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadTrips,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  // Search and filter
+                  Container(
+                    padding: EdgeInsets.all(responsive.responsivePadding()),
+                    child: Column(
+                      children: [
+                        // Search bar
+                        CustomInput(
+                          label: '',
+                          hint: 'Buscar passageiro ou destino...',
+                          prefixIcon: Icons.search,
+                          onChanged: (value) =>
+                              setState(() => searchQuery = value),
+                        ),
+                        SizedBox(height: responsive.scaledHeight(12)),
+                        // Filter chips
+                        Row(
+                          children: [
+                            _buildFilterChip(responsive, 'all', 'Todas'),
+                            SizedBox(width: responsive.scaledWidth(8)),
+                            _buildFilterChip(
+                                responsive, 'completed', 'Concluídas'),
+                            SizedBox(width: responsive.scaledWidth(8)),
+                            _buildFilterChip(
+                                responsive, 'cancelled', 'Canceladas'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Trips list
+                  Expanded(
+                    child: filteredTrips.isEmpty
+                        ? _buildEmptyState(responsive)
+                        : ListView.builder(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: responsive.responsivePadding()),
+                            itemCount: filteredTrips.length,
+                            itemBuilder: (context, index) {
+                              final trip = filteredTrips[index];
+                              return _buildTripCard(responsive, trip);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(
+      ResponsiveHelper responsive, String value, String label) {
+    final isSelected = activeFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => activeFilter = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(
+          horizontal: responsive.scaledWidth(16),
+          vertical: responsive.scaledHeight(8),
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.darkBlue : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(12),
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ResponsiveHelper responsive) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_taxi_outlined,
+            size: 64,
+            color: Colors.grey.shade300,
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          Text(
+            'Nenhuma viagem encontrada',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(16),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Text(
+            'Suas viagens aparecerão aqui',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(14),
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripCard(ResponsiveHelper responsive, Trip trip) {
+    return Container(
+      margin: EdgeInsets.only(bottom: responsive.scaledHeight(12)),
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius:
+            BorderRadius.circular(responsive.responsiveBorderRadius()),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with passenger and amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(responsive.scaledWidth(10)),
+                    decoration: BoxDecoration(
+                      color: AppColors.darkBlue.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.person_rounded,
+                      color: AppColors.darkBlue,
+                      size: responsive.scaledWidth(20),
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(12)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        trip.passengerName,
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(14),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.text,
+                        ),
+                      ),
+                      Text(
+                        '${trip.date} às ${trip.time}',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatCurrency(trip.amount),
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(16),
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: responsive.scaledWidth(8),
+                      vertical: responsive.scaledHeight(2),
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(trip.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getStatusIcon(trip.status),
+                          size: 12,
+                          color: _getStatusColor(trip.status),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          _getStatusLabel(trip.status),
+                          style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(10),
+                            fontWeight: FontWeight.w600,
+                            color: _getStatusColor(trip.status),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(16)),
+          // Route
+          Row(
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Container(
+                    width: 2,
+                    height: 30,
+                    color: Colors.grey.shade300,
+                  ),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.darkBlue,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      trip.origin,
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(12),
+                        color: AppColors.text,
+                      ),
+                    ),
+                    SizedBox(height: responsive.scaledHeight(20)),
+                    Text(
+                      trip.destination,
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(12),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Rating if available
+          if (trip.rating != null) ...[
+            SizedBox(height: responsive.scaledHeight(12)),
+            Container(
+              padding: EdgeInsets.all(responsive.responsiveSpacing()),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    color: Colors.amber,
+                    size: 16,
+                  ),
+                  SizedBox(width: responsive.scaledWidth(4)),
+                  Text(
+                    'Avaliação: ${trip.rating!.toStringAsFixed(1)}',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(12),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                  if (trip.comment != null) ...[
+                    SizedBox(width: responsive.scaledWidth(12)),
+                    Expanded(
+                      child: Text(
+                        '"${trip.comment}"',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          fontStyle: FontStyle.italic,
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

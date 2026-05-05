@@ -1,0 +1,430 @@
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
+import 'package:intl/intl.dart';
+
+class SuccessModal extends StatefulWidget {
+  final String title;
+  final String? subtitle;
+  final int? amount;
+  final IconData? icon;
+  final Color? iconColor;
+  final String? primaryButtonLabel;
+  final VoidCallback? onPrimaryPressed;
+  final String? secondaryButtonLabel;
+  final VoidCallback? onSecondaryPressed;
+  final bool autoDismiss;
+  final Duration autoDismissDelay;
+
+  const SuccessModal({
+    Key? key,
+    required this.title,
+    this.subtitle,
+    this.amount,
+    this.icon,
+    this.iconColor,
+    this.primaryButtonLabel,
+    this.onPrimaryPressed,
+    this.secondaryButtonLabel,
+    this.onSecondaryPressed,
+    this.autoDismiss = false,
+    this.autoDismissDelay = const Duration(seconds: 3),
+  }) : super(key: key);
+
+  static Future<void> show(
+    BuildContext context, {
+    required String title,
+    String? subtitle,
+    int? amount,
+    IconData? icon,
+    Color? iconColor,
+    String? primaryButtonLabel,
+    VoidCallback? onPrimaryPressed,
+    String? secondaryButtonLabel,
+    VoidCallback? onSecondaryPressed,
+    bool autoDismiss = false,
+    Duration autoDismissDelay = const Duration(seconds: 3),
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SuccessModal(
+        title: title,
+        subtitle: subtitle,
+        amount: amount,
+        icon: icon,
+        iconColor: iconColor,
+        primaryButtonLabel: primaryButtonLabel,
+        onPrimaryPressed: onPrimaryPressed,
+        secondaryButtonLabel: secondaryButtonLabel,
+        onSecondaryPressed: onSecondaryPressed,
+        autoDismiss: autoDismiss,
+        autoDismissDelay: autoDismissDelay,
+      ),
+    );
+  }
+
+  /// Shortcut for payment received success
+  static Future<void> showPaymentReceived(
+    BuildContext context, {
+    required int amount,
+    String? passengerName,
+    VoidCallback? onDismiss,
+  }) {
+    return show(
+      context,
+      title: 'Pagamento Recebido!',
+      subtitle: passengerName != null
+          ? 'Pagamento de $passengerName recebido com sucesso'
+          : 'O pagamento foi adicionado à sua carteira',
+      amount: amount,
+      icon: Icons.check_circle_rounded,
+      iconColor: AppColors.success,
+      primaryButtonLabel: 'OK',
+      onPrimaryPressed: () {
+        Navigator.pop(context);
+        onDismiss?.call();
+      },
+    );
+  }
+
+  /// Shortcut for withdrawal success
+  static Future<void> showWithdrawalSuccess(
+    BuildContext context, {
+    required int amount,
+    required String method,
+    VoidCallback? onDismiss,
+  }) {
+    return show(
+      context,
+      title: 'Saque Solicitado!',
+      subtitle: method == 'mcx_express'
+          ? 'Você receberá em minutos no seu MCX Express'
+          : 'O valor será transferido em até 24 horas úteis',
+      amount: amount,
+      icon: Icons.send_rounded,
+      iconColor: AppColors.accent,
+      primaryButtonLabel: 'ENTENDIDO',
+      onPrimaryPressed: () {
+        Navigator.pop(context);
+        onDismiss?.call();
+      },
+    );
+  }
+
+  /// Shortcut for generic error
+  static Future<void> showError(
+    BuildContext context, {
+    required String message,
+    VoidCallback? onRetry,
+    VoidCallback? onDismiss,
+  }) {
+    return show(
+      context,
+      title: 'Ops! Algo deu errado',
+      subtitle: message,
+      icon: Icons.error_outline_rounded,
+      iconColor: AppColors.error,
+      primaryButtonLabel: onRetry != null ? 'TENTAR NOVAMENTE' : 'OK',
+      onPrimaryPressed: () {
+        Navigator.pop(context);
+        if (onRetry != null) {
+          onRetry();
+        } else {
+          onDismiss?.call();
+        }
+      },
+      secondaryButtonLabel: onRetry != null ? 'CANCELAR' : null,
+      onSecondaryPressed: onRetry != null
+          ? () {
+              Navigator.pop(context);
+              onDismiss?.call();
+            }
+          : null,
+    );
+  }
+
+  @override
+  State<SuccessModal> createState() => _SuccessModalState();
+}
+
+class _SuccessModalState extends State<SuccessModal>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.elasticOut,
+      ),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeIn,
+      ),
+    );
+
+    _animationController.forward();
+
+    if (widget.autoDismiss) {
+      Future.delayed(widget.autoDismissDelay, () {
+        if (mounted) {
+          Navigator.pop(context);
+          widget.onPrimaryPressed?.call();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  String _formatCurrency(int amount) {
+    final format = NumberFormat('#,##0', 'pt_AO');
+    return '${format.format(amount)} Kz';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+    final iconColor = widget.iconColor ?? AppColors.success;
+
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _fadeAnimation,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Container(
+                padding: EdgeInsets.all(responsive.responsivePadding() * 1.5),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon
+                    Container(
+                      width: responsive.scaledWidth(80),
+                      height: responsive.scaledWidth(80),
+                      decoration: BoxDecoration(
+                        color: iconColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        widget.icon ?? Icons.check_circle_rounded,
+                        color: iconColor,
+                        size: responsive.scaledWidth(48),
+                      ),
+                    ),
+
+                    SizedBox(height: responsive.scaledHeight(24)),
+
+                    // Title
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(20),
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.text,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    // Amount (if provided)
+                    if (widget.amount != null) ...[
+                      SizedBox(height: responsive.scaledHeight(16)),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(24),
+                          vertical: responsive.scaledHeight(12),
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              iconColor.withOpacity(0.2),
+                              iconColor.withOpacity(0.1),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _formatCurrency(widget.amount!),
+                          style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(28),
+                            fontWeight: FontWeight.w900,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // Subtitle
+                    if (widget.subtitle != null) ...[
+                      SizedBox(height: responsive.scaledHeight(12)),
+                      Text(
+                        widget.subtitle!,
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(14),
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+
+                    SizedBox(height: responsive.scaledHeight(32)),
+
+                    // Primary button
+                    if (widget.primaryButtonLabel != null)
+                      CustomButton(
+                        label: widget.primaryButtonLabel!,
+                        onPressed: widget.onPrimaryPressed ??
+                            () => Navigator.pop(context),
+                      ),
+
+                    // Secondary button
+                    if (widget.secondaryButtonLabel != null) ...[
+                      SizedBox(height: responsive.scaledHeight(12)),
+                      CustomButton(
+                        label: widget.secondaryButtonLabel!,
+                        isOutlined: true,
+                        onPressed: widget.onSecondaryPressed ??
+                            () => Navigator.pop(context),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Confetti Animation Widget (para celebrações)
+class ConfettiOverlay extends StatefulWidget {
+  final Widget child;
+  final bool showConfetti;
+
+  const ConfettiOverlay({
+    Key? key,
+    required this.child,
+    this.showConfetti = false,
+  }) : super(key: key);
+
+  @override
+  State<ConfettiOverlay> createState() => _ConfettiOverlayState();
+}
+
+class _ConfettiOverlayState extends State<ConfettiOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+
+    if (widget.showConfetti) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ConfettiOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showConfetti && !oldWidget.showConfetti) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        widget.child,
+        if (widget.showConfetti)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: _ConfettiPainter(
+                      progress: _controller.value,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final double progress;
+  
+  _ConfettiPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final colors = [
+      AppColors.accent,
+      AppColors.darkBlue,
+      Colors.amber,
+      Colors.pink,
+      Colors.purple,
+    ];
+
+    for (int i = 0; i < 50; i++) {
+      final x = (size.width * (i / 50)) + (size.width * 0.1 * (i % 3));
+      final y = size.height * progress * (1 + (i % 4) * 0.3);
+      final color = colors[i % colors.length];
+      final paint = Paint()
+        ..color = color.withOpacity(1 - progress)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(
+        Offset(x % size.width, y % size.height),
+        4 + (i % 3) * 2,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
