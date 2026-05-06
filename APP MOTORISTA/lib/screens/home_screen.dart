@@ -11,6 +11,7 @@ import 'package:troco_seguro_motorista/screens/routes_screen.dart';
 import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
 import 'package:troco_seguro_motorista/screens/trips_screen.dart';
 import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
+import 'package:troco_seguro_motorista/screens/vehicles_screen.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -589,11 +590,11 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildTopHeader(responsive),
-                SizedBox(height: responsive.scaledHeight(12)),
+                SizedBox(height: responsive.scaledHeight(24)),
                 _buildHighlightedCard(responsive),
-                SizedBox(height: responsive.scaledHeight(8)),
+                SizedBox(height: responsive.scaledHeight(24)),
                 _buildQuickActions(responsive),
-                SizedBox(height: responsive.scaledHeight(12)),
+                SizedBox(height: responsive.scaledHeight(24)),
                 _buildTransactionsHeader(responsive),
                 SizedBox(height: responsive.scaledHeight(10)),
                 _buildTransactionsList(responsive),
@@ -617,7 +618,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<_HomeActionItem> _buildActions() {
     return [
       _HomeActionItem(
-        icon: Icons.south_west_rounded,
+        icon: Icons.downloading_rounded,
         label: 'Cobrar',
         onTap: widget.isOnline ? _scanPassengerQR : widget.onToggleOnline,
       ),
@@ -633,16 +634,9 @@ class _HomeScreenState extends State<HomeScreen> {
             : widget.onToggleOnline,
       ),
       _HomeActionItem(
-        icon: Icons.account_balance_wallet_rounded,
-        label: 'Carteira',
-        onTap: () => _openScreen(
-          WalletScreen(onOpenWithdrawal: widget.onOpenWithdrawal),
-        ),
-      ),
-      _HomeActionItem(
-        icon: Icons.logout_rounded,
-        label: 'Sair',
-        onTap: widget.onLogout,
+        icon: Icons.directions_car_rounded,
+        label: 'Veículos',
+        onTap: () => _openScreen(const VehiclesScreen()),
       ),
     ];
   }
@@ -905,61 +899,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildActionTile(ResponsiveHelper responsive, _HomeActionItem action) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tileBg = isDark ? AppColors.darkCardElevated : AppColors.lightCard;
-    final tileBorder =
+    final circleBg = isDark ? AppColors.darkCardElevated : AppColors.lightCard;
+    final circleBorder =
         isDark ? Colors.white.withOpacity(0.14) : AppColors.lightBorder;
     final iconColor = isDark ? Colors.white : AppColors.primaryBlue;
     final textColor = isDark ? Colors.white70 : AppColors.textSecondary;
 
-    return Material(
-      color: tileBg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: tileBorder),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: action.isLoading ? null : action.onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            vertical: responsive.scaledHeight(10),
-            horizontal: responsive.scaledWidth(6),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (action.isLoading)
-                SizedBox(
-                  width: responsive.scaledWidth(22),
-                  height: responsive.scaledWidth(22),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.adaptiveAccent(context),
+    return GestureDetector(
+      onTap: action.isLoading ? null : action.onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: responsive.scaledWidth(50),
+            height: responsive.scaledWidth(50),
+            decoration: BoxDecoration(
+              color: circleBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: circleBorder),
+            ),
+            child: Center(
+              child: action.isLoading
+                  ? SizedBox(
+                      width: responsive.scaledWidth(22),
+                      height: responsive.scaledWidth(22),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.adaptiveAccent(context),
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      action.icon,
+                      color: iconColor,
+                      size: responsive.scaledWidth(24),
                     ),
-                  ),
-                )
-              else
-                Icon(
-                  action.icon,
-                  color: iconColor,
-                  size: responsive.scaledWidth(20),
-                ),
-              SizedBox(height: responsive.scaledHeight(8)),
-              Text(
-                action.isLoading ? 'Aguarde' : action.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: responsive.responsiveFontSize(11),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          SizedBox(height: responsive.scaledHeight(8)),
+          Text(
+            action.isLoading ? 'Aguarde' : action.label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontSize: responsive.responsiveFontSize(11),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

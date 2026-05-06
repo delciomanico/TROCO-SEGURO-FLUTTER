@@ -6,6 +6,7 @@ import 'package:troco_seguro_motorista/models/transaction.dart';
 import 'package:troco_seguro_motorista/models/trip.dart';
 import 'package:troco_seguro_motorista/models/earnings.dart';
 import 'package:troco_seguro_motorista/models/faq_item.dart';
+import 'package:troco_seguro_motorista/models/vehicle.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
@@ -287,11 +288,13 @@ class ApiService {
     try {
       try {
         final response = await _dio.get('users/me');
-        return ApiResponse.success(DriverUser.fromJson(_payload(response.data)));
+        return ApiResponse.success(
+            DriverUser.fromJson(_payload(response.data)));
       } on DioException catch (e) {
         if (e.response?.statusCode == 404) {
           final response = await _dio.get('auth/profile');
-          return ApiResponse.success(DriverUser.fromJson(_payload(response.data)));
+          return ApiResponse.success(
+              DriverUser.fromJson(_payload(response.data)));
         }
         rethrow;
       }
@@ -520,8 +523,7 @@ class ApiService {
                 '',
             qrCodeImage: data['qrCodeImage']?.toString() ?? '',
             driverName: data['driverName']?.toString() ?? '',
-            currentAmount:
-                int.tryParse(data['currentAmount'].toString()) ?? 0,
+            currentAmount: int.tryParse(data['currentAmount'].toString()) ?? 0,
             currency: data['currency']?.toString() ?? 'AOA',
           ));
         }
@@ -542,7 +544,8 @@ class ApiService {
       if (result.isSuccess && result.data != null) {
         return ApiResponse.success(result.data!.qrToken.publicToken);
       }
-      return ApiResponse.error(result.error ?? 'Falha ao gerar QR de cobrança.');
+      return ApiResponse.error(
+          result.error ?? 'Falha ao gerar QR de cobrança.');
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
@@ -624,6 +627,57 @@ class ApiService {
       return map;
     }
     return <String, dynamic>{};
+  }
+
+  // ============== VEÍCULOS ==============
+
+  Future<ApiResponse<Vehicle>> registerVehicle(
+      String licensePlate, String model, String color) async {
+    try {
+      final response = await _dio.post('fleet/vehicles', data: {
+        'licensePlate': licensePlate,
+        'model': model,
+        'color': color,
+      });
+
+      final data = response.data;
+      // Tratar dados se estiverem envoltos num node 'data'
+      final vehicleData = data['data'] ?? data;
+      final vehicle = Vehicle.fromJson(vehicleData as Map<String, dynamic>);
+      return ApiResponse._(data: vehicle, isSuccess: true);
+    } on DioException catch (e) {
+      return ApiResponse._(error: _parseError(e), isSuccess: false);
+    } catch (e) {
+      return ApiResponse._(error: e.toString(), isSuccess: false);
+    }
+  }
+
+  Future<ApiResponse<List<Vehicle>>> getVehicles() async {
+    try {
+      final response = await _dio.get('fleet');
+
+      final data = response.data;
+      List<dynamic> vehiclesList = [];
+      
+      if (data is List) {
+        vehiclesList = data;
+      } else if (data is Map) {
+        // API retorna { id, name, vehicles: [...], groups: [], createdAt }
+        if (data['vehicles'] is List) {
+          vehiclesList = data['vehicles'];
+        } else if (data['data'] is List) {
+          vehiclesList = data['data'];
+        }
+      }
+
+      final vehicles = vehiclesList.map((v) => Vehicle.fromJson(v as Map<String, dynamic>)).toList();
+
+      return ApiResponse._(data: vehicles, isSuccess: true);
+    } on DioException catch (e) {
+      return ApiResponse._(error: _parseError(e), isSuccess: false);
+    } catch (e) {
+      return ApiResponse._(error: e.toString(), isSuccess: false);
+    }
   }
 
   String _parseError(DioException e) {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_motorista/utils/theme.dart';
@@ -14,6 +14,9 @@ import 'package:troco_seguro_motorista/screens/home_screen.dart';
 import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
 import 'package:troco_seguro_motorista/screens/trips_screen.dart';
 import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
+import 'package:troco_seguro_motorista/screens/vehicles_screen.dart';
+import 'package:troco_seguro_motorista/screens/about_screen.dart';
+import 'package:troco_seguro_motorista/screens/terms_and_conditions_screen.dart';
 import 'package:troco_seguro_motorista/widgets/withdrawal_modal.dart';
 import 'package:troco_seguro_motorista/widgets/success_modal.dart';
 import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
@@ -80,7 +83,7 @@ class AppController extends StatefulWidget {
 
 class _AppControllerState extends State<AppController>
     with WidgetsBindingObserver {
-  bool hasSeenOnboarding = true; // Onboarding desativado por padrão
+  bool hasSeenOnboarding = true; // Onboarding desativado por padrÃ£o
   DriverUser? driver;
   List<Transaction> transactions = [];
   bool isLoading = true;
@@ -229,7 +232,7 @@ class _AppControllerState extends State<AppController>
       await prefs.setString('ts_driver', json.encode(driver!.toJson()));
     }
 
-    // Buscar transações
+    // Buscar transaÃ§Ãµes
     final txResult = await _api.getTransactionHistory();
     if (txResult.isSuccess && txResult.data != null) {
       setState(() => transactions = txResult.data!);
@@ -310,7 +313,7 @@ class _AppControllerState extends State<AppController>
         onSuccess: () async {
           Navigator.pop(context);
           _showSuccessModal(
-              'Saque solicitado!', 'Sua solicitação foi enviada.');
+              'Saque solicitado!', 'Sua solicitaÃ§Ã£o foi enviada.');
           await _refreshFromApi();
         },
       ),
@@ -349,7 +352,7 @@ class _AppControllerState extends State<AppController>
       );
     }
 
-    // Onboarding (se necessário)
+    // Onboarding (se necessÃ¡rio)
     if (!hasSeenOnboarding) {
       return OnboardingScreen(
         onComplete: () async {
@@ -360,7 +363,7 @@ class _AppControllerState extends State<AppController>
       );
     }
 
-    // Tela de autenticação
+    // Tela de autenticaÃ§Ã£o
     if (driver == null || !driver!.isLoggedIn) {
       return AuthScreen(onAuth: _handleAuth);
     }
@@ -378,7 +381,7 @@ class _AppControllerState extends State<AppController>
   }
 }
 
-// ========== Tela de Reautenticação (Biometria + PIN) ==========
+// ========== Tela de ReautenticaÃ§Ã£o (Biometria + PIN) ==========
 class ReauthScreen extends StatefulWidget {
   final String phoneNumber;
   final Future<bool> Function(String pin) onUnlock;
@@ -423,7 +426,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
         });
       }
 
-      // Tentar biometria automaticamente se disponível
+      // Tentar biometria automaticamente se disponÃ­vel
       if (_biometricsAvailable) {
         _tryBiometric();
       }
@@ -441,7 +444,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
 
     if (mounted && !success) {
       setState(() {
-        _errorMessage = 'Biometria não reconhecida. Use o PIN.';
+        _errorMessage = 'Biometria nÃ£o reconhecida. Use o PIN.';
       });
     }
   }
@@ -451,7 +454,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
 
     if (pin.length != 6) {
       setState(() {
-        _errorMessage = 'Digite todos os 6 dígitos';
+        _errorMessage = 'Digite todos os 6 dÃ­gitos';
       });
       return;
     }
@@ -507,17 +510,12 @@ class _ReauthScreenState extends State<ReauthScreen> {
         isDark ? const Color(0xFF2A2A2A) : AppColors.lightCard;
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF1A1A1A) : AppColors.lightBackground,
       resizeToAvoidBottomInset: true,
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? const [Color(0xFF121212), Color(0xFF1E1E1E)]
-                : const [AppColors.lightBackground, AppColors.lightSurface],
-          ),
+          color: isDark ? const Color(0xFF1A1A1A) : AppColors.lightBackground,
         ),
         child: SafeArea(
           child: LayoutBuilder(
@@ -614,7 +612,17 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                       contentPadding: EdgeInsets.zero,
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide.none,
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
@@ -672,8 +680,15 @@ class _ReauthScreenState extends State<ReauthScreen> {
                           ],
                           const SizedBox(height: 28),
                           if (_isLoading)
-                            CircularProgressIndicator(
-                              color: accentColor,
+                            Center(
+                              child: SizedBox(
+                                width: 60,
+                                height: 60,
+                                child: CircularProgressIndicator(
+                                  color: accentColor,
+                                  strokeWidth: 4,
+                                ),
+                              ),
                             )
                           else ...[
                             if (_biometricsAvailable) ...[
@@ -848,7 +863,7 @@ class _MainNavigationState extends State<_MainNavigation> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_rounded),
-            label: 'Início',
+            label: 'Inicio',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_rounded),
@@ -972,7 +987,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: 'Número de Telefone',
+                    labelText: 'NÃºmero de Telefone',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
@@ -988,7 +1003,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       _showSnack('Perfil atualizado com sucesso!');
                     }
                   },
-                  child: const Text('Salvar Alterações'),
+                  child: const Text('Salvar AlteraÃ§Ãµes'),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
               ],
@@ -1063,7 +1078,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                   obscureText: true,
                   maxLength: 6,
                   decoration: const InputDecoration(
-                    labelText: 'Novo PIN (6 dígitos)',
+                    labelText: 'Novo PIN (6 dÃ­gitos)',
                     prefixIcon: Icon(Icons.lock_reset),
                     counterText: '',
                   ),
@@ -1073,13 +1088,13 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                   onPressed: () async {
                     if (currentPinCtrl.text.length != 6 ||
                         newPinCtrl.text.length != 6) {
-                      _showSnack('O PIN deve conter exatamente 6 dígitos.');
+                      _showSnack('O PIN deve conter exatamente 6 dÃ­gitos.');
                       return;
                     }
                     final sec = SecureStorageService();
                     final savedPin = await sec.readPin();
                     if (savedPin != currentPinCtrl.text) {
-                      _showSnack('O PIN atual está incorreto.');
+                      _showSnack('O PIN atual estÃ¡ incorreto.');
                       return;
                     }
 
@@ -1087,7 +1102,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     Navigator.pop(context);
                     _showSnack('PIN alterado com sucesso!');
                   },
-                  child: const Text('Confirmar Alteração'),
+                  child: const Text('Confirmar AlteraÃ§Ã£o'),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
               ],
@@ -1119,7 +1134,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header com botão de fechar
+              // Header com botÃ£o de fechar
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Align(
@@ -1141,7 +1156,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     : theme.colorScheme.onSurface
                         .withAlpha((0.12 * 255).round()),
               ),
-              // Informações do motorista
+              // InformaÃ§Ãµes do motorista
               Padding(
                 padding:
                     const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -1217,12 +1232,12 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     : theme.colorScheme.onSurface
                         .withAlpha((0.12 * 255).round()),
               ),
-              // Menu scrollável
+              // Menu scrollÃ¡vel
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    // Informações da Conta
+                    // InformaÃ§Ãµes da Conta
                     _buildSectionTitle('Conta', isDark),
                     _buildMenuOption(
                       'Editar Perfil',
@@ -1231,18 +1246,15 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       onTap: () => _showEditProfileSheet(responsive),
                     ),
                     _buildMenuOption(
-                      'Dados do Veículo',
+                      'Meus Veículos',
                       Icons.directions_car_outlined,
                       isDark,
                       onTap: () {
-                        // modal vehicle
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content:
-                                const Text('Funcionalidade em desenvolvimento'),
-                            backgroundColor: AppColors.adaptiveAccent(context),
-                          ),
-                        );
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const VehiclesScreen()));
                       },
                     ),
                     _buildMenuOption(
@@ -1250,7 +1262,6 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       Icons.account_balance_outlined,
                       isDark,
                       onTap: () {
-                        // modal banks
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content:
@@ -1261,8 +1272,8 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // Segurança
-                    _buildSectionTitle('Segurança', isDark),
+                    // SeguranÃ§a
+                    _buildSectionTitle('SeguranÃ§a', isDark),
                     _buildToggleOption(
                       'Biometria',
                       Icons.fingerprint,
@@ -1297,7 +1308,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       },
                     ),
                     _buildToggleOption(
-                      'Notificações',
+                      'NotificaÃ§Ãµes',
                       Icons.notifications_outlined,
                       notificationsEnabled,
                       isDark,
@@ -1306,20 +1317,18 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // Informações
-                    _buildSectionTitle('Informações', isDark),
+                    // InformaÃ§Ãµes
+                    _buildSectionTitle('InformaÃ§Ãµes', isDark),
                     _buildMenuOption(
                       'Sobre',
                       Icons.info_outline_rounded,
                       isDark,
                       onTap: () {
-                        // modal de sobre (reaproveitando comportamento)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content:
-                                const Text('Troco Seguro Motorista v1.0.0'),
-                            backgroundColor: AppColors.adaptiveAccent(context),
-                          ),
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const AboutScreen()),
                         );
                       },
                     ),
@@ -1328,11 +1337,12 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       Icons.description_outlined,
                       isDark,
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Ler termos de condição'),
-                            backgroundColor: AppColors.adaptiveAccent(context),
-                          ),
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const TermsAndConditionsScreen()),
                         );
                       },
                     ),
@@ -1348,7 +1358,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     : theme.colorScheme.onSurface
                         .withAlpha((0.12 * 255).round()),
               ),
-              // Botão de sair
+              // BotÃ£o de sair
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: _buildMenuOption(
