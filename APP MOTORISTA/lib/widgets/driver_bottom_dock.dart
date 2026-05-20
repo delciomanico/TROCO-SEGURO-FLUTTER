@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_motorista/models/driver_user.dart';
 import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
-import 'package:troco_seguro_motorista/screens/routes_screen.dart';
 import 'package:troco_seguro_motorista/screens/trips_screen.dart';
 import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';

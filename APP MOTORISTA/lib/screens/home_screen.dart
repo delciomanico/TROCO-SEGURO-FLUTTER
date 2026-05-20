@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/models/driver_user.dart';
 import 'package:troco_seguro_motorista/models/qr_config.dart';
+import 'package:troco_seguro_motorista/models/transaction.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/widgets/qr_display_modal.dart';
@@ -10,8 +11,9 @@ import 'package:troco_seguro_motorista/services/api_service.dart';
 import 'package:troco_seguro_motorista/screens/routes_screen.dart';
 import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
 import 'package:troco_seguro_motorista/screens/trips_screen.dart';
-import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
 import 'package:troco_seguro_motorista/screens/vehicles_screen.dart';
+import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
+import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,12 +43,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool showBalance = true;
   bool _isLoadingQr = false;
+  bool _isLoadingStats = false;
   int todayEarnings = 0;
   int todayTrips = 0;
+  int currentBalance = 0; // Saldo local atualizado
+  List<Transaction> transactions = [];
   final ApiService _api = ApiService();
   QrConfig? _qrConfig;
-
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
 
   Color _accentColor() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -56,8 +59,49 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🏠 HomeScreen iniciado');
+    debugPrint('   Driver inicial: ${widget.driver.fullName}');
+    debugPrint('   Balance padrão: 0 Kz (será carregado da API)');
     _loadTodayStats();
     _loadQrConfig();
+    _loadBalance(); // Carregar saldo atualizado da API
+  }
+
+  int _parseBalance(dynamic balance) {
+    if (balance == null) return 0;
+    if (balance is num) return balance.toInt();
+    return double.tryParse(balance.toString())?.toInt() ?? 0;
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      debugPrint('🔄 Carregando saldo de users/me...');
+      await _api.loadTokens();
+      final profileResult = await _api.getProfile();
+
+      debugPrint('👤 Profile Success: ${profileResult.isSuccess}');
+
+      if (profileResult.isSuccess && profileResult.data != null) {
+        final profile = profileResult.data!;
+        debugPrint('   Name: ${profile.fullName}');
+        debugPrint('   Wallet: ${profile.wallet}');
+
+        // Usar o saldo já processado pelo modelo DriverUser
+        final newBalance = profile.balance;
+        debugPrint('   Parsed balance: $newBalance Kz');
+
+        if (mounted) {
+          setState(() {
+            currentBalance = newBalance;
+            debugPrint('✅ Saldo atualizado no estado: $currentBalance Kz');
+          });
+        }
+      } else {
+        debugPrint('❌ Erro na API: ${profileResult.error}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Erro ao carregar saldo: $e');
+    }
   }
 
   Future<void> _loadQrConfig() async {
@@ -72,22 +116,61 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadTodayStats() async {
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() {
-        todayEarnings = 12500;
-        todayTrips = 5;
-      });
-      return;
-    }
+    if (_isLoadingStats) return; // Evita múltiplas chamadas simultâneas
 
-    await _api.loadTokens();
-    final result = await _api.getEarnings();
-    if (result.isSuccess && result.data != null) {
-      setState(() {
-        todayEarnings = result.data!.todayAmount;
-        todayTrips = result.data!.todayTrips;
-      });
+    setState(() => _isLoadingStats = true);
+    debugPrint('🔄 Iniciando carregamento de estatísticas...');
+
+    try {
+      await _api.loadTokens();
+      debugPrint('✅ Tokens carregados');
+
+      // Carregar ganhos e transações em paralelo
+      final earningsResult = await _api.getEarnings();
+      final transactionsResult = await _api.getTransactionHistory(limit: 10);
+
+      debugPrint('📊 Earnings Success: ${earningsResult.isSuccess}');
+      if (earningsResult.data != null) {
+        debugPrint(
+            '   Today: ${earningsResult.data!.todayAmount} Kz, Trips: ${earningsResult.data!.todayTrips}');
+      }
+
+      debugPrint('💳 Transactions Success: ${transactionsResult.isSuccess}');
+      if (transactionsResult.data != null) {
+        debugPrint('   Total: ${transactionsResult.data!.length} transações');
+      }
+
+      if (mounted) {
+        setState(() {
+          // Atualizar ganhos
+          if (earningsResult.isSuccess && earningsResult.data != null) {
+            todayEarnings = earningsResult.data!.todayAmount;
+            todayTrips = earningsResult.data!.todayTrips;
+            debugPrint('✅ Ganhos atualizados: $todayEarnings Kz');
+          }
+
+          // Atualizar transações
+          if (transactionsResult.isSuccess && transactionsResult.data != null) {
+            transactions = transactionsResult.data!;
+            debugPrint('✅ ${transactions.length} transações carregadas');
+          } else {
+            debugPrint(
+                '⚠️ Erro ao carregar transações: ${transactionsResult.error}');
+            transactions = []; // Limpar lista se houver erro
+          }
+
+          _isLoadingStats = false;
+          debugPrint('🎉 Carregamento completo!');
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar estatísticas: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingStats = false;
+          transactions = []; // Limpar em caso de erro
+        });
+      }
     }
   }
 
@@ -140,12 +223,46 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => QrDisplayModal(
         qrData: qr.publicToken,
         qrCodeImage: qr.qrCodeImage,
-        amount: qr.currentAmount > 0 ? qr.currentAmount : null,
+        amount: qr.currentAmount > 0
+            ? qr.currentAmount
+            : ((_qrConfig?.currentFare ?? 0) > 0 ? _qrConfig!.currentFare : null),
         currency: qr.currency,
         driverName:
             qr.driverName.isNotEmpty ? qr.driverName : widget.driver.fullName,
-        routeName: _qrConfig!.activeRouteName,
-        onClose: () {},
+        routeName: _qrConfig?.activeRouteName,
+        onClose: () {
+          debugPrint('QR Modal fechado');
+        },
+        onUpdateAmount: (newAmount) async {
+          await _api.loadTokens();
+          final description = (_qrConfig?.activeRouteName != null &&
+                  _qrConfig!.activeRouteName!.trim().isNotEmpty)
+              ? _qrConfig!.activeRouteName!.trim()
+              : 'Corrida';
+          final priceResult = await _api.setQrCodePrice(
+            amount: newAmount,
+            description: description,
+          );
+
+          if (priceResult.isSuccess) {
+            if (_qrConfig != null) {
+              final newConfig = _qrConfig!.copyWith(currentFare: newAmount);
+              await newConfig.save();
+              if (mounted) setState(() => _qrConfig = newConfig);
+            }
+            return true;
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(priceResult.error ?? 'Erro ao atualizar valor'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return false;
+          }
+        },
       ),
     );
   }
@@ -532,6 +649,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () {
                     Navigator.pop(context);
                     _loadTodayStats();
+                    _loadBalance(); // Recarregar saldo após pagamento
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(
@@ -575,6 +693,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: () async {
             await Future.wait([
               _loadTodayStats(),
+              _loadBalance(),
               _loadQrConfig(),
             ]);
           },
@@ -593,6 +712,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: responsive.scaledHeight(24)),
                 _buildHighlightedCard(responsive),
                 SizedBox(height: responsive.scaledHeight(24)),
+
                 _buildQuickActions(responsive),
                 SizedBox(height: responsive.scaledHeight(24)),
                 _buildTransactionsHeader(responsive),
@@ -603,8 +723,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      bottomNavigationBar:
-          widget.showBottomDock ? _buildBottomDock(responsive) : null,
+      bottomNavigationBar: widget.showBottomDock
+          ? DriverBottomDock(
+              selectedTab: DriverDockTab.home,
+              driver: widget.driver,
+              onOpenWithdrawal: widget.onOpenWithdrawal,
+              onCenterTap: widget.isOnline ? _scanPassengerQR : widget.onToggleOnline,
+            )
+          : null,
     );
   }
 
@@ -797,7 +923,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           showBalance
-                              ? _formatCurrency(widget.driver.balance)
+                              ? _formatCurrency(currentBalance)
                               : '••••••••',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -969,18 +1095,6 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const Spacer(),
-        GestureDetector(
-          onTap: () => _openScreen(const TripsScreen()),
-          child: Text(
-            'Ver tudo',
-            style: TextStyle(
-              color: secondaryText,
-              fontSize: responsive.responsiveFontSize(12),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -996,220 +1110,138 @@ class _HomeScreenState extends State<HomeScreen> {
     final primaryText = isDark ? Colors.white : AppColors.textDark;
     final secondaryText = isDark ? Colors.white54 : AppColors.textSecondary;
 
+    // Criar lista com dados da API
     final entries = [
-      _UiTransactionRow(
-        name: 'Corridas de hoje',
-        time: 'Atualizado agora',
-        value: '+${_formatCurrency(todayEarnings)}',
-        type: 'Crédito',
-      ),
-      _UiTransactionRow(
-        name: 'Viagens concluídas',
-        time: 'Hoje',
-        value: '+$todayTrips',
-        type: 'Viagens',
-      ),
-      _UiTransactionRow(
-        name: 'Carteira',
-        time: 'Saldo atual',
-        value: _formatCurrency(widget.driver.balance),
-        type: 'Disponível',
-      ),
+      // Adicionar últimas 3 transações da API
+      ...transactions.take(3).map((tx) {
+        final isReceived = tx.type.toLowerCase().contains('received') ||
+            tx.type.toLowerCase().contains('deposit');
+        final amountStr = tx.amount;
+
+        return _UiTransactionRow(
+          name: tx.description.isNotEmpty ? tx.description : tx.type,
+          time: tx.date,
+          value: '${isReceived ? '+' : '-'}${_formatCurrency(amountStr.abs())}',
+          type: isReceived ? 'Entrada' : 'Saída',
+        );
+      }).toList(),
     ];
 
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: listBg,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        children: entries.map((entry) {
-          final isLast = entries.last == entry;
-          return Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: responsive.scaledWidth(12),
-              vertical: responsive.scaledHeight(12),
-            ),
-            decoration: BoxDecoration(
-              border: isLast
-                  ? null
-                  : Border(
-                      bottom: BorderSide(
-                        color: dividerColor,
-                      ),
-                    ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: responsive.scaledWidth(36),
-                  height: responsive.scaledWidth(36),
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(
-                    Icons.receipt_long_rounded,
-                    size: responsive.scaledWidth(18),
-                    color: _accentColor(),
-                  ),
-                ),
-                SizedBox(width: responsive.scaledWidth(10)),
-                Expanded(
+        children: entries.isEmpty
+            ? [
+                Padding(
+                  padding: EdgeInsets.all(responsive.scaledHeight(24)),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Icon(
+                        Icons.receipt_long_rounded,
+                        size: responsive.scaledWidth(40),
+                        color: secondaryText,
+                      ),
+                      SizedBox(height: responsive.scaledHeight(12)),
                       Text(
-                        entry.name,
+                        'Nenhuma transação',
                         style: TextStyle(
                           color: primaryText,
                           fontSize: responsive.responsiveFontSize(13),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: responsive.scaledHeight(2)),
-                      Text(
-                        entry.time,
-                        style: TextStyle(
-                          color: secondaryText,
-                          fontSize: responsive.responsiveFontSize(11),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      entry.value,
-                      style: TextStyle(
-                        color: primaryText,
-                        fontSize: responsive.responsiveFontSize(13),
-                        fontWeight: FontWeight.w800,
+              ]
+            : entries.asMap().entries.map((mapEntry) {
+                final entry = mapEntry.value;
+                final isLast = mapEntry.key == entries.length - 1;
+
+                return Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.scaledWidth(12),
+                    vertical: responsive.scaledHeight(12),
+                  ),
+                  decoration: BoxDecoration(
+                    border: isLast
+                        ? null
+                        : Border(
+                            bottom: BorderSide(
+                              color: dividerColor,
+                            ),
+                          ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: responsive.scaledWidth(36),
+                        height: responsive.scaledWidth(36),
+                        decoration: BoxDecoration(
+                          color: iconBg,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Icon(
+                          Icons.receipt_long_rounded,
+                          size: responsive.scaledWidth(18),
+                          color: _accentColor(),
+                        ),
                       ),
-                    ),
-                    SizedBox(height: responsive.scaledHeight(2)),
-                    Text(
-                      entry.type,
-                      style: TextStyle(
-                        color: _accentColor(),
-                        fontSize: responsive.responsiveFontSize(10),
-                        fontWeight: FontWeight.w600,
+                      SizedBox(width: responsive.scaledWidth(10)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.name,
+                              style: TextStyle(
+                                color: primaryText,
+                                fontSize: responsive.responsiveFontSize(13),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: responsive.scaledHeight(2)),
+                            Text(
+                              entry.time,
+                              style: TextStyle(
+                                color: secondaryText,
+                                fontSize: responsive.responsiveFontSize(11),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildBottomDock(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dockBg = isDark ? AppColors.darkSurface : AppColors.lightCard;
-    final dockBorder =
-        isDark ? Colors.white.withOpacity(0.08) : AppColors.lightBorder;
-
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        responsive.scaledWidth(16),
-        0,
-        responsive.scaledWidth(16),
-        responsive.scaledHeight(14),
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: responsive.scaledWidth(8),
-        vertical: responsive.scaledHeight(7),
-      ),
-      decoration: BoxDecoration(
-        color: dockBg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: dockBorder),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildDockItem(
-            responsive,
-            icon: Icons.home_rounded,
-            label: 'Home',
-            onTap: () {},
-            selected: true,
-          ),
-          _buildDockItem(
-            responsive,
-            icon: Icons.bar_chart_rounded,
-            label: 'Estatística',
-            onTap: () => _openScreen(EarningsScreen(driver: widget.driver)),
-          ),
-          GestureDetector(
-            onTap: widget.onOpenWithdrawal,
-            child: Container(
-              width: responsive.scaledWidth(46),
-              height: responsive.scaledWidth(46),
-              decoration: BoxDecoration(
-                color: _accentColor(),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.currency_exchange_rounded,
-                color: isDark ? AppColors.darkSurface : AppColors.textLight,
-                size: responsive.scaledWidth(26),
-              ),
-            ),
-          ),
-          _buildDockItem(
-            responsive,
-            icon: Icons.local_taxi_rounded,
-            label: 'Viagens',
-            onTap: () => _openScreen(const TripsScreen()),
-          ),
-          _buildDockItem(
-            responsive,
-            icon: Icons.person_outline_rounded,
-            label: 'Perfil',
-            onTap: () => _openScreen(const RoutesScreen()),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDockItem(
-    ResponsiveHelper responsive, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool selected = false,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = selected
-        ? _accentColor()
-        : (isDark ? Colors.white70 : AppColors.textSecondary);
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: responsive.scaledWidth(4)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: responsive.scaledWidth(19)),
-            SizedBox(height: responsive.scaledHeight(4)),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: responsive.responsiveFontSize(9),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            entry.value,
+                            style: TextStyle(
+                              color: primaryText,
+                              fontSize: responsive.responsiveFontSize(13),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: responsive.scaledHeight(2)),
+                          Text(
+                            entry.type,
+                            style: TextStyle(
+                              color: _accentColor(),
+                              fontSize: responsive.responsiveFontSize(10),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
       ),
     );
   }

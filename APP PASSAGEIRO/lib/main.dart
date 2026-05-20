@@ -788,14 +788,14 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                             if (!_isValidPin(newPin) ||
                                 !_isValidPin(confirmPin)) {
                               FeedbackService.showError(
-                                this.context,
+                                context,
                                 message: 'PIN deve ter 6 dígitos numéricos',
                               );
                               return;
                             }
                             if (newPin != confirmPin) {
                               FeedbackService.showError(
-                                this.context,
+                                context,
                                 message: 'Novo PIN e confirmação não coincidem',
                               );
                               return;
@@ -815,12 +815,12 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                               await PinGuard.resetFailures('global');
                               if (mounted) Navigator.pop(ctx);
                               FeedbackService.showSuccess(
-                                this.context,
+                                context,
                                 message: 'PIN alterado com sucesso',
                               );
                             } else {
                               FeedbackService.showError(
-                                this.context,
+                                context,
                                 message:
                                     'Erro: ${result.error ?? "PIN atual incorreto"}',
                               );
@@ -1634,7 +1634,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
+                            const Text(
                               'Bem-vindo',
                               textAlign: TextAlign.center,
                               style: TextStyle(

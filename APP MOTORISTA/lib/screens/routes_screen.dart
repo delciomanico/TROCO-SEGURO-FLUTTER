@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/models/route.dart';
+import 'package:troco_seguro_motorista/services/api_service.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
 import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
@@ -18,13 +19,12 @@ class RoutesScreen extends StatefulWidget {
 }
 
 class _RoutesScreenState extends State<RoutesScreen> {
-  // ========== API INTEGRATION ==========
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
-  // ===============================
+  final ApiService _api = ApiService();
 
   List<TaxiRoute> routes = [];
   TaxiRoute? selectedRoute;
   bool isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -33,190 +33,34 @@ class _RoutesScreenState extends State<RoutesScreen> {
   }
 
   Future<void> _loadRoutes() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      _errorMessage = null;
+    });
 
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      routes = _getMockRoutes();
-    } else {
-      // TODO: Implementar chamada à API
-      routes = [];
+    try {
+      await _api.loadTokens();
+      final result = await _api.getRoutes();
+      if (result.isSuccess && result.data != null) {
+        setState(() {
+          routes = result.data!;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          routes = [];
+          _errorMessage = result.error ?? 'Não foi possível carregar as rotas.';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar rotas: $e');
+      setState(() {
+        routes = [];
+        _errorMessage = 'Erro inesperado ao carregar rotas.';
+        isLoading = false;
+      });
     }
-
-    setState(() => isLoading = false);
-  }
-
-  List<TaxiRoute> _getMockRoutes() {
-    return [
-      TaxiRoute(
-        id: '1',
-        name: 'Aeroporto → Centro',
-        origin: 'Aeroporto 4 de Fevereiro',
-        destination: 'Largo do Kinaxixi',
-        trafficStatus: TrafficStatus.moderate,
-        trafficReason: 'Obras na via principal',
-        activeTaxis: 23,
-        distance: 12.5,
-        estimatedTime: 25,
-        currentTime: 35,
-        basePrice: 3500,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      TaxiRoute(
-        id: '2',
-        name: 'Viana → Maianga',
-        origin: 'Viana (Estalagem)',
-        destination: 'Maianga',
-        trafficStatus: TrafficStatus.heavy,
-        trafficReason: 'Acidente na Estrada de Catete',
-        activeTaxis: 15,
-        distance: 18.2,
-        estimatedTime: 30,
-        currentTime: 55,
-        basePrice: 4000,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 2)),
-      ),
-      TaxiRoute(
-        id: '3',
-        name: 'Talatona → Mutamba',
-        origin: 'Talatona (Xyami)',
-        destination: 'Mutamba',
-        trafficStatus: TrafficStatus.normal,
-        trafficReason: null,
-        activeTaxis: 31,
-        distance: 15.0,
-        estimatedTime: 28,
-        currentTime: 30,
-        basePrice: 3800,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 8)),
-      ),
-      TaxiRoute(
-        id: '4',
-        name: 'Cacuaco → Porto de Luanda',
-        origin: 'Cacuaco (Vidrul)',
-        destination: 'Porto de Luanda',
-        trafficStatus: TrafficStatus.blocked,
-        trafficReason: 'Manifestação na Avenida Deolinda Rodrigues',
-        activeTaxis: 5,
-        distance: 22.0,
-        estimatedTime: 35,
-        currentTime: 90,
-        basePrice: 5000,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 1)),
-      ),
-      TaxiRoute(
-        id: '5',
-        name: 'Miramar → Ilha de Luanda',
-        origin: 'Miramar',
-        destination: 'Ilha de Luanda',
-        trafficStatus: TrafficStatus.normal,
-        trafficReason: null,
-        activeTaxis: 42,
-        distance: 8.5,
-        estimatedTime: 15,
-        currentTime: 17,
-        basePrice: 2500,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 3)),
-      ),
-      TaxiRoute(
-        id: '6',
-        name: 'Benfica → Alvalade',
-        origin: 'Benfica',
-        destination: 'Alvalade',
-        trafficStatus: TrafficStatus.moderate,
-        trafficReason: 'Trânsito intenso no horário de pico',
-        activeTaxis: 28,
-        distance: 10.0,
-        estimatedTime: 20,
-        currentTime: 28,
-        basePrice: 3000,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 4)),
-      ),
-      TaxiRoute(
-        id: '7',
-        name: 'Camama → Rangel',
-        origin: 'Camama',
-        destination: 'Rangel',
-        trafficStatus: TrafficStatus.heavy,
-        trafficReason: 'Semáforo avariado no cruzamento principal',
-        activeTaxis: 12,
-        distance: 14.0,
-        estimatedTime: 25,
-        currentTime: 45,
-        basePrice: 3200,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 6)),
-      ),
-      TaxiRoute(
-        id: '8',
-        name: 'Kilamba → Belas Shopping',
-        origin: 'Centralidade do Kilamba',
-        destination: 'Belas Shopping',
-        trafficStatus: TrafficStatus.normal,
-        trafficReason: null,
-        activeTaxis: 35,
-        distance: 6.0,
-        estimatedTime: 12,
-        currentTime: 14,
-        basePrice: 2000,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 7)),
-      ),
-      TaxiRoute(
-        id: '9',
-        name: 'Golfe → Ingombota',
-        origin: 'Golfe II',
-        destination: 'Ingombota',
-        trafficStatus: TrafficStatus.normal,
-        trafficReason: null,
-        activeTaxis: 18,
-        distance: 9.0,
-        estimatedTime: 18,
-        currentTime: 20,
-        basePrice: 2800,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 10)),
-      ),
-      TaxiRoute(
-        id: '10',
-        name: 'Cazenga → Maianga',
-        origin: 'Cazenga (Terra Nova)',
-        destination: 'Maianga',
-        trafficStatus: TrafficStatus.moderate,
-        trafficReason: 'Trânsito lento devido ao mercado informal',
-        activeTaxis: 20,
-        distance: 11.0,
-        estimatedTime: 22,
-        currentTime: 32,
-        basePrice: 3000,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      TaxiRoute(
-        id: '11',
-        name: 'Zango → Viana',
-        origin: 'Zango 0',
-        destination: 'Viana Centro',
-        trafficStatus: TrafficStatus.heavy,
-        trafficReason: 'Congestionamento na entrada de Viana',
-        activeTaxis: 8,
-        distance: 16.0,
-        estimatedTime: 28,
-        currentTime: 50,
-        basePrice: 3500,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 3)),
-      ),
-      TaxiRoute(
-        id: '12',
-        name: 'Sambizanga → Porto',
-        origin: 'Sambizanga',
-        destination: 'Porto de Luanda',
-        trafficStatus: TrafficStatus.normal,
-        trafficReason: null,
-        activeTaxis: 25,
-        distance: 7.0,
-        estimatedTime: 14,
-        currentTime: 16,
-        basePrice: 2200,
-        lastUpdate: DateTime.now().subtract(const Duration(minutes: 8)),
-      ),
-    ];
   }
 
   String _formatCurrency(int amount) {
@@ -272,54 +116,62 @@ class _RoutesScreenState extends State<RoutesScreen> {
           );
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Rotas'),
         backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        foregroundColor: isDark ? Colors.white : AppColors.textDark,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadRoutes,
-            tooltip: 'Atualizar',
-          ),
-        ],
-      ),
-      bottomNavigationBar: widget.showBottomDock
-          ? const DriverBottomDock(
-              selectedTab: DriverDockTab.menu,
-            )
-          : null,
-      body: Container(
-        decoration: BoxDecoration(gradient: pageGradient),
-        child: isLoading
-            ? Center(
-                child: CircularProgressIndicator(color: AppColors.adaptiveAccent(context)),
+            isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text('Rotas'),
+          backgroundColor:
+              isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          foregroundColor: isDark ? Colors.white : AppColors.textDark,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _loadRoutes,
+              tooltip: 'Atualizar',
+            ),
+          ],
+        ),
+        bottomNavigationBar: widget.showBottomDock
+            ? const DriverBottomDock(
+                selectedTab: DriverDockTab.menu,
               )
-            : SingleChildScrollView(
-                padding: EdgeInsets.all(responsive.responsivePadding()),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Dropdown de seleção de rota
-                    _buildRouteSelector(responsive),
-                    SizedBox(height: responsive.scaledHeight(24)),
+            : null,
+        body: Container(
+          decoration: BoxDecoration(gradient: pageGradient),
+          child: isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                      color: AppColors.adaptiveAccent(context)),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadRoutes,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.all(responsive.responsivePadding()),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_errorMessage != null)
+                          _buildErrorBanner(responsive),
+                        if (_errorMessage != null)
+                          SizedBox(height: responsive.scaledHeight(16)),
+                        // Dropdown de seleção de rota
+                        _buildRouteSelector(responsive),
+                        SizedBox(height: responsive.scaledHeight(24)),
 
-                    // Detalhes da rota selecionada
-                    if (selectedRoute != null) ...[
-                      _buildRouteDetails(responsive),
-                    ] else ...[
-                      _buildEmptyState(responsive),
-                    ],
-                  ],
+                        // Detalhes da rota selecionada
+                        if (selectedRoute != null) ...[
+                          _buildRouteDetails(responsive),
+                        ] else ...[
+                          _buildEmptyState(responsive),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-      ),
-    );
+        ));
   }
 
   Widget _buildRouteSelector(ResponsiveHelper responsive) {
@@ -931,6 +783,47 @@ class _RoutesScreenState extends State<RoutesScreen> {
     );
   }
 
+  Widget _buildErrorBanner(ResponsiveHelper responsive) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(responsive.responsivePadding()),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded,
+              color: Colors.red.shade600, size: responsive.scaledWidth(20)),
+          SizedBox(width: responsive.scaledWidth(10)),
+          Expanded(
+            child: Text(
+              _errorMessage ?? 'Não foi possível carregar as rotas.',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(13),
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _loadRoutes,
+            child: Text(
+              'Tentar\nnovamente',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(11),
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(ResponsiveHelper responsive) {
     return Container(
       padding: EdgeInsets.all(responsive.responsivePadding() * 2),
@@ -966,4 +859,3 @@ class _RoutesScreenState extends State<RoutesScreen> {
     );
   }
 }
-

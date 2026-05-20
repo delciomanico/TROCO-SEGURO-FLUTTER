@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
 import 'package:troco_seguro_motorista/widgets/custom_widgets.dart'
@@ -25,7 +25,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool isLogin = true;
-  int step = 1; // 1: auth, 3: otp (apenas registro), 4: vehicle info
+  int step = 1; // 1: auth, 3: otp (apenas registro)
   bool isLoading = false;
 
   final ApiService _api = ApiService();
@@ -97,7 +97,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         if (result.isSuccess) {
           widget.onAuth(
-            nameController.text.isEmpty ? 'Motorista' : nameController.text,
+            result.data?.driver?.fullName ?? (nameController.text.isEmpty ? 'Motorista' : nameController.text),
             phoneController.text,
             pin,
             accessToken: result.data?.accessToken,
@@ -107,47 +107,27 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() => errorMessage = result.error ?? 'Erro ao fazer login');
         }
       } else {
-        // REGISTRO - ir para dados do veículo
-        setState(() {
-          isLoading = false;
-          step = 4; // Pular para dados do veículo
-        });
-      }
-    } else if (step == 4) {
-      // Validar dados do veículo
-      if (licensePlateController.text.isEmpty) {
-        setState(() => errorMessage = 'Digite a matrícula do veículo');
-        return;
-      }
+        // REGISTRO - Chama a API de registro diretamente e vai para OTP
+        setState(() => isLoading = true);
 
-      if (vehicleModelController.text.isEmpty) {
-        setState(() => errorMessage = 'Digite o modelo do veículo');
-        return;
-      }
+        final result = await _api.register(
+          fullName: nameController.text,
+          phoneNumber: phoneNumber,
+          password: pin,
+        );
 
-      setState(() => isLoading = true);
+        setState(() => isLoading = false);
 
-      final phoneNumber = _formatPhoneNumber(phoneController.text);
-      String pin = pinController.text;
-
-      // REGISTRO via API
-      final result = await _api.register(
-        fullName: nameController.text,
-        phoneNumber: phoneNumber,
-        password: pin,
-        licensePlate: licensePlateController.text,
-        vehicleModel: vehicleModelController.text,
-      );
-
-      setState(() => isLoading = false);
-
-      if (result.isSuccess) {
-        setState(() {
-          step = 3; // Ir para OTP
-          successMessage = 'Código enviado por SMS para $phoneNumber';
-        });
-      } else {
-        setState(() => errorMessage = result.error ?? 'Erro ao registrar');
+        if (result.isSuccess) {
+          setState(() {
+            isLogin = true; // Volta para o login
+            successMessage = 'Conta criada com sucesso! Já pode entrar.';
+            // Limpa o PIN para segurança, mas mantém o telefone
+            pinController.clear();
+          });
+        } else {
+          setState(() => errorMessage = result.error ?? 'Erro ao registrar');
+        }
       }
     } else if (step == 3) {
       // Verificar OTP
@@ -182,15 +162,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _handleBack() {
-    if (step == 4) {
+    if (step == 3) {
       setState(() {
         step = 1;
-        errorMessage = null;
-        successMessage = null;
-      });
-    } else if (step == 3) {
-      setState(() {
-        step = 4;
         otpController.clear();
         errorMessage = null;
         successMessage = null;
@@ -272,7 +246,6 @@ class _AuthScreenState extends State<AuthScreen> {
                               children: [
                                 if (step == 1) _buildPhoneStep(responsive),
                                 if (step == 3) _buildOtpStep(responsive),
-                                if (step == 4) _buildVehicleStep(responsive),
                               ],
                             ),
                           ),
@@ -344,8 +317,6 @@ class _AuthScreenState extends State<AuthScreen> {
     switch (step) {
       case 3:
         return 'Confirmar código';
-      case 4:
-        return 'Dados do veículo';
       default:
         return isLogin ? 'Entrar na conta' : 'Criar conta';
     }
@@ -355,8 +326,6 @@ class _AuthScreenState extends State<AuthScreen> {
     switch (step) {
       case 3:
         return 'Digite o código SMS para validar o cadastro.';
-      case 4:
-        return 'Finalize seu perfil profissional antes de entrar.';
       default:
         return 'Acesse com o seu número e continue a trabalhar com segurança.';
     }
@@ -474,57 +443,6 @@ class _AuthScreenState extends State<AuthScreen> {
       prefixIcon: Icons.lock_outline,
       maxLength: 6,
       textColor: isDark ? Colors.white : null,
-    );
-  }
-
-  Widget _buildVehicleStep(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (errorMessage != null) _buildErrorMessage(responsive),
-        CustomInput(
-          label: '',
-          hint: 'Matrícula (LD-XX-XX-XX)',
-          controller: licensePlateController,
-          prefixIcon: Icons.directions_car_outlined,
-          textColor: isDark ? Colors.white : null,
-          textCapitalization: TextCapitalization.characters,
-        ),
-        SizedBox(height: responsive.scaledHeight(16)),
-        CustomInput(
-          label: '',
-          hint: 'Modelo do veículo',
-          controller: vehicleModelController,
-          prefixIcon: Icons.car_rental_outlined,
-          textColor: isDark ? Colors.white : null,
-        ),
-        SizedBox(height: responsive.scaledHeight(32)),
-        SizedBox(
-          width: double.infinity,
-          height: responsive.responsiveButtonHeight(),
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleContinue,
-            style: _primaryButtonStyle(responsive),
-            child: isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'REGISTRAR',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(15),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-          ),
-        ),
-      ],
     );
   }
 

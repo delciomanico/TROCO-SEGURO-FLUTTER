@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/models/trip.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
@@ -26,7 +26,6 @@ class _TripsScreenState extends State<TripsScreen> {
   bool isLoading = true;
   final ApiService _api = ApiService();
 
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
 
   @override
   void initState() {
@@ -40,13 +39,6 @@ class _TripsScreenState extends State<TripsScreen> {
     }
 
     try {
-      if (useMockData) {
-        await Future.delayed(const Duration(milliseconds: 400));
-        if (!mounted) return;
-        setState(() => trips = Constants.mockTrips);
-        return;
-      }
-
       await _api.loadTokens();
 
       final tripsResult = await _api.getTrips();
@@ -62,6 +54,7 @@ class _TripsScreenState extends State<TripsScreen> {
         return;
       }
 
+      // Fallback: cache local
       final prefs = await SharedPreferences.getInstance();
       final tripsJson = prefs.getString('ts_driver_trips');
       if (tripsJson != null && tripsJson.trim().isNotEmpty) {
@@ -78,13 +71,15 @@ class _TripsScreenState extends State<TripsScreen> {
         }
       }
 
+      // Sem dados: exibe lista vazia
       if (mounted) {
-        setState(() => trips = Constants.mockTrips);
+        setState(() => trips = []);
       }
     } catch (e) {
       debugPrint('Erro ao carregar viagens: $e');
+      // Mantém o estado atual em caso de erro (evita apagar dados em cache)
       if (mounted && trips.isEmpty) {
-        setState(() => trips = Constants.mockTrips);
+        setState(() => trips = []);
       }
     } finally {
       if (mounted) {

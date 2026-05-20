@@ -3,7 +3,7 @@ class Transaction {
   final String id;
   final String type; // 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'received' | 'withdrawal'
   final String description;
-  final dynamic amount; // Pode ser string ou número
+  final int amount; // Saldo em Kz
   final String date;
   final String time;
   final String? passengerName;
@@ -26,9 +26,9 @@ class Transaction {
     this.receiverWallet,
   });
 
-  bool get isReceived => type == 'received';
-  bool get isWithdrawal => type == 'withdrawal';
-  bool get isRefund => type == 'refund';
+  bool get isReceived => type == 'received' || type == 'DEPOSIT';
+  bool get isWithdrawal => type == 'withdrawal' || type == 'WITHDRAWAL';
+  bool get isRefund => type == 'refund' || type == 'REFUND';
 
   Map<String, dynamic> toJson() {
     return {
@@ -57,18 +57,58 @@ class Transaction {
     final date = createdAt?.toString().split(' ')[0] ?? json['date'] ?? '';
     final time = createdAt?.toString().split(' ')[1].substring(0, 5) ?? json['time'] ?? '';
 
+    // Normaliza o tipo da API (maísculas) para o padrão interno (minúsculas)
+    final rawType = (json['type'] ?? 'DEPOSIT').toString().toUpperCase();
+    final direction = (json['direction'] ?? '').toString().toUpperCase();
+    
+    String normalizedType;
+    if (direction == 'IN') {
+      normalizedType = 'received';
+    } else if (direction == 'OUT') {
+      normalizedType = 'withdrawal';
+    } else {
+      switch (rawType) {
+        case 'DEPOSIT':
+        case 'PAYMENT':
+        case 'CREDIT':
+          normalizedType = 'received';
+          break;
+        case 'WITHDRAWAL':
+        case 'DEBIT':
+          normalizedType = 'withdrawal';
+          break;
+        case 'TRANSFER':
+          normalizedType = 'transfer';
+          break;
+        case 'REFUND':
+          normalizedType = 'refund';
+          break;
+        default:
+          normalizedType = rawType.toLowerCase();
+      }
+    }
+
+    // Pega o valor absoluto do displayAmount ou originalAmount
+    final int amount = () {
+      final raw = json['displayAmount'] ?? json['originalAmount'] ?? json['amount'] ?? json['value'] ?? 0;
+      if (raw is num) return raw.toInt().abs();
+      return double.tryParse(raw.toString())?.toInt().abs() ?? 0;
+    }();
+
     return Transaction(
       id: json['id'] ?? '',
-      type: json['type'] ?? 'DEPOSIT',
+      type: normalizedType,
       description: json['description'] ?? '',
-      amount: json['amount'] ?? 0,
+      amount: amount,
       date: date,
       time: time,
-      passengerName: json['passengerName'] ?? json['passenger']?['name'],
+      passengerName: json['passengerName'] ?? json['counterparty'] ?? json['passenger']?['name'],
       status: json['status'],
       paymentMethod: json['paymentMethod'],
       createdAt: createdAt,
-      receiverWallet: json['receiverWallet'],
+      receiverWallet: json['receiverWallet'] is Map
+          ? (json['receiverWallet'] as Map).cast<String, dynamic>()
+          : null,
     );
   }
 }

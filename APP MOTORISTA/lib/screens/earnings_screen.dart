@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/models/driver_user.dart';
 import 'package:troco_seguro_motorista/models/earnings.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
@@ -27,7 +27,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
   bool isLoading = true;
   final ApiService _api = ApiService();
 
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
 
   @override
   void initState() {
@@ -37,34 +36,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
   Future<void> _loadEarnings() async {
     setState(() => isLoading = true);
-
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      setState(() {
-        earnings = Earnings(
-          todayAmount: 12500,
-          todayTrips: 5,
-          weekAmount: 78500,
-          weekTrips: 32,
-          monthAmount: 320000,
-          monthTrips: 128,
-          totalAmount: 1250000,
-          totalTrips: 520,
-          averageRating: 4.8,
-          dailyHistory: [
-            DailyEarning(date: 'Seg', amount: 15000, trips: 6),
-            DailyEarning(date: 'Ter', amount: 18500, trips: 7),
-            DailyEarning(date: 'Qua', amount: 12000, trips: 5),
-            DailyEarning(date: 'Qui', amount: 22000, trips: 9),
-            DailyEarning(date: 'Sex', amount: 19500, trips: 8),
-            DailyEarning(date: 'Sáb', amount: 25000, trips: 10),
-            DailyEarning(date: 'Dom', amount: 8000, trips: 3),
-          ],
-        );
-        isLoading = false;
-      });
-      return;
-    }
 
     await _api.loadTokens();
     final result = await _api.getEarnings();
@@ -76,20 +47,18 @@ class _EarningsScreenState extends State<EarningsScreen> {
       });
     } else {
       setState(() {
-        earnings = Earnings(
-          todayAmount: 12500,
-          todayTrips: 5,
-          weekAmount: 78500,
-          weekTrips: 32,
-          monthAmount: 320000,
-          monthTrips: 128,
-          totalAmount: 1250000,
-          totalTrips: 520,
-          averageRating: 4.8,
-          dailyHistory: [],
-        );
+        earnings = Earnings.empty();
         isLoading = false;
       });
+      if (mounted && result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar ganhos: ${result.error}'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 

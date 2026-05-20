@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro/utils/color_extensions.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:troco_seguro/utils/responsive_helper.dart';

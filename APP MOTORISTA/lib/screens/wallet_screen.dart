@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/models/transaction.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
+import 'package:troco_seguro_motorista/models/driver_user.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenWithdrawal;
@@ -28,10 +29,9 @@ class _WalletScreenState extends State<WalletScreen> {
   String activeFilter = 'all';
   String searchQuery = '';
   bool isLoading = true;
-  bool showBalance = false;
+  bool showBalance = true;
   final ApiService _api = ApiService();
 
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
 
   Color _accentColor() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -47,21 +47,26 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _loadData() async {
     setState(() => isLoading = true);
 
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      setState(() {
-        balance = 45000;
-        transactions = Constants.mockTransactions;
-        isLoading = false;
-      });
-      return;
-    }
-
     await _api.loadTokens();
+
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Fallback: Tentar carregar do cache do perfil se a API de saldo demorar ou falhar
+    if (balance == 0) {
+      final driverJson = prefs.getString('ts_driver');
+      if (driverJson != null) {
+        try {
+          final cachedDriver = DriverUser.fromJson(json.decode(driverJson));
+          setState(() => balance = cachedDriver.balance);
+          debugPrint('💰 Saldo carregado do cache: $balance');
+        } catch (_) {}
+      }
+    }
 
     final balanceResult = await _api.getBalance();
     if (balanceResult.isSuccess && balanceResult.data != null) {
       setState(() => balance = balanceResult.data!);
+      debugPrint('💰 Saldo atualizado da API: $balance');
     }
 
     final txResult = await _api.getTransactionHistory();
@@ -71,16 +76,21 @@ class _WalletScreenState extends State<WalletScreen> {
       await prefs.setString('ts_driver_transactions',
           json.encode(transactions.map((t) => t.toJson()).toList()));
     } else {
+      // Fallback: cache local
       final prefs = await SharedPreferences.getInstance();
       final txsJson = prefs.getString('ts_driver_transactions');
-      if (txsJson != null) {
-        setState(() {
-          transactions = (json.decode(txsJson) as List)
-              .map((tx) => Transaction.fromJson(tx))
-              .toList();
-        });
+      if (txsJson != null && txsJson.trim().isNotEmpty) {
+        try {
+          setState(() {
+            transactions = (json.decode(txsJson) as List)
+                .map((tx) => Transaction.fromJson(tx))
+                .toList();
+          });
+        } catch (_) {
+          setState(() => transactions = []);
+        }
       } else {
-        setState(() => transactions = Constants.mockTransactions);
+        setState(() => transactions = []);
       }
     }
 
@@ -103,11 +113,11 @@ class _WalletScreenState extends State<WalletScreen> {
   Map<String, int> get stats {
     final totalReceived = transactions
         .where((t) => t.type == 'received')
-        .fold(0, (sum, t) => sum + (int.tryParse(t.amount.toString()) ?? 0));
+        .fold(0, (sum, t) => sum + t.amount);
     final totalWithdrawn = transactions
         .where((t) => t.type == 'withdrawal')
         .fold(0,
-            (sum, t) => sum + (int.tryParse(t.amount.toString()) ?? 0).abs());
+            (sum, t) => sum + t.amount.abs());
     return {'totalReceived': totalReceived, 'totalWithdrawn': totalWithdrawn};
   }
 
@@ -130,7 +140,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: true,
         title: const Text('Carteira'),
         backgroundColor:
             isDark ? AppColors.darkSurface : AppColors.lightBackground,

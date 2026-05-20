@@ -4,7 +4,7 @@ class DriverUser {
   final String fullName;
   final String phoneNumber;
   final String? email;
-  final dynamic balance; // Pode ser string ou número
+  final int balance; // Saldo em Kz
   final bool isLoggedIn;
   final String? role; // DRIVER ou PASSENGER
   final String? photo;
@@ -122,10 +122,17 @@ class DriverUser {
     // Suporta tanto 'wallet.balance' quanto 'balance' direto
     int balance = 0;
     if (json['wallet'] != null && json['wallet']['balance'] != null) {
-      balance = json['wallet']['balance'];
+      balance = double.tryParse(json['wallet']['balance'].toString())?.toInt() ?? 0;
     } else if (json['balance'] != null) {
-      balance = json['balance'];
+      balance = double.tryParse(json['balance'].toString())?.toInt() ?? 0;
     }
+
+    // Se vier do users/me, alguns dados podem estar em json['stats'] ou json['earnings']
+    final stats = json['stats'] is Map<String, dynamic> 
+        ? json['stats'] as Map<String, dynamic> 
+        : (json['earnings'] is Map<String, dynamic> 
+            ? json['earnings'] as Map<String, dynamic> 
+            : json);
 
     return DriverUser(
       id: json['id'],
@@ -136,9 +143,9 @@ class DriverUser {
       isLoggedIn: json['isLoggedIn'] ?? true,
       role: json['role'] ?? 'DRIVER',
       photo: json['photo'] ?? json['avatar'],
-      rating: (json['rating'] ?? json['averageRating'])?.toDouble(),
+      rating: (stats['rating'] ?? stats['averageRating'] ?? json['rating'] ?? json['averageRating'])?.toDouble(),
       isVerified: json['isVerified'] ?? json['verified'],
-      totalTrips: json['totalTrips'] ?? json['totalRides'] ?? 0,
+      totalTrips: stats['totalTrips'] ?? stats['totalRides'] ?? json['totalTrips'] ?? json['totalRides'] ?? 0,
       licensePlate: json['licensePlate'],
       vehicleModel: json['vehicleModel'],
       vehicleColor: json['vehicleColor'],

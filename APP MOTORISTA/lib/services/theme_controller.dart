@@ -6,16 +6,17 @@ class ThemeController {
   ThemeController._internal();
 
   final ValueNotifier<ThemeMode> themeMode =
-      ValueNotifier<ThemeMode>(ThemeMode.light);
+      ValueNotifier<ThemeMode>(ThemeMode.dark);
   static const _prefKey = 'ts_driver_theme_mode';
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString(_prefKey);
-    if (mode == 'dark') {
-      themeMode.value = ThemeMode.dark;
-    } else {
+    if (mode == 'light') {
       themeMode.value = ThemeMode.light;
+    } else {
+      // Padrão é dark se não houver preferência ou se for 'dark'
+      themeMode.value = ThemeMode.dark;
     }
   }
 

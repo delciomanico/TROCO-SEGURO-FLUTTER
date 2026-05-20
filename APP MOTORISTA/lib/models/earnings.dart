@@ -55,19 +55,26 @@ class Earnings {
   }
 
   factory Earnings.fromJson(Map<String, dynamic> json) {
+    // Se vier do users/me, os dados podem estar em json['stats'] ou json['earnings']
+    final data = json['stats'] is Map<String, dynamic> 
+        ? json['stats'] as Map<String, dynamic> 
+        : (json['earnings'] is Map<String, dynamic> 
+            ? json['earnings'] as Map<String, dynamic> 
+            : json);
+
     return Earnings(
-      todayAmount: json['todayAmount'] ?? json['today']?['amount'] ?? 0,
-      todayTrips: json['todayTrips'] ?? json['today']?['trips'] ?? 0,
-      weekAmount: json['weekAmount'] ?? json['week']?['amount'] ?? 0,
-      weekTrips: json['weekTrips'] ?? json['week']?['trips'] ?? 0,
-      monthAmount: int.tryParse(json['monthSpent']?.toString() ?? '') ?? (json['monthAmount'] ?? json['month']?['amount'] ?? 0),
-      monthTrips: json['monthTrips'] ?? json['month']?['trips'] ?? 0,
-      totalAmount: json['totalAmount'] ?? json['total']?['amount'] ?? 0,
-      totalTrips: json['totalTrips'] ?? 0,
+      todayAmount: double.tryParse((data['todayAmount'] ?? data['today']?['amount'] ?? 0).toString())?.toInt() ?? 0,
+      todayTrips: data['todayTrips'] ?? data['today']?['trips'] ?? 0,
+      weekAmount: double.tryParse((data['weekAmount'] ?? data['week']?['amount'] ?? 0).toString())?.toInt() ?? 0,
+      weekTrips: data['weekTrips'] ?? data['week']?['trips'] ?? 0,
+      monthAmount: double.tryParse(data['monthSpent']?.toString() ?? (data['monthAmount'] ?? data['month']?['amount'] ?? 0).toString())?.toInt() ?? 0,
+      monthTrips: data['monthTrips'] ?? data['month']?['trips'] ?? 0,
+      totalAmount: double.tryParse((data['totalAmount'] ?? data['total']?['amount'] ?? 0).toString())?.toInt() ?? 0,
+      totalTrips: data['totalTrips'] ?? 0,
       averageRating:
-          (json['averageRating'] ?? json['rating'] ?? 0.0).toDouble(),
-      dailyHistory: json['dailyHistory'] != null
-          ? (json['dailyHistory'] as List)
+          (data['averageRating'] ?? data['rating'] ?? 0.0).toDouble(),
+      dailyHistory: data['dailyHistory'] != null
+          ? (data['dailyHistory'] as List)
               .map((e) => DailyEarning.fromJson(e))
               .toList()
           : [],

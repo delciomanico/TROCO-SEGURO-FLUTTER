@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:troco_seguro_motorista/utils/constants.dart';
 import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
 
@@ -89,7 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Text(
                     'Pular',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: isDark ? Colors.white70 : AppColors.textSecondary,
                       fontSize: responsive.responsiveFontSize(14),
                     ),
                   ),
@@ -131,7 +131,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(28),
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: isDark ? Colors.white : AppColors.textDark,
                           ),
                         ),
                         SizedBox(height: responsive.scaledHeight(16)),
@@ -140,7 +140,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(14),
-                            color: Colors.white70,
+                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                             height: 1.5,
                           ),
                         ),
@@ -162,7 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   decoration: BoxDecoration(
                     color: _currentPage == index
                         ? AppColors.adaptiveAccent(context)
-                        : Colors.white30,
+                        : (isDark ? Colors.white30 : AppColors.lightBorder),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -179,7 +179,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onPressed: _nextPage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.adaptiveAccent(context),
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.textDark,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                           responsive.responsiveBorderRadius()),

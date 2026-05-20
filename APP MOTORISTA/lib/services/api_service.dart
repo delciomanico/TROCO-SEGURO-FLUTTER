@@ -7,6 +7,7 @@ import 'package:troco_seguro_motorista/models/trip.dart';
 import 'package:troco_seguro_motorista/models/earnings.dart';
 import 'package:troco_seguro_motorista/models/faq_item.dart';
 import 'package:troco_seguro_motorista/models/vehicle.dart';
+import 'package:troco_seguro_motorista/models/route.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
@@ -257,12 +258,14 @@ class ApiService {
       }
       await saveTokens(accessToken, refreshToken);
 
+      final userMap = data['user'] != null 
+          ? (data['user'] as Map).cast<String, dynamic>()
+          : (data['fullName'] != null || data['name'] != null ? data : null);
+
       return ApiResponse.success(AuthResult(
         accessToken: accessToken,
         refreshToken: refreshToken,
-        driver: data['user'] != null
-            ? DriverUser.fromJson((data['user'] as Map).cast<String, dynamic>())
-            : null,
+        driver: userMap != null ? DriverUser.fromJson(userMap) : null,
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -361,7 +364,9 @@ class ApiService {
   /// Obter resumo de ganhos e estatísticas
   Future<ApiResponse<Earnings>> getEarnings() async {
     try {
-      final response = await _dio.get('trips/stats');
+      // O usuário solicitou que todas as informações de conta (saldo, ganhos, etc)
+      // sejam obtidas da rota users/me
+      final response = await _dio.get('users/me');
       return ApiResponse.success(Earnings.fromJson(_payload(response.data)));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -430,32 +435,14 @@ class ApiService {
   /// Obter saldo disponível
   Future<ApiResponse<int>> getBalance() async {
     try {
-      try {
-        final response = await _dio.get('wallet/balance');
-        final data = _payload(response.data);
-        return ApiResponse.success(
-            int.tryParse(data['balance'].toString()) ?? 0);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404) {
-          final profileResponse = await _dio.get('users/me');
-          final profile = _payload(profileResponse.data);
-          final wallet = profile['wallet'];
-
-          if (wallet is Map) {
-            final walletBalance = wallet['balance'];
-            return ApiResponse.success(
-              int.tryParse(walletBalance.toString()) ?? 0,
-            );
-          }
-
-          return ApiResponse.success(
-            int.tryParse(profile['balance'].toString()) ?? 0,
-          );
-        }
-        rethrow;
+      // Reutiliza a lógica do getProfile para garantir consistência total
+      final profileResult = await getProfile();
+      if (profileResult.isSuccess && profileResult.data != null) {
+        return ApiResponse.success(profileResult.data!.balance);
       }
-    } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
+      return ApiResponse.error(profileResult.error ?? 'Falha ao obter saldo');
+    } catch (e) {
+      return ApiResponse.error('Erro ao processar saldo: $e');
     }
   }
 
@@ -604,9 +591,20 @@ class ApiService {
 
   List<dynamic> _listPayload(dynamic raw) {
     if (raw is List) return raw;
-    final map = _payload(raw);
-    final nested = map['data'];
-    if (nested is List) return nested;
+    if (raw is Map) {
+      if (raw['data'] is List) return raw['data'];
+      if (raw['transactions'] is List) return raw['transactions'];
+      if (raw['history'] is List) return raw['history'];
+      if (raw['list'] is List) return raw['list'];
+      
+      // Procura qualquer lista no primeiro nível como fallback
+      for (var val in raw.values) {
+        if (val is List) return val;
+      }
+      
+      final map = _payload(raw);
+      if (map['data'] is List) return map['data'];
+    }
     return <dynamic>[];
   }
 
@@ -677,6 +675,44 @@ class ApiService {
       return ApiResponse._(error: _parseError(e), isSuccess: false);
     } catch (e) {
       return ApiResponse._(error: e.toString(), isSuccess: false);
+    }
+  }
+
+  // ============== ROTAS ==============
+
+  /// Listar rotas disponíveis (tráfego e preços)
+  Future<ApiResponse<List<TaxiRoute>>> getRoutes() async {
+    try {
+      Response response;
+      try {
+        response = await _dio.get('routes');
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          response = await _dio.get('taxi-routes');
+        } else {
+          rethrow;
+        }
+      }
+
+      final raw = response.data;
+      List<dynamic> list = [];
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map) {
+        final nested = raw['data'] ?? raw['routes'] ?? raw['items'];
+        if (nested is List) {
+          list = nested;
+        }
+      }
+
+      final routes = list
+          .map((r) => TaxiRoute.fromJson((r as Map).cast<String, dynamic>()))
+          .toList();
+      return ApiResponse.success(routes);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      return ApiResponse.error('Erro ao carregar rotas: $e');
     }
   }
 

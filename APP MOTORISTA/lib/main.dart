@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_motorista/utils/theme.dart';
@@ -19,7 +19,6 @@ import 'package:troco_seguro_motorista/screens/about_screen.dart';
 import 'package:troco_seguro_motorista/screens/terms_and_conditions_screen.dart';
 import 'package:troco_seguro_motorista/widgets/withdrawal_modal.dart';
 import 'package:troco_seguro_motorista/widgets/success_modal.dart';
-import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
@@ -27,6 +26,7 @@ import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
 import 'package:troco_seguro_motorista/security/pin_guard.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
+import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -292,6 +292,16 @@ class _AppControllerState extends State<AppController>
     });
   }
 
+  Future<void> _updateProfileName(String newName) async {
+    if (driver == null) return;
+    
+    final updatedDriver = driver!.copyWith(fullName: newName);
+    setState(() => driver = updatedDriver);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ts_driver', json.encode(updatedDriver.toJson()));
+  }
+
   void _toggleOnlineStatus() async {
     final newStatus = !isOnline;
     setState(() => isOnline = newStatus);
@@ -377,6 +387,7 @@ class _AppControllerState extends State<AppController>
       onOpenWithdrawal: _showWithdrawalModal,
       onLogout: _handleLogout,
       onRefresh: _refreshFromApi,
+      onUpdateProfile: _updateProfileName,
     );
   }
 }
@@ -407,6 +418,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
   bool _isLoading = false;
   bool _biometricsAvailable = false;
   String? _errorMessage;
+  bool _obscurePin = true;
 
   @override
   void initState() {
@@ -599,7 +611,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                     textAlign: TextAlign.center,
                                     keyboardType: TextInputType.number,
                                     maxLength: 1,
-                                    obscureText: true,
+                                    obscureText: _obscurePin,
                                     style: TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
@@ -651,6 +663,27 @@ class _ReauthScreenState extends State<ReauthScreen> {
                               );
                             }),
                           ),
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: () =>
+                                setState(() => _obscurePin = !_obscurePin),
+                            icon: Icon(
+                              _obscurePin
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 16,
+                              color: accentColor.withOpacity(0.8),
+                            ),
+                            label: Text(
+                              _obscurePin ? 'Ver PIN' : 'Ocultar PIN',
+                              style: TextStyle(
+                                fontSize: responsive.responsiveFontSize(12),
+                                color: accentColor.withOpacity(0.8),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: responsive.scaledHeight(16)),
                           if (_errorMessage != null) ...[
                             const SizedBox(height: 16),
                             Container(
@@ -768,6 +801,7 @@ class _MainNavigation extends StatefulWidget {
   final VoidCallback onOpenWithdrawal;
   final VoidCallback onLogout;
   final Future<void> Function() onRefresh;
+  final Function(String name)? onUpdateProfile;
 
   const _MainNavigation({
     required this.driver,
@@ -777,6 +811,7 @@ class _MainNavigation extends StatefulWidget {
     required this.onOpenWithdrawal,
     required this.onLogout,
     required this.onRefresh,
+    this.onUpdateProfile,
   });
 
   @override
@@ -806,6 +841,7 @@ class _MainNavigationState extends State<_MainNavigation> {
             child: _MenuDrawer(
               driver: widget.driver,
               onLogout: widget.onLogout,
+              onUpdateProfile: widget.onUpdateProfile,
             ),
           ),
         );
@@ -887,10 +923,12 @@ class _MainNavigationState extends State<_MainNavigation> {
 class _MenuDrawer extends StatefulWidget {
   final DriverUser driver;
   final VoidCallback? onLogout;
+  final Function(String name)? onUpdateProfile;
 
   const _MenuDrawer({
     required this.driver,
     this.onLogout,
+    this.onUpdateProfile,
   });
 
   @override
@@ -985,9 +1023,10 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                 SizedBox(height: responsive.scaledHeight(16)),
                 TextField(
                   controller: phoneCtrl,
+                  enabled: false, // Desabilitado para edição
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: 'NÃºmero de Telefone',
+                    labelText: 'Número de Telefone',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
@@ -999,11 +1038,14 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       _showSnack(
                           'Por favor, preencha todos os campos corretamente');
                     } else {
+                      if (widget.onUpdateProfile != null) {
+                        widget.onUpdateProfile!(nameCtrl.text.trim());
+                      }
                       Navigator.pop(context);
                       _showSnack('Perfil atualizado com sucesso!');
                     }
                   },
-                  child: const Text('Salvar AlteraÃ§Ãµes'),
+                  child: const Text('Salvar Alterações'),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
               ],
@@ -1060,28 +1102,22 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                   ),
                 ),
                 SizedBox(height: responsive.scaledHeight(24)),
-                TextField(
+                CustomInput(
                   controller: currentPinCtrl,
                   keyboardType: TextInputType.number,
                   obscureText: true,
                   maxLength: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'PIN Atual',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    counterText: '',
-                  ),
+                  label: 'PIN Atual',
+                  prefixIcon: Icons.lock_outline,
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
-                TextField(
+                CustomInput(
                   controller: newPinCtrl,
                   keyboardType: TextInputType.number,
                   obscureText: true,
                   maxLength: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Novo PIN (6 dÃ­gitos)',
-                    prefixIcon: Icon(Icons.lock_reset),
-                    counterText: '',
-                  ),
+                  label: 'Novo PIN (6 dígitos)',
+                  prefixIcon: Icons.lock_reset,
                 ),
                 SizedBox(height: responsive.scaledHeight(24)),
                 ElevatedButton(
@@ -1280,11 +1316,39 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       biometricsEnabled,
                       isDark,
                       onChanged: (value) async {
+                        if (value) {
+                          // Verificar se o dispositivo suporta biometria
+                          final auth = LocalAuthentication();
+                          final isSupported = await auth.isDeviceSupported();
+                          final canCheck = await auth.canCheckBiometrics;
+
+                          if (!isSupported || !canCheck) {
+                            _showSnack('Seu dispositivo não suporta biometria');
+                            return;
+                          }
+
+                          // Tentar autenticar uma vez para confirmar
+                          try {
+                            final didAuth = await auth.authenticate(
+                              localizedReason: 'Confirme sua biometria para ativar esta funcionalidade',
+                              options: const AuthenticationOptions(
+                                stickyAuth: true,
+                                biometricOnly: true,
+                              ),
+                            );
+
+                            if (!didAuth) return;
+                          } catch (e) {
+                            _showSnack('Erro ao configurar biometria: $e');
+                            return;
+                          }
+                        }
+
                         final prefs = await SharedPreferences.getInstance();
                         await prefs.setBool('ts_bio_enabled', value);
                         setState(() => biometricsEnabled = value);
                         _showSnack(value
-                            ? 'Biometria ativada'
+                            ? 'Biometria ativada com sucesso'
                             : 'Biometria desativada');
                       },
                     ),
@@ -1308,7 +1372,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       },
                     ),
                     _buildToggleOption(
-                      'NotificaÃ§Ãµes',
+                      'Notificações',
                       Icons.notifications_outlined,
                       notificationsEnabled,
                       isDark,
@@ -1317,8 +1381,8 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // InformaÃ§Ãµes
-                    _buildSectionTitle('InformaÃ§Ãµes', isDark),
+                    // Informações
+                    _buildSectionTitle('Informações', isDark),
                     _buildMenuOption(
                       'Sobre',
                       Icons.info_outline_rounded,
