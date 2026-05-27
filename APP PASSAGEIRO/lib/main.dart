@@ -11,7 +11,6 @@ import 'package:troco_seguro/screens/auth_screen.dart';
 import 'package:troco_seguro/screens/home_screen.dart';
 import 'package:troco_seguro/screens/wallet_screen.dart';
 import 'package:troco_seguro/screens/trips_screen.dart';
-import 'package:troco_seguro/screens/profile_screen.dart';
 import 'package:troco_seguro/widgets/virtual_cards_fullscreen.dart';
 import 'package:troco_seguro/widgets/topup_modal.dart';
 import 'package:troco_seguro/widgets/transfer_modal.dart';
@@ -1677,13 +1676,28 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                         border: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          borderSide: BorderSide.none,
+                                          borderSide: BorderSide(
+                                            color: isDark
+                                                ? Colors.grey.shade800
+                                                : Colors.grey.shade400,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: BorderSide(
+                                            color: isDark
+                                                ? Colors.grey.shade800
+                                                : Colors.grey.shade400,
+                                            width: 1,
+                                          ),
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
                                           borderSide: const BorderSide(
-                                            color: AppColors.accent,
+                                            color: AppColors.primaryGold,
                                             width: 2,
                                           ),
                                         ),

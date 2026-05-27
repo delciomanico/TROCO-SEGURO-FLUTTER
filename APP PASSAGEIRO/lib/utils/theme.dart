@@ -22,7 +22,7 @@ class AppTheme {
         onSurface: AppColors.textDark,
       ),
       textTheme: GoogleFonts.sairaTextTheme(
-        TextTheme(
+        const TextTheme(
           displayLarge: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w900,
@@ -74,10 +74,10 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
-      bottomSheetTheme: BottomSheetThemeData(
+      bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.lightCard,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
       ),
@@ -139,10 +139,10 @@ class AppTheme {
       navigationBarTheme: const NavigationBarThemeData(backgroundColor: AppColors.darkBackground, indicatorColor: AppColors.primaryGold),
       textTheme: GoogleFonts.sairaTextTheme(
         TextTheme(
-          displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.textLight, letterSpacing: -0.5),
-          displayMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.textLight, letterSpacing: -0.3),
-          bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textLight),
-          bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textLight),
+          displayLarge: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.textLight, letterSpacing: -0.5),
+          displayMedium: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.textLight, letterSpacing: -0.3),
+          bodyLarge: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textLight),
+          bodyMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textLight),
           bodySmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textLight.withOpacity(0.85), letterSpacing: 1.5),
         ),
       ),

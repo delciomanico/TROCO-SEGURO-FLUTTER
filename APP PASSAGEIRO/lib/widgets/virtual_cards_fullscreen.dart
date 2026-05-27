@@ -10,9 +10,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 
-
 class VirtualCardsFullscreen extends StatefulWidget {
   final List<VirtualCard> cards;
+
   /// Returns a [VirtualCardCreated] on success, throws a String error message on failure.
   final Future<VirtualCardCreated> Function({
     required String name,
@@ -40,11 +40,11 @@ class VirtualCardsFullscreen extends StatefulWidget {
 
 class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     with SingleTickerProviderStateMixin {
-  final _nameController        = TextEditingController();
-  final _balanceController     = TextEditingController();
-  final _dailyLimitController  = TextEditingController();
-  final _userPinController     = TextEditingController(); // 6-digit account PIN
-  final _cardPinController     = TextEditingController(); // 4-digit card PIN
+  final _nameController = TextEditingController();
+  final _balanceController = TextEditingController();
+  final _dailyLimitController = TextEditingController();
+  final _userPinController = TextEditingController(); // 6-digit account PIN
+  final _cardPinController = TextEditingController(); // 4-digit card PIN
   final _formKey = GlobalKey<FormState>();
 
   late final TabController _tabController;
@@ -95,21 +95,21 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      _isCreating  = true;
+      _isCreating = true;
       _createError = '';
     });
 
-    final balance       = int.parse(_balanceController.text.trim());
+    final balance = int.parse(_balanceController.text.trim());
     final dailyLimitTxt = _dailyLimitController.text.trim();
-    final dailyLimit    = dailyLimitTxt.isEmpty ? 0 : int.parse(dailyLimitTxt);
+    final dailyLimit = dailyLimitTxt.isEmpty ? 0 : int.parse(dailyLimitTxt);
 
     try {
       final created = await widget.onCreateCard(
-        name:           _nameController.text.trim(),
+        name: _nameController.text.trim(),
         initialBalance: balance,
-        dailyLimit:     dailyLimit,
-        userPin:        _userPinController.text.trim(),
-        cardPin:        _cardPinController.text.trim(),
+        dailyLimit: dailyLimit,
+        userPin: _userPinController.text.trim(),
+        cardPin: _cardPinController.text.trim(),
       );
 
       if (!mounted) return;
@@ -122,7 +122,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
       _cardPinController.clear();
 
       setState(() {
-        _isCreating  = false;
+        _isCreating = false;
         _createError = '';
         _createdCard = created; // show the one-time card display
       });
@@ -132,7 +132,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isCreating  = false;
+        _isCreating = false;
         _createError = e.toString();
       });
     }
@@ -166,6 +166,9 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
 
     await widget.onDeleteCard(card.id);
     if (!mounted) return;
+
+    // Limpar _createdCard para evitar inconsistências de estado
+    setState(() => _createdCard = null);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Cartão "${card.name}" removido.')),
@@ -329,9 +332,9 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                             builder: (context, constraints) {
                               final scale =
                                   (constraints.maxWidth / 410).clamp(0.72, 1.0);
-                              final contentPadding = 18.0 * scale;
-                              final qrSize = 84.0 * scale;
-                              final qrPadding = 6.0 * scale;
+                              final contentPadding = 12.0 * scale;
+                              final qrSize = 110.0 * scale;
+                              final qrPadding = 4.0 * scale;
 
                               return Container(
                                 decoration: BoxDecoration(
@@ -353,16 +356,25 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          'CARTÃO VIRTUAL',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 11 * scale,
-                                            letterSpacing: 1.2 * scale,
-                                            fontWeight: FontWeight.w700,
+                                        Image.asset(
+                                          'assets/images/logo.png',
+                                          height: 42 * scale,
+                                          width: 42 * scale,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        SizedBox(width: 12 * scale),
+                                        Expanded(
+                                          child: Text(
+                                            card.name.toUpperCase(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14 * scale,
+                                              letterSpacing: 1.2 * scale,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        const Spacer(),
                                         Icon(
                                           Icons.wifi_rounded,
                                           color: Colors.white
@@ -371,7 +383,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                         ),
                                       ],
                                     ),
-                                    SizedBox(height: 12 * scale),
+                                    SizedBox(height: 8 * scale),
                                     Container(
                                       width: 44 * scale,
                                       height: 32 * scale,
@@ -386,7 +398,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                         ),
                                       ),
                                     ),
-                                    const Spacer(),
+                                    const Spacer(flex: 1),
                                     SizedBox(
                                       width: double.infinity,
                                       child: FittedBox(
@@ -396,15 +408,17 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                           virtualNumber,
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: 20 * scale,
+                                            fontSize: 22 * scale,
                                             letterSpacing: 1.8 * scale,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
                                     ),
-                                    SizedBox(height: 12 * scale),
+                                    const Spacer(flex: 1),
                                     Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       crossAxisAlignment:
                                           CrossAxisAlignment.end,
                                       children: [
@@ -417,12 +431,12 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                                 'TITULAR',
                                                 style: TextStyle(
                                                   color: Colors.white70,
-                                                  fontSize: 10 * scale,
+                                                  fontSize: 9 * scale,
                                                   letterSpacing: 1.0 * scale,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
-                                              SizedBox(height: 3 * scale),
+                                              SizedBox(height: 2 * scale),
                                               Text(
                                                 widget.cardHolderName
                                                     .toUpperCase(),
@@ -430,29 +444,29 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 13 * scale,
+                                                  fontSize: 12 * scale,
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
-                                              SizedBox(height: 6 * scale),
+                                              SizedBox(height: 4 * scale),
                                               Text(
                                                 'Validade $expiry',
                                                 style: TextStyle(
                                                   color: Colors.white70,
-                                                  fontSize: 11 * scale,
+                                                  fontSize: 10 * scale,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        SizedBox(width: 8 * scale),
+                                        SizedBox(width: 6 * scale),
                                         Container(
                                           padding: EdgeInsets.all(qrPadding),
                                           decoration: BoxDecoration(
                                             color: Colors.white,
                                             borderRadius: BorderRadius.circular(
-                                              10 * scale,
+                                              8 * scale,
                                             ),
                                           ),
                                           child: QrImageView(
@@ -598,6 +612,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
 
   Widget _buildCardsTab(ThemeData theme) {
     return CustomScrollView(
+      key: ValueKey(widget.cards.length),
       slivers: [
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
@@ -647,10 +662,11 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
           )
         else
           SliverList.builder(
+            key: ValueKey('cards_list_${widget.cards.length}'),
             itemCount: widget.cards.length,
             itemBuilder: (context, index) {
-              final card      = widget.cards[index];
-              final isFrozen  = card.isFrozen;
+              final card = widget.cards[index];
+              final isFrozen = card.isFrozen;
               final isBlocked = card.isBlocked;
 
               return Stack(
@@ -734,8 +750,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                         child: Container(
                           margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                           decoration: BoxDecoration(
-                            color: Colors.red
-                                .withAlpha(isBlocked ? 55 : 30),
+                            color: Colors.red.withAlpha(isBlocked ? 55 : 30),
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
@@ -751,225 +766,227 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
   }
 
   Widget _buildCreateTab(ThemeData theme) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.colorScheme.outline.withAlpha((0.12 * 255).round()),
-            ),
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          const SizedBox(height: 8),
+          const Text(
+            'Criar Cartão Virtual',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
-          child: Form(
-            key: _formKey,
-            child: Column(
+          const SizedBox(height: 24),
+
+          // Nome do cartão
+          TextFormField(
+            controller: _nameController,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: 'Nome do cartão',
+              hintText: 'Ex: Cartão Netflix',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              prefixIcon: const Icon(Icons.badge_outlined),
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) {
+                return 'Informe um nome para o cartão.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Saldo inicial
+          TextFormField(
+            controller: _balanceController,
+            textInputAction: TextInputAction.next,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Saldo inicial',
+              hintText: 'Valor em AOA',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+              suffixText: 'Kz',
+            ),
+            validator: (v) {
+              final n = int.tryParse((v ?? '').trim());
+              if (n == null || n <= 0) {
+                return 'Saldo deve ser maior que 0.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Limite diário
+          TextFormField(
+            controller: _dailyLimitController,
+            textInputAction: TextInputAction.next,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Limite diário (opcional)',
+              hintText: '0 = sem limite',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              prefixIcon: const Icon(Icons.speed_outlined),
+              suffixText: 'Kz',
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              final n = int.tryParse(v.trim());
+              if (n == null || n < 0) return 'Limite inválido.';
+              return null;
+            },
+          ),
+          const SizedBox(height: 28),
+
+          // PIN da conta (6 dígitos)
+          TextFormField(
+            controller: _userPinController,
+            maxLength: 6,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            obscuringCharacter: '●',
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: 'PIN da conta (6 dígitos)',
+              hintText: '●●●●●●',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              prefixIcon: const Icon(Icons.lock_person_outlined),
+              counterText: '',
+            ),
+            validator: (v) {
+              final p = (v ?? '').trim();
+              if (p.length != 6) {
+                return 'PIN da conta deve ter 6 dígitos.';
+              }
+              if (int.tryParse(p) == null) {
+                return 'Apenas dígitos numéricos.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // PIN do cartão (4 dígitos)
+          TextFormField(
+            controller: _cardPinController,
+            maxLength: 4,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            obscuringCharacter: '●',
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _isCreating ? null : _submitCreate(),
+            decoration: InputDecoration(
+              labelText: 'PIN do cartão (4 dígitos)',
+              hintText: '●●●●',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              prefixIcon: const Icon(Icons.credit_card_outlined),
+              counterText: '',
+            ),
+            validator: (v) {
+              final p = (v ?? '').trim();
+              if (p.length != 4) {
+                return 'PIN do cartão deve ter 4 dígitos.';
+              }
+              if (int.tryParse(p) == null) {
+                return 'Apenas dígitos numéricos.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Info message
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withAlpha(25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Criar Cartão Virtual',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.blue.shade700,
+                  size: 20,
                 ),
-                const SizedBox(height: 16),
-
-                // Nome do cartão
-                TextFormField(
-                  controller: _nameController,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do cartão',
-                    hintText: 'Ex: Cartão Netflix',
-                    prefixIcon: Icon(Icons.badge_outlined),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Informe um nome para o cartão.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Saldo inicial
-                TextFormField(
-                  controller: _balanceController,
-                  textInputAction: TextInputAction.next,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Saldo inicial',
-                    hintText: 'Valor em AOA',
-                    prefixIcon: Icon(Icons.account_balance_wallet_outlined),
-                    suffixText: 'Kz',
-                  ),
-                  validator: (v) {
-                    final n = int.tryParse((v ?? '').trim());
-                    if (n == null || n <= 0) {
-                      return 'Saldo deve ser maior que 0.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Limite diário
-                TextFormField(
-                  controller: _dailyLimitController,
-                  textInputAction: TextInputAction.next,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Limite diário (opcional)',
-                    hintText: '0 = sem limite',
-                    prefixIcon: Icon(Icons.speed_outlined),
-                    suffixText: 'Kz',
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    final n = int.tryParse(v.trim());
-                    if (n == null || n < 0) return 'Limite inválido.';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Divider — PINs section
-                Row(children: [
-                  Expanded(child: Divider(color: theme.colorScheme.outline.withAlpha(60))),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      'Autenticação',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Guarda bem os teus PINs. O PIN do cartão não será mostrado novamente.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue.shade900,
                     ),
-                  ),
-                  Expanded(child: Divider(color: theme.colorScheme.outline.withAlpha(60))),
-                ]),
-                const SizedBox(height: 14),
-
-                // PIN da conta (6 dígitos)
-                TextFormField(
-                  controller: _userPinController,
-                  maxLength: 6,
-                  keyboardType: TextInputType.number,
-                  obscureText: true,
-                  obscuringCharacter: '●',
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'PIN da conta',
-                    hintText: '●●●●●●',
-                    prefixIcon: Icon(Icons.lock_person_outlined),
-                    helperText: 'O teu PIN de 6 dígitos — apenas para provar identidade.',
-                  ),
-                  validator: (v) {
-                    final p = (v ?? '').trim();
-                    if (p.length != 6) return 'PIN da conta deve ter 6 dígitos.';
-                    if (int.tryParse(p) == null) return 'Apenas dígitos numéricos.';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // PIN do cartão (4 dígitos)
-                TextFormField(
-                  controller: _cardPinController,
-                  maxLength: 4,
-                  keyboardType: TextInputType.number,
-                  obscureText: true,
-                  obscuringCharacter: '●',
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _isCreating ? null : _submitCreate(),
-                  decoration: const InputDecoration(
-                    labelText: 'PIN do cartão',
-                    hintText: '●●●●',
-                    prefixIcon: Icon(Icons.credit_card_outlined),
-                    helperText: 'Novo PIN de 4 dígitos exclusivo para compras com este cartão.',
-                  ),
-                  validator: (v) {
-                    final p = (v ?? '').trim();
-                    if (p.length != 4) return 'PIN do cartão deve ter 4 dígitos.';
-                    if (int.tryParse(p) == null) return 'Apenas dígitos numéricos.';
-                    return null;
-                  },
-                ),
-
-                // Warning about card PIN
-                Container(
-                  margin: const EdgeInsets.only(top: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withAlpha(28),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade700.withAlpha(80)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: Colors.amber.shade700, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Memoriza este PIN — não será mostrado novamente após a criação.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber.shade900,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (_createError.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _createError,
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _isCreating ? null : _submitCreate,
-                    icon: _isCreating
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.add_card_outlined),
-                    label:
-                        Text(_isCreating ? 'A criar...' : 'Criar cartão'),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+
+          if (_createError.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withAlpha(25),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.red.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _createError,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _isCreating ? null : _submitCreate,
+              icon: _isCreating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.add_card_outlined),
+              label: Text(_isCreating ? 'A criar...' : 'Criar cartão'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1047,7 +1064,11 @@ class _VirtualCardDisplayState extends State<_VirtualCardDisplay> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF1565C0)],
+                colors: [
+                  Color(0xFF1A237E),
+                  Color(0xFF283593),
+                  Color(0xFF1565C0)
+                ],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
@@ -1065,12 +1086,19 @@ class _VirtualCardDisplayState extends State<_VirtualCardDisplay> {
                 // Card name top
                 Row(
                   children: [
+                    Image.asset(
+                      'assets/images/logo.png',
+                      height: 34,
+                      width: 34,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         c.card.name.toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.4,
                         ),

@@ -29,21 +29,29 @@ class BiometricService {
     bool stickyAuth = false,
   }) async {
     try {
-      final canAuth =
-          await _auth.canCheckBiometrics || await _auth.isDeviceSupported();
-      if (!canAuth) {
-        return false;
-      }
+      final canCheck = await _auth.canCheckBiometrics;
+      final isSupported = await _auth.isDeviceSupported();
+      final hasBiometrics = (await _auth.getAvailableBiometrics()).isNotEmpty;
+
+      print('🔍 Biometric Auth Check:');
+      print('   - canCheckBiometrics: $canCheck');
+      print('   - isDeviceSupported: $isSupported');
+      print('   - hasBiometrics: $hasBiometrics');
+
+      if (!isSupported) return false;
 
       return await _auth.authenticate(
         localizedReason: reason,
         options: AuthenticationOptions(
           stickyAuth: stickyAuth,
-          biometricOnly: true,
+          biometricOnly:
+              false, // Alterado para false para permitir face/fingerprint genérico e PIN do sistema se necessário
           useErrorDialogs: useErrorDialogs,
+          sensitiveTransaction: true,
         ),
       );
     } catch (e) {
+      print('❌ Biometric Auth Error: $e');
       return false;
     }
   }

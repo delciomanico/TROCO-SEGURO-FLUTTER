@@ -16,7 +16,7 @@ class ApiService {
   final Dio _dio;
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
-  
+
   factory ApiService() {
     return _instance;
   }
@@ -79,14 +79,15 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     _accessToken = prefs.getString('accessToken');
     _refreshToken = prefs.getString('refreshToken');
-    debugPrint('💾 Tokens carregados: Access=${_accessToken != null}, Refresh=${_refreshToken != null}');
+    debugPrint(
+        '💾 Tokens carregados: Access=${_accessToken != null}, Refresh=${_refreshToken != null}');
   }
 
   /// Salvar tokens externamente e na memória
   Future<void> saveTokens(String accessToken, String? refreshToken) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('accessToken', accessToken);
     if (refreshToken != null) {
@@ -151,7 +152,7 @@ class ApiService {
       });
 
       final data = response.data;
-        if (data['accessToken'] != null) {
+      if (data['accessToken'] != null) {
         await saveTokens(data['accessToken'], data['refreshToken']);
       }
 
@@ -347,9 +348,9 @@ class ApiService {
     try {
       final response = await _dio.get('/transactions/history');
       // API pode retornar array direto ou objeto com chave 'transactions'
-      final List<dynamic> data = response.data is List 
-        ? response.data 
-        : (response.data['transactions'] ?? []);
+      final List<dynamic> data = response.data is List
+          ? response.data
+          : (response.data['transactions'] ?? []);
       return ApiResponse.success(
         data.map((e) => Transaction.fromJson(e)).toList(),
       );
@@ -410,6 +411,8 @@ class ApiService {
     required String origin,
     required String destination,
     required String paymentToken,
+    double distanceKm = 0.0,
+    int durationMinutes = 0,
   }) async {
     try {
       final response = await _dio.post('/payments/process', data: {
@@ -419,6 +422,8 @@ class ApiService {
         'origin': origin,
         'destination': destination,
         'paymentToken': paymentToken,
+        'distanceKm': distanceKm,
+        'durationMinutes': durationMinutes,
       });
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
@@ -433,10 +438,10 @@ class ApiService {
     try {
       final response = await _dio.get('/virtual-cards');
       debugPrint('💳 Response /virtual-cards (raw): ${response.data}');
-      
+
       final dynamic data = response.data;
       List<dynamic> list;
-      
+
       if (data is Map && data.containsKey('cards')) {
         list = data['cards'];
         debugPrint('💳 Formato com "cards": ${list.length} itens');
@@ -444,15 +449,16 @@ class ApiService {
         list = data;
         debugPrint('💳 Formato direto List: ${list.length} itens');
       } else {
-        debugPrint('⚠️ Formato de resposta inesperado para cartões: ${data.runtimeType}');
+        debugPrint(
+            '⚠️ Formato de resposta inesperado para cartões: ${data.runtimeType}');
         list = [];
       }
-      
+
       final cards = list.map((e) {
         debugPrint('💳 Parseando cartão: $e');
         return VirtualCard.fromJson(e);
       }).toList();
-      
+
       debugPrint('💳 Total de cartões parseados: ${cards.length}');
       return ApiResponse.success(cards);
     } on DioException catch (e) {
@@ -468,7 +474,8 @@ class ApiService {
   ) async {
     try {
       debugPrint('💳 POST /virtual-cards payload: ${payload.toJson()}');
-      final response = await _dio.post('/virtual-cards', data: payload.toJson());
+      final response =
+          await _dio.post('/virtual-cards', data: payload.toJson());
       debugPrint('💳 Response createVirtualCard: ${response.data}');
       return ApiResponse.success(VirtualCardResponse.fromJson(response.data));
     } on DioException catch (e) {
@@ -566,12 +573,12 @@ class ApiService {
       if (raw == null) {
         data = [];
       } else if (raw is Map && raw['trips'] != null) {
-          final t = raw['trips'];
-          if (t is List) {
-            data = t;
-          } else {
-            data = [t];
-          }
+        final t = raw['trips'];
+        if (t is List) {
+          data = t;
+        } else {
+          data = [t];
+        }
       } else if (raw is List) {
         data = raw;
       } else if (raw is Map) {
@@ -583,7 +590,17 @@ class ApiService {
           try {
             return Trip.fromJson(jsonDecode(e) as Map<String, dynamic>);
           } catch (_) {
-            return Trip.fromJson({'id': '', 'origin': '', 'destination': '', 'amount': 0, 'date': '', 'time': '', 'driverName': '', 'licensePlate': '', 'status': 'pending'});
+            return Trip.fromJson({
+              'id': '',
+              'origin': '',
+              'destination': '',
+              'amount': 0,
+              'date': '',
+              'time': '',
+              'driverName': '',
+              'licensePlate': '',
+              'status': 'pending'
+            });
           }
         }
         return Trip.fromJson(e as Map<String, dynamic>);

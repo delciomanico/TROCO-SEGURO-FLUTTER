@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro/utils/constants.dart';
-import 'package:local_auth/local_auth.dart';
+import 'package:troco_seguro/services/biometric_service.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/theme_controller.dart';
@@ -37,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = false;
   bool isChangingPassword = false;
   final ApiService _api = ApiService();
+  final BiometricService _biometricService = BiometricService();
 
   @override
   void initState() {
@@ -194,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildDefaultAvatar() {
     return Container(
       color: AppColors.primary.withOpacity(0.1),
-      child: Icon(
+      child: const Icon(
         Icons.person_outline,
         size: 50,
         color: AppColors.primary,
@@ -857,33 +858,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _onToggleBiometrics(bool enable) async {
     final prefs = await SharedPreferences.getInstance();
-    final auth = LocalAuthentication();
 
     if (enable) {
-      final canCheck = await auth.canCheckBiometrics;
-      final isSupported = await auth.isDeviceSupported();
-      if (!canCheck || !isSupported) {
-        _showSnack('Biometria não disponível neste dispositivo');
-        return;
+      try {
+        // Verificar se biometria está disponível
+        final isBioAvailable = await _biometricService.isBiometricAvailable();
+        if (!isBioAvailable) {
+          if (mounted) {
+            _showSnack('Biometria não disponível neste dispositivo');
+          }
+          return;
+        }
+
+        // Tentar autenticar
+        debugPrint('🔐 Ativando biometria...');
+        final didAuth = await _biometricService.authenticate(
+          reason: 'Confirme para ativar a biometria',
+          useErrorDialogs: true,
+        );
+
+        if (!didAuth) {
+          if (mounted) {
+            _showSnack('Autenticação biométrica cancelada');
+          }
+          return;
+        }
+
+        // Salvar preferência apenas após autenticação bem-sucedida
+        await prefs.setBool('ts_bio_enabled', true);
+        if (mounted) {
+          setState(() => biometricsEnabled = true);
+          _showSnack('✅ Biometria ativada com sucesso');
+          debugPrint('✅ Biometria ativada');
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao ativar biometria: $e');
+        if (mounted) {
+          _showSnack('Erro ao ativar biometria: ${e.toString()}');
+        }
       }
-
-      final didAuth = await auth.authenticate(
-        localizedReason: 'Confirme para ativar a biometria',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-
-      if (!didAuth) {
-        _showSnack('Não foi possível ativar a biometria');
-        return;
-      }
-
-      await prefs.setBool('ts_bio_enabled', true);
-      setState(() => biometricsEnabled = true);
-      _showSnack('Biometria ativada');
     } else {
-      await prefs.setBool('ts_bio_enabled', false);
-      setState(() => biometricsEnabled = false);
-      _showSnack('Biometria desativada');
+      try {
+        await prefs.setBool('ts_bio_enabled', false);
+        if (mounted) {
+          setState(() => biometricsEnabled = false);
+          _showSnack('Biometria desativada');
+          debugPrint('✅ Biometria desativada');
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao desativar biometria: $e');
+        if (mounted) {
+          _showSnack('Erro ao desativar biometria');
+        }
+      }
     }
   }
 

@@ -275,6 +275,9 @@ class _AppControllerState extends State<AppController>
 
     await prefs.setString('ts_driver', json.encode(driver!.toJson()));
     await prefs.setBool('ts_driver_onboarding', true);
+
+    // Buscar dados reais da API imediatamente após o login
+    await _refreshFromApi();
   }
 
   Future<void> _handleLogout() async {
@@ -294,7 +297,7 @@ class _AppControllerState extends State<AppController>
 
   Future<void> _updateProfileName(String newName) async {
     if (driver == null) return;
-    
+
     final updatedDriver = driver!.copyWith(fullName: newName);
     setState(() => driver = updatedDriver);
 
@@ -1330,7 +1333,8 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                           // Tentar autenticar uma vez para confirmar
                           try {
                             final didAuth = await auth.authenticate(
-                              localizedReason: 'Confirme sua biometria para ativar esta funcionalidade',
+                              localizedReason:
+                                  'Confirme sua biometria para ativar esta funcionalidade',
                               options: const AuthenticationOptions(
                                 stickyAuth: true,
                                 biometricOnly: true,

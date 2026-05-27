@@ -701,7 +701,7 @@ class _WalletToCardTransferSheetState
                     ),
                   ),
                 DropdownButtonFormField<String>(
-                  value: _selectedCardId,
+                  initialValue: _selectedCardId,
                   decoration: const InputDecoration(
                     labelText: 'Cartão de destino',
                     border: OutlineInputBorder(),

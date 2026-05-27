@@ -93,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {
             currentBalance = newBalance;
+            todayEarnings = profile.balance; // Fallback se o stats falhar
             debugPrint('✅ Saldo atualizado no estado: $currentBalance Kz');
           });
         }
@@ -225,7 +226,9 @@ class _HomeScreenState extends State<HomeScreen> {
         qrCodeImage: qr.qrCodeImage,
         amount: qr.currentAmount > 0
             ? qr.currentAmount
-            : ((_qrConfig?.currentFare ?? 0) > 0 ? _qrConfig!.currentFare : null),
+            : ((_qrConfig?.currentFare ?? 0) > 0
+                ? _qrConfig!.currentFare
+                : null),
         currency: qr.currency,
         driverName:
             qr.driverName.isNotEmpty ? qr.driverName : widget.driver.fullName,
@@ -712,7 +715,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: responsive.scaledHeight(24)),
                 _buildHighlightedCard(responsive),
                 SizedBox(height: responsive.scaledHeight(24)),
-
                 _buildQuickActions(responsive),
                 SizedBox(height: responsive.scaledHeight(24)),
                 _buildTransactionsHeader(responsive),
@@ -728,7 +730,8 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedTab: DriverDockTab.home,
               driver: widget.driver,
               onOpenWithdrawal: widget.onOpenWithdrawal,
-              onCenterTap: widget.isOnline ? _scanPassengerQR : widget.onToggleOnline,
+              onCenterTap:
+                  widget.isOnline ? _scanPassengerQR : widget.onToggleOnline,
             )
           : null,
     );
@@ -1124,7 +1127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           value: '${isReceived ? '+' : '-'}${_formatCurrency(amountStr.abs())}',
           type: isReceived ? 'Entrada' : 'Saída',
         );
-      }).toList(),
+      }),
     ];
 
     return Container(

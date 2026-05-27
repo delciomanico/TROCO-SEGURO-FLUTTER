@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
-import 'package:troco_seguro/utils/color_extensions.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 
@@ -358,7 +357,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
             ),
           ),
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             decoration: InputDecoration(
               hintText: hint,

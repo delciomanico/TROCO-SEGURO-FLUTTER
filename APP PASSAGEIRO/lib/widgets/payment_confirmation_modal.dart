@@ -91,6 +91,8 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
       paymentToken: widget.driverInfo.paymentToken ??
           widget.driverInfo.sessionToken ??
           '',
+      distanceKm: 0.0,
+      durationMinutes: 0,
     );
 
     if (!mounted) return;
@@ -98,7 +100,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
     if (result != null) {
       Navigator.pop(context);
       widget.onSuccess();
-      
+
       // Mostrar modal de avaliação após pagamento bem-sucedido
       if (result.tripId != null && result.tripId!.isNotEmpty) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -134,7 +136,10 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
           color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           border: Border.all(
-            color: Theme.of(context).colorScheme.onSurface.withAlpha((0.08 * 255).round()),
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withAlpha((0.08 * 255).round()),
           ),
           boxShadow: [
             BoxShadow(
@@ -165,117 +170,56 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                SizedBox(height: responsive.scaledHeight(20)),
-                Text(
-                  'CONFIRMAR PAGAMENTO',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(18),
-                    fontWeight: FontWeight.w900,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(20)),
-
-                // Driver block
-                Container(
-                  padding: EdgeInsets.all(responsive.responsiveSpacing()),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(
-                        responsive.responsiveBorderRadius()),
-                    border:
-                        Border.all(color: AppColors.accent.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: responsive.scaledWidth(60),
-                            height: responsive.scaledWidth(60),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Icons.person,
-                                color: AppColors.accent,
-                                size: responsive.scaledWidth(30)),
-                          ),
-                          SizedBox(width: responsive.scaledWidth(12)),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(widget.driverInfo.driverName ?? 'Taxista',
-                                    style: TextStyle(
-                                        fontSize:
-                                            responsive.responsiveFontSize(14),
-                                        fontWeight: FontWeight.w900,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface)),
-                                SizedBox(height: responsive.scaledHeight(4)),
-                                Text(
-                                    widget.driverInfo.licensePlate ??
-                                        'Placa desconhecida',
-                                    style: TextStyle(
-                                        fontSize:
-                                            responsive.responsiveFontSize(12),
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withOpacity(0.6))),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: responsive.scaledHeight(12)),
-                      _buildInfoRow('Origem', widget.origin,
-                          Icons.location_on_outlined, responsive),
-                      SizedBox(height: responsive.scaledHeight(8)),
-                      _buildInfoRow('Destino', widget.destination,
-                          Icons.location_on, responsive),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: responsive.scaledHeight(20)),
-                Container(
-                  padding: EdgeInsets.all(responsive.responsiveSpacing()),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(
-                        responsive.responsiveBorderRadius()),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('VALOR DO PAGAMENTO',
-                          style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(12),
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.7))),
-                      Text('${widget.amount} Kz',
-                          style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(24),
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.accent)),
-                    ],
-                  ),
-                ),
-
                 SizedBox(height: responsive.scaledHeight(16)),
-                Text('CONFIRME COM SEU PIN',
+
+                // Driver info - Clean and simple
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(widget.driverInfo.driverName ?? 'Taxista',
+                        style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(16),
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface)),
+                    SizedBox(height: responsive.scaledHeight(8)),
+                    Text(widget.driverInfo.licensePlate ?? 'Placa desconhecida',
+                        style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(14),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.6))),
+                  ],
+                ),
+
+                SizedBox(height: responsive.scaledHeight(24)),
+
+                // Amount - Highlight
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Valor',
+                        style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(12),
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.6))),
+                    SizedBox(height: responsive.scaledHeight(8)),
+                    Text('${widget.amount} Kz',
+                        style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(28),
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.accent)),
+                  ],
+                ),
+
+                SizedBox(height: responsive.scaledHeight(24)),
+                Text('Confirme com seu PIN',
                     style: TextStyle(
                         fontSize: responsive.responsiveFontSize(12),
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.onSurface)),
                 SizedBox(height: responsive.scaledHeight(12)),
                 if (_pinError != null)
@@ -312,9 +256,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                               horizontal: responsive.scaledWidth(4)),
                           decoration: BoxDecoration(
                             border: Border.all(
-                                color: _enteredPin.length > i
-                                    ? AppColors.accent
-                                    : Theme.of(context).colorScheme.outline,
+                                color: Theme.of(context).colorScheme.outline,
                                 width: 2),
                             borderRadius: BorderRadius.circular(12),
                             color: Theme.of(context)
@@ -350,7 +292,10 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                     enableSuggestions: false,
                     autocorrect: false,
                     decoration: const InputDecoration(
-                        border: InputBorder.none, counterText: ''),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        counterText: ''),
                     style:
                         const TextStyle(color: Colors.transparent, height: 0.1),
                   ),
@@ -385,36 +330,6 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildInfoRow(
-      String label, String value, IconData icon, ResponsiveHelper responsive) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.accent, size: responsive.scaledWidth(18)),
-        SizedBox(width: responsive.scaledWidth(8)),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(10),
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.6))),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(13),
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

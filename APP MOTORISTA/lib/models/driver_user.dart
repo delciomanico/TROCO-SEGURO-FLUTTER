@@ -119,44 +119,93 @@ class DriverUser {
   }
 
   factory DriverUser.fromJson(Map<String, dynamic> json) {
-    // Suporta tanto 'wallet.balance' quanto 'balance' direto
-    int balance = 0;
-    if (json['wallet'] != null && json['wallet']['balance'] != null) {
-      balance = double.tryParse(json['wallet']['balance'].toString())?.toInt() ?? 0;
-    } else if (json['balance'] != null) {
-      balance = double.tryParse(json['balance'].toString())?.toInt() ?? 0;
-    }
-
-    // Se vier do users/me, alguns dados podem estar em json['stats'] ou json['earnings']
-    final stats = json['stats'] is Map<String, dynamic> 
-        ? json['stats'] as Map<String, dynamic> 
-        : (json['earnings'] is Map<String, dynamic> 
-            ? json['earnings'] as Map<String, dynamic> 
+    // Se vier embrulhado em 'user' ou 'data', tente extrair o mapa interno de dados do usuário
+    final userData = json['user'] is Map<String, dynamic>
+        ? json['user'] as Map<String, dynamic>
+        : (json['driver'] is Map<String, dynamic>
+            ? json['driver'] as Map<String, dynamic>
             : json);
 
+    // Suporta tanto 'wallet.balance' quanto 'balance' direto (no root ou no userData)
+    int balance = 0;
+
+    // Tentar encontrar o balance em várias localizações possíveis do JSON
+    final searchNodes = [json, userData];
+    for (var node in searchNodes) {
+      if (node['wallet'] != null && node['wallet']['balance'] != null) {
+        balance =
+            double.tryParse(node['wallet']['balance'].toString())?.toInt() ?? 0;
+        break;
+      } else if (node['balance'] != null) {
+        balance = double.tryParse(node['balance'].toString())?.toInt() ?? 0;
+        break;
+      }
+    }
+
+    // Se vier do users/me, alguns dados podem estar em stats ou earnings
+    Map<String, dynamic> stats;
+    if (json['stats'] is Map<String, dynamic>) {
+      stats = json['stats'] as Map<String, dynamic>;
+    } else if (userData['stats'] is Map<String, dynamic>) {
+      stats = userData['stats'] as Map<String, dynamic>;
+    } else if (json['earnings'] is Map<String, dynamic>) {
+      stats = json['earnings'] as Map<String, dynamic>;
+    } else if (userData['earnings'] is Map<String, dynamic>) {
+      stats = userData['earnings'] as Map<String, dynamic>;
+    } else {
+      stats = userData;
+    }
+
     return DriverUser(
-      id: json['id'],
-      fullName: json['fullName'] ?? json['name'] ?? '',
-      phoneNumber: json['phoneNumber'] ?? json['phone'] ?? '',
-      email: json['email'],
+      id: userData['id']?.toString() ?? json['id']?.toString(),
+      fullName: userData['fullName'] ??
+          userData['name'] ??
+          json['fullName'] ??
+          json['name'] ??
+          '',
+      phoneNumber: userData['phoneNumber'] ??
+          userData['phone'] ??
+          json['phoneNumber'] ??
+          json['phone'] ??
+          '',
+      email: userData['email'] ?? json['email'],
       balance: balance,
-      isLoggedIn: json['isLoggedIn'] ?? true,
-      role: json['role'] ?? 'DRIVER',
-      photo: json['photo'] ?? json['avatar'],
-      rating: (stats['rating'] ?? stats['averageRating'] ?? json['rating'] ?? json['averageRating'])?.toDouble(),
-      isVerified: json['isVerified'] ?? json['verified'],
-      totalTrips: stats['totalTrips'] ?? stats['totalRides'] ?? json['totalTrips'] ?? json['totalRides'] ?? 0,
-      licensePlate: json['licensePlate'],
-      vehicleModel: json['vehicleModel'],
-      vehicleColor: json['vehicleColor'],
-      vehicleYear: json['vehicleYear'],
-      isOnline: json['isOnline'] ?? false,
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'])
+      isLoggedIn: userData['isLoggedIn'] ?? json['isLoggedIn'] ?? true,
+      role: userData['role'] ?? json['role'] ?? 'DRIVER',
+      photo: userData['photo'] ??
+          userData['avatar'] ??
+          json['photo'] ??
+          json['avatar'],
+      rating: (stats['rating'] ??
+              stats['averageRating'] ??
+              userData['rating'] ??
+              userData['averageRating'] ??
+              json['rating'] ??
+              json['averageRating'])
+          ?.toDouble(),
+      isVerified: userData['isVerified'] ??
+          userData['verified'] ??
+          json['isVerified'] ??
+          json['verified'],
+      totalTrips: stats['totalTrips'] ??
+          stats['totalRides'] ??
+          userData['totalTrips'] ??
+          userData['totalRides'] ??
+          json['totalTrips'] ??
+          json['totalRides'] ??
+          0,
+      licensePlate: userData['licensePlate'] ?? json['licensePlate'],
+      vehicleModel: userData['vehicleModel'] ?? json['vehicleModel'],
+      vehicleColor: userData['vehicleColor'] ?? json['vehicleColor'],
+      vehicleYear: userData['vehicleYear'] ?? json['vehicleYear'],
+      isOnline: userData['isOnline'] ?? json['isOnline'] ?? false,
+      createdAt: (userData['createdAt'] ?? json['createdAt']) != null
+          ? DateTime.tryParse(
+              (userData['createdAt'] ?? json['createdAt']).toString())
           : null,
-      bankAccount: json['bankAccount'],
-      bankName: json['bankName'],
-      wallet: json['wallet'],
+      bankAccount: userData['bankAccount'] ?? json['bankAccount'],
+      bankName: userData['bankName'] ?? json['bankName'],
+      wallet: userData['wallet'] ?? json['wallet'],
     );
   }
 }

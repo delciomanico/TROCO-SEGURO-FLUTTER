@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro/utils/color_extensions.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/biometric_service.dart';

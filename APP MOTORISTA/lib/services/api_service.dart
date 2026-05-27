@@ -258,7 +258,7 @@ class ApiService {
       }
       await saveTokens(accessToken, refreshToken);
 
-      final userMap = data['user'] != null 
+      final userMap = data['user'] != null
           ? (data['user'] as Map).cast<String, dynamic>()
           : (data['fullName'] != null || data['name'] != null ? data : null);
 
@@ -291,13 +291,26 @@ class ApiService {
     try {
       try {
         final response = await _dio.get('users/me');
-        return ApiResponse.success(
-            DriverUser.fromJson(_payload(response.data)));
+        final data = _payload(response.data);
+
+        // Unificar lógica de extração de usuário (idêntica ao login)
+        final userMap = data['user'] != null
+            ? (data['user'] as Map).cast<String, dynamic>()
+            : (data['fullName'] != null || data['name'] != null ? data : data);
+
+        return ApiResponse.success(DriverUser.fromJson(userMap));
       } on DioException catch (e) {
         if (e.response?.statusCode == 404) {
           final response = await _dio.get('auth/profile');
-          return ApiResponse.success(
-              DriverUser.fromJson(_payload(response.data)));
+          final data = _payload(response.data);
+
+          final userMap = data['user'] != null
+              ? (data['user'] as Map).cast<String, dynamic>()
+              : (data['fullName'] != null || data['name'] != null
+                  ? data
+                  : data);
+
+          return ApiResponse.success(DriverUser.fromJson(userMap));
         }
         rethrow;
       }
@@ -364,14 +377,31 @@ class ApiService {
   /// Obter resumo de ganhos e estatísticas
   Future<ApiResponse<Earnings>> getEarnings() async {
     try {
-      // O usuário solicitou que todas as informações de conta (saldo, ganhos, etc)
-      // sejam obtidas da rota users/me
+      // Buscar viagens e calcular ganhos por período a partir dos dados reais
+      final tripsResponse = await _dio.get('trips', queryParameters: {
+        'page': 1,
+        'limit': 200, // busca suficiente para cobrir meses de histórico
+      });
+      final List<dynamic> rawList = _listPayload(tripsResponse.data);
+      if (rawList.isNotEmpty) {
+        final tripMaps = rawList
+            .whereType<Map>()
+            .map((m) => m.cast<String, dynamic>())
+            .toList();
+        return ApiResponse.success(Earnings.fromTrips(tripMaps));
+      }
+    } on DioException catch (_) {
+      // Falhou ao buscar trips — tenta users/me como fallback
+    }
+
+    try {
       final response = await _dio.get('users/me');
       return ApiResponse.success(Earnings.fromJson(_payload(response.data)));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
   }
+
 
   // ============ VIAGENS ============
 
@@ -596,12 +626,12 @@ class ApiService {
       if (raw['transactions'] is List) return raw['transactions'];
       if (raw['history'] is List) return raw['history'];
       if (raw['list'] is List) return raw['list'];
-      
+
       // Procura qualquer lista no primeiro nível como fallback
       for (var val in raw.values) {
         if (val is List) return val;
       }
-      
+
       final map = _payload(raw);
       if (map['data'] is List) return map['data'];
     }
@@ -656,7 +686,7 @@ class ApiService {
 
       final data = response.data;
       List<dynamic> vehiclesList = [];
-      
+
       if (data is List) {
         vehiclesList = data;
       } else if (data is Map) {
@@ -668,7 +698,9 @@ class ApiService {
         }
       }
 
-      final vehicles = vehiclesList.map((v) => Vehicle.fromJson(v as Map<String, dynamic>)).toList();
+      final vehicles = vehiclesList
+          .map((v) => Vehicle.fromJson(v as Map<String, dynamic>))
+          .toList();
 
       return ApiResponse._(data: vehicles, isSuccess: true);
     } on DioException catch (e) {

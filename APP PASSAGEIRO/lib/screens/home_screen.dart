@@ -1,8 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:troco_seguro/services/api_service.dart';
-import 'package:troco_seguro/utils/color_extensions.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/utils/constants.dart';
@@ -538,14 +536,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     width: responsive.scaledWidth(42),
                     height: responsive.scaledWidth(42),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.28),
-                        width: 1,
-                      ),
-                    ),
                     child: Icon(
                       Icons.more_vert_rounded,
                       color: Colors.white,
@@ -1100,7 +1090,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: responsive.scaledWidth(64),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(10),
+              shape: BoxShape.circle,
               border: Border.all(
                 color: isDark
                     ? Colors.white.withAlpha((0.1 * 255).round())

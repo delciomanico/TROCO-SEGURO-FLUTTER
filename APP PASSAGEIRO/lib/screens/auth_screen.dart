@@ -19,6 +19,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool isLogin = true;
+  bool _obscurePin = true;
   // simplified single-screen flow: no multi-step state
   bool isLoading = false;
   String? errorMessage;
@@ -226,8 +227,20 @@ class _AuthScreenState extends State<AuthScreen> {
                                 hint: '••••••',
                                 icon: Icons.lock_outline,
                                 keyboardType: TextInputType.number,
-                                obscure: true,
+                                obscure: _obscurePin,
                                 maxLength: 6,
+                                suffix: IconButton(
+                                  icon: Icon(
+                                    _obscurePin
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: primaryGold.withOpacity(0.7),
+                                    size: r.scaledWidth(20),
+                                  ),
+                                  onPressed: () => setState(() {
+                                    _obscurePin = !_obscurePin;
+                                  }),
+                                ),
                               ),
                               if (errorMessage != null) ...[
                                 SizedBox(height: r.scaledHeight(16)),
@@ -564,8 +577,20 @@ class _AuthScreenState extends State<AuthScreen> {
           hint: '••••••',
           icon: Icons.lock_outline,
           keyboardType: TextInputType.number,
-          obscure: true,
+          obscure: _obscurePin,
           maxLength: 6,
+          suffix: IconButton(
+            icon: Icon(
+              _obscurePin
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: primaryGold.withOpacity(0.7),
+              size: r.scaledWidth(20),
+            ),
+            onPressed: () => setState(() {
+              _obscurePin = !_obscurePin;
+            }),
+          ),
         ),
       ],
     );
@@ -591,6 +616,7 @@ class _AuthScreenState extends State<AuthScreen> {
     bool obscure = false,
     int? maxLength,
     String? prefix,
+    Widget? suffix,
   }) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: r.scaledHeight(8)),
@@ -640,6 +666,7 @@ class _AuthScreenState extends State<AuthScreen> {
             hintStyle: TextStyle(color: Colors.grey[500]),
             counterText: '',
             prefixIcon: Icon(icon, color: primaryGold),
+            suffixIcon: suffix,
             prefixText: prefix,
             prefixStyle: TextStyle(
               fontSize: r.responsiveFontSize(15),
@@ -650,12 +677,15 @@ class _AuthScreenState extends State<AuthScreen> {
             fillColor: isDark ? darkCard : lightCard,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.transparent),
+              borderSide: BorderSide(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
+                  width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                  color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
+                  color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
+                  width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
