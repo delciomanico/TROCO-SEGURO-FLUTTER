@@ -86,48 +86,48 @@ class _AuthScreenState extends State<AuthScreen> {
 
       final phoneNumber = _formatPhoneNumber(phoneController.text);
 
-      if (isLogin) {
-        // LOGIN via API
-        final result = await _api.login(
-          phoneNumber: phoneNumber,
-          password: pin,
-        );
-
-        setState(() => isLoading = false);
-
-        if (result.isSuccess) {
-          widget.onAuth(
-            result.data?.driver?.fullName ?? (nameController.text.isEmpty ? 'Motorista' : nameController.text),
-            phoneController.text,
-            pin,
-            accessToken: result.data?.accessToken,
-            refreshToken: result.data?.refreshToken,
+      try {
+        if (isLogin) {
+          // LOGIN via API
+          final result = await _api.login(
+            phoneNumber: phoneNumber,
+            password: pin,
           );
+
+          if (result.isSuccess) {
+            widget.onAuth(
+              result.data?.driver?.fullName ?? (nameController.text.isEmpty ? 'Motorista' : nameController.text),
+              phoneController.text,
+              pin,
+              accessToken: result.data?.accessToken,
+              refreshToken: result.data?.refreshToken,
+            );
+          } else {
+            setState(() => errorMessage = result.error ?? 'Erro ao fazer login');
+          }
         } else {
-          setState(() => errorMessage = result.error ?? 'Erro ao fazer login');
+          // REGISTRO - Chama a API de registro
+          final result = await _api.register(
+            fullName: nameController.text,
+            phoneNumber: phoneNumber,
+            password: pin,
+          );
+
+          if (result.isSuccess) {
+            setState(() {
+              isLogin = true; // Volta para o login
+              successMessage = 'Conta criada com sucesso! Já pode entrar.';
+              // Limpa o PIN para segurança, mas mantém o telefone
+              pinController.clear();
+            });
+          } else {
+            setState(() => errorMessage = result.error ?? 'Erro ao registrar');
+          }
         }
-      } else {
-        // REGISTRO - Chama a API de registro diretamente e vai para OTP
-        setState(() => isLoading = true);
-
-        final result = await _api.register(
-          fullName: nameController.text,
-          phoneNumber: phoneNumber,
-          password: pin,
-        );
-
-        setState(() => isLoading = false);
-
-        if (result.isSuccess) {
-          setState(() {
-            isLogin = true; // Volta para o login
-            successMessage = 'Conta criada com sucesso! Já pode entrar.';
-            // Limpa o PIN para segurança, mas mantém o telefone
-            pinController.clear();
-          });
-        } else {
-          setState(() => errorMessage = result.error ?? 'Erro ao registrar');
-        }
+      } catch (e) {
+        setState(() => errorMessage = 'Erro inesperado. Tente novamente.');
+      } finally {
+        if (mounted) setState(() => isLoading = false);
       }
     } else if (step == 3) {
       // Verificar OTP

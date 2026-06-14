@@ -28,8 +28,8 @@ class ApiService {
   ApiService._internal()
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
+          connectTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -178,8 +178,6 @@ class ApiService {
         'phoneNumber': phoneNumber,
         'password': password,
         'role': 'DRIVER',
-        'licensePlate': licensePlate,
-        'vehicleModel': vehicleModel,
       });
 
       final data = _payload(response.data);
@@ -189,6 +187,9 @@ class ApiService {
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      debugPrint('❌ Erro inesperado no registo: $e');
+      return ApiResponse.error('Erro inesperado ao criar conta. Tente novamente.');
     }
   }
 
@@ -207,22 +208,33 @@ class ApiService {
       final authData = _extractAuthData(response.data);
       final accessToken = authData['accessToken']?.toString();
       final refreshToken = authData['refreshToken']?.toString();
-      if (accessToken != null && accessToken.isNotEmpty) {
-        await saveTokens(
-          accessToken,
-          refreshToken,
+
+      // ✅ Verificar role no OTP também
+      final userMap = data['user'] is Map
+          ? (data['user'] as Map).cast<String, dynamic>()
+          : null;
+      final role = (userMap?['role'] ?? data['role'] ?? authData['role'])?.toString().toUpperCase();
+      if (role != null && role != 'DRIVER') {
+        debugPrint('🚫 Acesso negado no OTP: role=$role (apenas DRIVER permitido)');
+        return ApiResponse.error(
+          'Esta conta é de passageiro. Por favor, utilize o App Passageiro.',
         );
+      }
+
+      if (accessToken != null && accessToken.isNotEmpty) {
+        await saveTokens(accessToken, refreshToken);
       }
 
       return ApiResponse.success(AuthResult(
         accessToken: accessToken,
         refreshToken: refreshToken,
-        driver: data['user'] != null
-            ? DriverUser.fromJson((data['user'] as Map).cast<String, dynamic>())
-            : null,
+        driver: userMap != null ? DriverUser.fromJson(userMap) : null,
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      debugPrint('❌ Erro inesperado no verifyOtp: $e');
+      return ApiResponse.error('Erro inesperado. Tente novamente.');
     }
   }
 
@@ -256,11 +268,21 @@ class ApiService {
       if (accessToken == null || accessToken.isEmpty) {
         return ApiResponse.error('Token de acesso não retornado pela API.');
       }
-      await saveTokens(accessToken, refreshToken);
 
       final userMap = data['user'] != null
           ? (data['user'] as Map).cast<String, dynamic>()
           : (data['fullName'] != null || data['name'] != null ? data : null);
+
+      // ✅ Verificar role: apenas DRIVER pode aceder ao app motorista
+      final role = (userMap?['role'] ?? data['role'] ?? authData['role'])?.toString().toUpperCase();
+      if (role != null && role != 'DRIVER') {
+        debugPrint('🚫 Acesso negado: role=$role (apenas DRIVER permitido)');
+        return ApiResponse.error(
+          'Esta conta é de passageiro. Por favor, utilize o App Passageiro.',
+        );
+      }
+
+      await saveTokens(accessToken, refreshToken);
 
       return ApiResponse.success(AuthResult(
         accessToken: accessToken,
@@ -269,6 +291,9 @@ class ApiService {
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      debugPrint('❌ Erro inesperado no login: $e');
+      return ApiResponse.error('Erro inesperado ao entrar. Tente novamente.');
     }
   }
 
