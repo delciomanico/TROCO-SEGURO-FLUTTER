@@ -127,14 +127,14 @@ class FeedbackService {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: (colors['shadow'] as Color).withOpacity(0.4),
+                      color: (colors['shadow'] as Color).withValues(alpha: 0.4),
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                       spreadRadius: 2,
                     ),
                   ],
                   border: Border.all(
-                    color: (colors['icon'] as Color).withOpacity(0.3),
+                    color: (colors['icon'] as Color).withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -143,7 +143,7 @@ class FeedbackService {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: (colors['icon'] as Color).withOpacity(0.2),
+                        color: (colors['icon'] as Color).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(

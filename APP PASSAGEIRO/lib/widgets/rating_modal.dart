@@ -154,8 +154,8 @@ class _RatingModalState extends State<RatingModal> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(13),
                   color: isDark
-                      ? Colors.white.withOpacity(0.7)
-                      : AppColors.textDark.withOpacity(0.6),
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : AppColors.textDark.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
               ),

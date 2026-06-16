@@ -15,13 +15,9 @@ class TripsScreen extends StatefulWidget {
 }
 
 class _TripsScreenState extends State<TripsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().refreshTrips();
-    });
-  }
+  // Sem fetch extra no initState: os dados são carregados pelo AppProvider
+  // em background no initialize() e invalidados via invalidate(AppDomain.trips)
+  // após cada pagamento.
 
   String _formatCurrency(int amount) {
     final format = NumberFormat('#,##0', 'pt_AO');
@@ -123,7 +119,7 @@ class _TripsScreenState extends State<TripsScreen> {
               Container(
                 padding: EdgeInsets.all(responsive.scaledWidth(12)),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.14),
+                  color: AppColors.primaryGold.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -151,8 +147,8 @@ class _TripsScreenState extends State<TripsScreen> {
                       style: TextStyle(
                         fontSize: responsive.responsiveFontSize(12),
                         color: isDark
-                            ? Colors.white.withOpacity(0.7)
-                            : AppColors.textDark.withOpacity(0.6),
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : AppColors.textDark.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -183,7 +179,7 @@ class _TripsScreenState extends State<TripsScreen> {
               Container(
                 width: 1,
                 height: responsive.scaledHeight(40),
-                color: AppColors.primaryGold.withOpacity(0.2),
+                color: AppColors.primaryGold.withValues(alpha: 0.2),
               ),
               Expanded(
                 child: _buildStatItem(
@@ -218,8 +214,8 @@ class _TripsScreenState extends State<TripsScreen> {
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(11),
             color: isDark
-                ? Colors.white.withOpacity(0.6)
-                : AppColors.textDark.withOpacity(0.6),
+                ? Colors.white.withValues(alpha: 0.6)
+                : AppColors.textDark.withValues(alpha: 0.6),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -286,13 +282,13 @@ class _TripsScreenState extends State<TripsScreen> {
             Container(
               padding: EdgeInsets.all(responsive.scaledWidth(20)),
               decoration: BoxDecoration(
-                color: AppColors.primaryGold.withOpacity(0.1),
+                color: AppColors.primaryGold.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.route_outlined,
                 size: responsive.scaledWidth(48),
-                color: AppColors.primaryGold.withOpacity(0.5),
+                color: AppColors.primaryGold.withValues(alpha: 0.5),
               ),
             ),
             SizedBox(height: responsive.scaledHeight(16)),

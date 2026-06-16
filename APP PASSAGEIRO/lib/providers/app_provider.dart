@@ -7,6 +7,10 @@ import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/models/trip.dart';
 import 'package:troco_seguro/services/api_service.dart';
 
+/// Domínios de dados gerenciados pelo AppProvider.
+/// Usado em [AppProvider.invalidate] para refrescar apenas o domínio afetado.
+enum AppDomain { user, cards, transactions, trips }
+
 /// Provider principal para gerenciar estado global da aplicação
 class AppProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -280,6 +284,33 @@ class AppProvider extends ChangeNotifier {
   /// Refresh manual das viagens
   Future<void> refreshTrips() async {
     await _fetchTripsFromApi(showLoading: true);
+  }
+
+  /// Invalida o cache de um domínio e dispara um fetch em background (sem
+  /// loading state visível). Chame isto após qualquer mutação que afete um
+  /// domínio específico para que a UI reaja automaticamente.
+  ///
+  /// Exemplo de uso:
+  /// ```dart
+  /// // Após um pagamento que afeta saldo, transações e viagens:
+  /// provider.invalidate(AppDomain.user);
+  /// provider.invalidate(AppDomain.transactions);
+  /// provider.invalidate(AppDomain.trips);
+  /// ```
+  void invalidate(AppDomain domain) {
+    switch (domain) {
+      case AppDomain.user:
+        _fetchUserFromApi(showLoading: false);
+      case AppDomain.cards:
+        _cardsLastFetch = null;
+        _fetchCardsFromApi(showLoading: false);
+      case AppDomain.transactions:
+        _transactionsLastFetch = null;
+        _fetchTransactionsFromApi(showLoading: false);
+      case AppDomain.trips:
+        _tripsLastFetch = null;
+        _fetchTripsFromApi(showLoading: false);
+    }
   }
 
   /// Criar cartão virtual via API.
@@ -584,7 +615,7 @@ class AppProvider extends ChangeNotifier {
         ));
 
         // Recarregar transações da API em background
-        _fetchTransactionsFromApi(showLoading: false);
+        invalidate(AppDomain.transactions);
 
         return true;
       } else {

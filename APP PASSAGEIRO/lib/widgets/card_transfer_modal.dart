@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 
@@ -80,11 +81,9 @@ class _CardTransferModalState extends State<CardTransferModal> {
 
     if (transferError == null) {
       widget.onClose();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transferência entre cartões concluída com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
+      FeedbackService.showSuccess(
+        context,
+        message: 'Transferência entre cartões concluída com sucesso!',
       );
     } else {
       setState(() => error = transferError);
@@ -144,7 +143,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -349,11 +348,11 @@ class _CardTransferModalState extends State<CardTransferModal> {
             color: Theme.of(context)
                 .colorScheme
                 .surfaceContainerHighest
-                .withOpacity(0.5),
+                .withValues(alpha: 0.5),
             borderRadius:
                 BorderRadius.circular(responsive.responsiveBorderRadius()),
             border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
             ),
           ),
           child: DropdownButtonFormField<String>(
@@ -413,13 +412,13 @@ class _CardTransferModalState extends State<CardTransferModal> {
             fillColor: Theme.of(context)
                 .colorScheme
                 .surfaceContainerHighest
-                .withOpacity(0.5),
+                .withValues(alpha: 0.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(
                 responsive.responsiveBorderRadius(),
               ),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
               ),
             ),
             enabledBorder: OutlineInputBorder(
@@ -427,7 +426,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
                 responsive.responsiveBorderRadius(),
               ),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
               ),
             ),
             focusedBorder: OutlineInputBorder(

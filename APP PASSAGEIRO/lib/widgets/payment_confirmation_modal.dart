@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/services/payment_service.dart';
@@ -14,7 +16,8 @@ class PaymentConfirmationModal extends StatefulWidget {
   final String origin;
   final String destination;
   final Future<bool> Function(String pin) pinValidator;
-  final VoidCallback onSuccess;
+  /// Chamado com o [PaymentResult] após pagamento confirmado pela API.
+  final void Function(PaymentResult result) onSuccess;
   final VoidCallback onCancel;
 
   const PaymentConfirmationModal({
@@ -98,8 +101,14 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
     if (!mounted) return;
     setState(() => _isProcessing = false);
     if (result != null) {
+      // Invalidar domínios afetados pelo pagamento antes de fechar o modal
+      final provider = context.read<AppProvider>();
+      provider.invalidate(AppDomain.user);
+      provider.invalidate(AppDomain.transactions);
+      provider.invalidate(AppDomain.trips);
+
       Navigator.pop(context);
-      widget.onSuccess();
+      widget.onSuccess(result);
 
       // Mostrar modal de avaliação após pagamento bem-sucedido
       if (result.tripId != null && result.tripId!.isNotEmpty) {
@@ -166,7 +175,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                   height: 4,
                   decoration: BoxDecoration(
                     color:
-                        Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                        Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -188,7 +197,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.6))),
+                                .withValues(alpha: 0.6))),
                   ],
                 ),
 
@@ -205,7 +214,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.6))),
+                                .withValues(alpha: 0.6))),
                     SizedBox(height: responsive.scaledHeight(8)),
                     Text('${widget.amount} Kz',
                         style: TextStyle(

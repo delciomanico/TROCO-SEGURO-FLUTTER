@@ -27,6 +27,7 @@ import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/services/biometric_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -333,19 +334,15 @@ class _MainScreenState extends State<MainScreen> {
             readExpectedPin: () => SecureStorageService().readPin(),
           );
         },
-        onSuccess: () {
-          final provider = context.read<AppProvider>();
-          if (provider.user != null) {
-            // Atualizar saldo
-            final newBalance = provider.user!.balance - 2500;
-            provider.updateUserBalance(newBalance);
-
-            // Mostrar sucesso
+        onSuccess: (_) {
+          // Saldo/transações/viagens já foram invalidados dentro do modal.
+          // Apenas mostrar feedback de sucesso.
+          if (mounted) {
             SuccessModal.show(
               context,
               title: 'Pagamento Realizado!',
               message:
-                  'Pagamento de 2500 Kz realizado com sucesso para ${driverInfo.driverName}.',
+                  'Pagamento realizado com sucesso para ${driverInfo.driverName}.',
               icon: Icons.check_circle,
             );
           }
@@ -427,7 +424,7 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (ctx, animation, secondaryAnimation) {
         return Align(
@@ -491,7 +488,7 @@ class _MainScreenState extends State<MainScreen> {
       type: BottomNavigationBarType.fixed,
       backgroundColor: theme.colorScheme.surface,
       selectedItemColor: theme.colorScheme.primary,
-      unselectedItemColor: theme.colorScheme.onSurface.withOpacity(0.65),
+      unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
       selectedLabelStyle: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
@@ -534,6 +531,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
   bool biometricsEnabled = false;
   bool darkModeEnabled = false;
   final ApiService _api = ApiService();
+  final BiometricService _biometricService = BiometricService();
 
   @override
   void initState() {
@@ -552,6 +550,47 @@ class _MenuDrawerState extends State<_MenuDrawer> {
         biometricsEnabled = bioPref;
         darkModeEnabled = themePref == 'dark';
       });
+    }
+  }
+
+  Future<void> _onToggleBiometrics(bool enable) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (enable) {
+      try {
+        final didAuth = await _biometricService.authenticate(
+          reason: 'Confirme para ativar a biometria',
+          useErrorDialogs: true,
+          stickyAuth: true,
+        );
+
+        if (!didAuth) {
+          if (mounted) {
+            FeedbackService.showInfo(context,
+                message: 'Autenticação biométrica cancelada');
+          }
+          return;
+        }
+
+        await prefs.setBool('ts_bio_enabled', true);
+        if (mounted) setState(() => biometricsEnabled = true);
+        if (mounted) {
+          FeedbackService.showSuccess(context,
+              message: 'Biometria ativada com sucesso');
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao ativar biometria: $e');
+        if (mounted) {
+          FeedbackService.showError(context,
+              message: 'Biometria não disponível: ${e.toString()}');
+        }
+      }
+    } else {
+      await prefs.setBool('ts_bio_enabled', false);
+      if (mounted) setState(() => biometricsEnabled = false);
+      if (mounted) {
+        FeedbackService.showInfo(context, message: 'Biometria desativada');
+      }
     }
   }
 
@@ -664,18 +703,15 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     final provider = context.read<AppProvider>();
                     Navigator.pop(context);
 
-                    final result = await _api.updateProfile(
+                    final success = await provider.updateProfile(
                       fullName: nameController.text,
                     );
 
-                    if (result.isSuccess && result.data != null) {
-                      await provider.refreshUserData();
-                      if (mounted) {
-                        FeedbackService.showSuccess(
-                          this.context,
-                          message: 'Perfil atualizado com sucesso',
-                        );
-                      }
+                    if (success && mounted) {
+                      FeedbackService.showSuccess(
+                        this.context,
+                        message: 'Perfil atualizado com sucesso',
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -834,7 +870,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       ),
                       elevation: 0,
                       disabledBackgroundColor:
-                          Theme.of(ctx).colorScheme.primary.withOpacity(0.6),
+                          Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.6),
                     ),
                     child: isChanging
                         ? const SizedBox(
@@ -989,10 +1025,10 @@ class _MenuDrawerState extends State<_MenuDrawer> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(ctx).colorScheme.primary.withOpacity(0.1),
+                  color: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Theme.of(ctx).colorScheme.primary.withOpacity(0.2),
+                    color: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Column(
@@ -1187,7 +1223,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       height: 48,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: theme.colorScheme.primary.withOpacity(0.2),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.2),
                       ),
                       child: user?.photo != null && user!.photo!.isNotEmpty
                           ? ClipOval(
@@ -1284,9 +1320,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                       Icons.fingerprint,
                       biometricsEnabled,
                       isDark,
-                      onChanged: (value) {
-                        setState(() => biometricsEnabled = value);
-                      },
+                      onChanged: (value) => _onToggleBiometrics(value),
                     ),
                     _buildMenuOption(
                       'Alterar PIN',
@@ -1398,8 +1432,8 @@ class _MenuDrawerState extends State<_MenuDrawer> {
               color: isLogout
                   ? Colors.red
                   : (isDark
-                      ? AppColors.textLight.withOpacity(0.7)
-                      : AppColors.textDark.withOpacity(0.7)),
+                      ? AppColors.textLight.withValues(alpha: 0.7)
+                      : AppColors.textDark.withValues(alpha: 0.7)),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1437,8 +1471,8 @@ class _MenuDrawerState extends State<_MenuDrawer> {
             icon,
             size: 20,
             color: isDark
-                ? AppColors.textLight.withOpacity(0.7)
-                : AppColors.textDark.withOpacity(0.7),
+                ? AppColors.textLight.withValues(alpha: 0.7)
+                : AppColors.textDark.withValues(alpha: 0.7),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1460,7 +1494,7 @@ class _MenuDrawerState extends State<_MenuDrawer> {
               value: value,
               onChanged: onChanged,
               activeThumbColor: AppColors.primary,
-              activeTrackColor: AppColors.primary.withOpacity(0.3),
+              activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
@@ -1614,7 +1648,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                 child: Container(
-                  color: const Color(0xFF121212).withOpacity(0.3),
+                  color: const Color(0xFF121212).withValues(alpha: 0.3),
                 ),
               ),
             SafeArea(

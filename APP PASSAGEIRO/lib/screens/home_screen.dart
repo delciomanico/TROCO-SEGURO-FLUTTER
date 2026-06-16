@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.12),
+                    color: Colors.red.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -279,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.12),
+                    color: Colors.red.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -533,7 +533,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 InkWell(
                   onTap: () => widget.onOpenProfile?.call(),
                   borderRadius: BorderRadius.circular(16),
-                  child: Container(
+                  child: SizedBox(
                     width: responsive.scaledWidth(42),
                     height: responsive.scaledWidth(42),
                     child: Icon(
@@ -1063,11 +1063,8 @@ class _HomeScreenState extends State<HomeScreen> {
             readExpectedPin: () => SecureStorageService().readPin(),
           );
         },
-        onSuccess: () {
-          // Optionally refresh user data
-          if (!mounted) return;
-          final provider = context.read<AppProvider>();
-          provider.refreshUserData();
+        onSuccess: (_) {
+          // Dados já foram invalidados dentro do PaymentConfirmationModal.
         },
         onCancel: () {},
       ),

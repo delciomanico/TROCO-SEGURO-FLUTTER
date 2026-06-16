@@ -83,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 color:
                     (isDark ? Theme.of(context).cardColor : AppColors.lightCard)
-                        .withOpacity(0.3),
+                        .withValues(alpha: 0.3),
               ),
             ),
           // Content
@@ -194,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDefaultAvatar() {
     return Container(
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.primary.withValues(alpha: 0.1),
       child: const Icon(
         Icons.person_outline,
         size: 50,
@@ -345,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 0.5,
         ),
       ),
@@ -385,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             value: value,
             onChanged: onChanged,
             activeThumbColor: AppColors.primary,
-            activeTrackColor: AppColors.primary.withOpacity(0.3),
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -411,7 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
           ),
         ),
@@ -519,7 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
           ),
         ),
@@ -823,10 +823,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkBackground : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -1045,7 +1045,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     elevation: 0,
                     disabledBackgroundColor:
-                        Theme.of(ctx).colorScheme.primary.withOpacity(0.6),
+                        Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.6),
                   ),
                   child: isChangingPassword
                       ? SizedBox(
@@ -1274,7 +1274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Fechar',
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (dialogContext, _, __) {
         final responsive = ResponsiveHelper(dialogContext);

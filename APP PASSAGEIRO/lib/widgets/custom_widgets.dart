@@ -62,10 +62,10 @@ class AppBrandingHeader extends StatelessWidget {
         Container(
           padding: EdgeInsets.all(responsive.scaledWidth(compact ? 8 : 12)),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(compact ? 10 : 14),
             border: Border.all(
-              color: AppColors.accent.withOpacity(0.6),
+              color: AppColors.accent.withValues(alpha: 0.6),
               width: 2,
             ),
           ),
@@ -141,7 +141,7 @@ class GradientBalanceCard extends StatelessWidget {
             BorderRadius.circular(responsive.responsiveBorderRadius() * 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.darkBlue.withOpacity(0.3),
+            color: AppColors.darkBlue.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -158,7 +158,7 @@ class GradientBalanceCard extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -170,7 +170,7 @@ class GradientBalanceCard extends StatelessWidget {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -225,7 +225,7 @@ class GradientBalanceCard extends StatelessWidget {
                     if (onToggleVisibility != null)
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -247,9 +247,9 @@ class GradientBalanceCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.white.withOpacity(0),
-                          Colors.white.withOpacity(0.3),
-                          Colors.white.withOpacity(0),
+                          Colors.white.withValues(alpha: 0),
+                          Colors.white.withValues(alpha: 0.3),
+                          Colors.white.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -324,7 +324,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
             boxShadow: widget.isPrimary
                 ? [
                     BoxShadow(
-                      color: AppColors.accent.withOpacity(0.3),
+                      color: AppColors.accent.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -401,7 +401,7 @@ class CustomButton extends StatelessWidget {
               ? null
               : [
                   BoxShadow(
-                    color: AppColors.darkBlue.withOpacity(0.2),
+                    color: AppColors.darkBlue.withValues(alpha: 0.2),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -489,10 +489,10 @@ class CustomCard extends StatelessWidget {
           color: scheme.surface,
           borderRadius:
               BorderRadius.circular(responsive.responsiveBorderRadius()),
-          border: Border.all(color: scheme.outline.withOpacity(0.2), width: 1),
+          border: Border.all(color: scheme.outline.withValues(alpha: 0.2), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -550,7 +550,7 @@ class CustomInput extends StatelessWidget {
               style: TextStyle(
                 fontSize: labelFontSize,
                 fontWeight: FontWeight.w900,
-                color: scheme.onSurface.withOpacity(0.6),
+                color: scheme.onSurface.withValues(alpha: 0.6),
                 letterSpacing: 1.5,
               ),
             ),
@@ -563,11 +563,11 @@ class CustomInput extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: enabled 
-                  ? scheme.surfaceContainerHighest.withOpacity(0.5)
-                  : scheme.surfaceContainerHighest.withOpacity(0.3),
+                  ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                  : scheme.surfaceContainerHighest.withValues(alpha: 0.3),
               borderRadius:
                   BorderRadius.circular(responsive.responsiveBorderRadius()),
-              border: Border.all(color: scheme.outline.withOpacity(0.2)),
+              border: Border.all(color: scheme.outline.withValues(alpha: 0.2)),
             ),
             child: Row(
               crossAxisAlignment: maxLines != null && maxLines! > 1 
@@ -593,7 +593,7 @@ class CustomInput extends StatelessWidget {
                     decoration: BoxDecoration(
                       border: Border(
                         right:
-                            BorderSide(color: scheme.outline.withOpacity(0.3)),
+                            BorderSide(color: scheme.outline.withValues(alpha: 0.3)),
                       ),
                     ),
                     child: Text(
@@ -620,12 +620,12 @@ class CustomInput extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: enabled 
                           ? scheme.onSurface 
-                          : scheme.onSurface.withOpacity(0.5),
+                          : scheme.onSurface.withValues(alpha: 0.5),
                     ),
                     decoration: InputDecoration(
                       hintText: placeholder,
                       hintStyle: TextStyle(
-                        color: scheme.onSurface.withOpacity(0.5),
+                        color: scheme.onSurface.withValues(alpha: 0.5),
                         fontWeight: FontWeight.w600,
                       ),
                       border: InputBorder.none,

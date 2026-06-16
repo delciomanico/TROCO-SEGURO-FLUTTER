@@ -143,7 +143,7 @@ class AppTheme {
           displayMedium: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.textLight, letterSpacing: -0.3),
           bodyLarge: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textLight),
           bodyMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textLight),
-          bodySmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textLight.withOpacity(0.85), letterSpacing: 1.5),
+          bodySmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textLight.withValues(alpha: 0.85), letterSpacing: 1.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

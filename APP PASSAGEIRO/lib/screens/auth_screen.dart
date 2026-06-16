@@ -180,7 +180,7 @@ class _AuthScreenState extends State<AuthScreen> {
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
               child: Container(
-                color: (isDark ? darkBg : lightBg).withOpacity(0.3),
+                color: (isDark ? darkBg : lightBg).withValues(alpha: 0.3),
               ),
             ),
           // Content
@@ -234,7 +234,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     _obscurePin
                                         ? Icons.visibility_off_outlined
                                         : Icons.visibility_outlined,
-                                    color: primaryGold.withOpacity(0.7),
+                                    color: primaryGold.withValues(alpha: 0.7),
                                     size: r.scaledWidth(20),
                                   ),
                                   onPressed: () => setState(() {
@@ -584,7 +584,7 @@ class _AuthScreenState extends State<AuthScreen> {
               _obscurePin
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: primaryGold.withOpacity(0.7),
+              color: primaryGold.withValues(alpha: 0.7),
               size: r.scaledWidth(20),
             ),
             onPressed: () => setState(() {

@@ -5,6 +5,7 @@ import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -62,11 +63,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
     if (!mounted) return;
     if (didTransfer == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transferência para cartão virtual concluída!'),
-          backgroundColor: Colors.green,
-        ),
+      FeedbackService.showSuccess(
+        context,
+        message: 'Transferência para cartão virtual concluída!',
       );
     }
   }
@@ -373,15 +372,15 @@ class _WalletScreenState extends State<WalletScreen> {
           color: isActive
               ? AppColors.darkBackground
               : (isDark
-                  ? AppColors.darkCard.withOpacity(0.06)
+                  ? AppColors.darkCard.withValues(alpha: 0.06)
                   : AppColors.lightBackground),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
                 ? AppColors.darkBackground
                 : (isDark
-                    ? AppColors.textLight.withOpacity(0.18)
-                    : Colors.grey.withOpacity(0.3)),
+                    ? AppColors.textLight.withValues(alpha: 0.18)
+                    : Colors.grey.withValues(alpha: 0.3)),
           ),
         ),
         child: Text(
@@ -392,7 +391,7 @@ class _WalletScreenState extends State<WalletScreen> {
             color: isActive
                 ? AppColors.textLight
                 : (isDark
-                    ? AppColors.textLight.withOpacity(0.9)
+                    ? AppColors.textLight.withValues(alpha: 0.9)
                     : Colors.grey[600]),
           ),
         ),
@@ -408,9 +407,9 @@ class _WalletScreenState extends State<WalletScreen> {
       decoration: InputDecoration(
         hintText: 'Buscar transações...',
         hintStyle: TextStyle(
-            color: isDark ? AppColors.textLight.withOpacity(0.6) : Colors.grey),
+            color: isDark ? AppColors.textLight.withValues(alpha: 0.6) : Colors.grey),
         prefixIcon: Icon(Icons.search,
-            color: isDark ? AppColors.textLight.withOpacity(0.6) : Colors.grey),
+            color: isDark ? AppColors.textLight.withValues(alpha: 0.6) : Colors.grey),
         filled: true,
         fillColor: isDark ? AppColors.darkCard : AppColors.lightCard,
         border: OutlineInputBorder(
@@ -431,7 +430,7 @@ class _WalletScreenState extends State<WalletScreen> {
               Icons.inbox_outlined,
               size: 48,
               color: isDark
-                  ? AppColors.textLight.withOpacity(0.38)
+                  ? AppColors.textLight.withValues(alpha: 0.38)
                   : Colors.grey[400],
             ),
             const SizedBox(height: 12),
@@ -440,7 +439,7 @@ class _WalletScreenState extends State<WalletScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: isDark
-                    ? AppColors.textLight.withOpacity(0.6)
+                    ? AppColors.textLight.withValues(alpha: 0.6)
                     : Colors.grey[500],
                 fontWeight: FontWeight.w500,
               ),
@@ -465,7 +464,7 @@ class _WalletScreenState extends State<WalletScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -478,8 +477,8 @@ class _WalletScreenState extends State<WalletScreen> {
             height: 44,
             decoration: BoxDecoration(
               color: isIncoming
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -512,7 +511,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark
-                          ? AppColors.textLight.withOpacity(0.6)
+                          ? AppColors.textLight.withValues(alpha: 0.6)
                           : Colors.grey[500],
                       fontWeight: FontWeight.w500,
                     ),
@@ -537,7 +536,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark
-                      ? AppColors.textLight.withOpacity(0.6)
+                      ? AppColors.textLight.withValues(alpha: 0.6)
                       : Colors.grey[500],
                 ),
               ),
