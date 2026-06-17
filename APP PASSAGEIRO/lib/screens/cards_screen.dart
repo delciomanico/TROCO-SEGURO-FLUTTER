@@ -1711,22 +1711,14 @@ class _ActionChip extends StatelessWidget {
               Container(
                 width: 54,
                 height: 54,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.05),
-                  border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.5),
-                    width: 1.2,
-                  ),
+                  color: AppColors.primaryGold,
                 ),
                 child: Icon(
                   icon,
                   size: 22,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.75)
-                      : AppColors.textDark.withValues(alpha: 0.65),
+                  color: Colors.black.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 7),
