@@ -568,147 +568,376 @@ class _MenuModal extends StatefulWidget {
 }
 
 class _MenuModalState extends State<_MenuModal> {
-  void _openSubModal(Widget modal) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (ctx, animation, _) {
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-          child: modal,
+  bool _bio = false;
+  bool _darkMode = false;
+  bool _notifications = true;
+  final ApiService _api = ApiService();
+  final BiometricService _bioSvc = BiometricService();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await _api.loadTokens();
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _bio = prefs.getBool('ts_bio_enabled') ?? false;
+        _darkMode = prefs.getString('ts_theme_mode') == 'dark';
+      });
+    }
+  }
+
+  Future<void> _toggleBio(bool enable) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (enable) {
+      try {
+        final ok = await _bioSvc.authenticate(
+          reason: 'Confirme para ativar a biometria',
+          useErrorDialogs: true,
+          stickyAuth: true,
         );
-      },
+        if (!ok) {
+          if (mounted) FeedbackService.showInfo(context, message: 'Cancelado');
+          return;
+        }
+        await prefs.setBool('ts_bio_enabled', true);
+        if (mounted) setState(() => _bio = true);
+        if (mounted) FeedbackService.showSuccess(context, message: 'Biometria ativada');
+      } catch (_) {
+        if (mounted) FeedbackService.showError(context, message: 'Biometria indisponível');
+      }
+    } else {
+      await prefs.setBool('ts_bio_enabled', false);
+      if (mounted) setState(() => _bio = false);
+      if (mounted) FeedbackService.showInfo(context, message: 'Biometria desativada');
+    }
+  }
+
+  Future<void> _changePin() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final curCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final cfmCtrl = TextEditingController();
+    bool busy = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('Alterar PIN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+                const SizedBox(height: 4),
+                Text('Novo PIN de 6 dígitos numéricos', style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+                const SizedBox(height: 20),
+                _pinField('PIN actual', curCtrl, isDark),
+                const SizedBox(height: 12),
+                _pinField('Novo PIN', newCtrl, isDark),
+                const SizedBox(height: 12),
+                _pinField('Confirmar PIN', cfmCtrl, isDark),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: busy ? null : () async {
+                      final cur = curCtrl.text.trim();
+                      final nw = newCtrl.text.trim();
+                      final cf = cfmCtrl.text.trim();
+                      if (!RegExp(r'^\d{6}$').hasMatch(nw)) {
+                        FeedbackService.showError(context, message: 'PIN deve ter 6 dígitos');
+                        return;
+                      }
+                      if (nw != cf) {
+                        FeedbackService.showError(context, message: 'PINs não coincidem');
+                        return;
+                      }
+                      setSheet(() => busy = true);
+                      final res = await _api.changePassword(currentPassword: cur, newPassword: nw);
+                      setSheet(() => busy = false);
+                      if (res.isSuccess) {
+                        await SecureStorageService().savePin(nw);
+                        await PinGuard.resetFailures('global');
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) FeedbackService.showSuccess(context, message: 'PIN alterado');
+                      } else {
+                        if (mounted) FeedbackService.showError(context, message: res.error ?? 'PIN actual incorreto');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: busy
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Text('Alterar PIN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  Widget _pinField(String label, TextEditingController ctrl, bool isDark) {
+    return TextField(
+      controller: ctrl,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: 6,
+      decoration: InputDecoration(
+        labelText: label,
+        counterText: '',
+        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryGold),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+        ),
+        filled: true,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+      ),
+    );
+  }
+
+  void _showEditProfile() {
+    final provider = context.read<AppProvider>();
+    final user = provider.user;
+    if (user == null) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nameCtrl = TextEditingController(text: user.fullName);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Editar Perfil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Nome completo',
+                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.primaryGold),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final ok = await provider.updateProfile(fullName: nameCtrl.text.trim());
+                    if (ok && mounted) FeedbackService.showSuccess(context, message: 'Perfil atualizado');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Guardar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAbout(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Troco Seguro', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Versão 1.0.0', style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+          const SizedBox(height: 10),
+          Text('Plataforma segura para pagamentos digitais de táxis em Luanda.', style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white : AppColors.textDark)),
+        ]),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.w600)))],
+      ),
+    );
+  }
+
+  void _showTerms(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Termos e Condições', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+        content: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _termBlock('Aceitação', 'Ao usar este aplicativo, concorda com estes termos.', isDark),
+            const SizedBox(height: 10),
+            _termBlock('Privacidade', 'Dados protegidos com criptografia. Nunca partilhamos sem consentimento.', isDark),
+            const SizedBox(height: 10),
+            _termBlock('Responsabilidades', 'É responsável pela confidencialidade da sua conta e PIN.', isDark),
+          ]),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Aceitar', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.w600)))],
+      ),
+    );
+  }
+
+  Widget _termBlock(String title, String body, bool isDark) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryGold)),
+      const SizedBox(height: 3),
+      Text(body, style: TextStyle(fontSize: 11, height: 1.5, color: isDark ? Colors.white : AppColors.textDark)),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = context.read<AppProvider>().user;
+    final user = context.watch<AppProvider>().user;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
       body: SafeArea(
         child: Column(
           children: [
+            // ── Header ──────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
               child: Row(
                 children: [
                   Container(
-                    width: 46,
-                    height: 46,
+                    width: 46, height: 46,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : Colors.black.withValues(alpha: 0.04),
-                      border:
-                          Border.all(color: AppColors.primaryGold, width: 1.5),
+                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                      border: Border.all(color: AppColors.primaryGold, width: 1.5),
                     ),
                     child: user?.photo != null && user!.photo!.isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(user.photo!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                    Icons.person_rounded,
-                                    size: 22,
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.75)
-                                        : AppColors.textDark
-                                            .withValues(alpha: 0.65))))
-                        : Icon(Icons.person_rounded,
-                            size: 22,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.75)
-                                : AppColors.textDark.withValues(alpha: 0.65)),
+                        ? ClipOval(child: Image.network(user.photo!, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 22, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65))))
+                        : Icon(Icons.person_rounded, size: 22, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.fullName ?? '—',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color:
-                                  isDark ? Colors.white : AppColors.textDark),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          user?.phoneNumber ?? '—',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.5)
-                                  : Colors.black.withValues(alpha: 0.45)),
-                        ),
-                      ],
-                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(user?.fullName ?? '—',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(user?.phoneNumber ?? '—',
+                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+                    ]),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      width: 36,
-                      height: 36,
+                      width: 36, height: 36,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : Colors.black.withValues(alpha: 0.05),
+                        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
                       ),
-                      child: Icon(Icons.close_rounded,
-                          size: 18,
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.75)
-                              : AppColors.textDark.withValues(alpha: 0.65)),
+                      child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
                     ),
                   ),
                 ],
               ),
             ),
-            Container(
-              height: 1,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.07)
-                  : Colors.black.withValues(alpha: 0.06),
+            Container(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            // ── Scrollable list ─────────────────────────────────────────────
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(top: 20, bottom: 12),
+                children: [
+                  _sectionLabel('PERFIL', isDark),
+                  _actionTile(isDark, Icons.edit_outlined, 'Editar perfil', 'Nome e informações pessoais', _showEditProfile),
+                  _actionTile(isDark, Icons.payment_outlined, 'Métodos de pagamento', 'Cartões e contas vinculadas', () {}),
+                  _actionTile(isDark, Icons.location_on_outlined, 'Endereço', 'Morada e localização', () {}),
+                  const SizedBox(height: 8),
+                  _sectionLabel('SEGURANÇA', isDark),
+                  _toggleTile(isDark, Icons.fingerprint_rounded, 'Biometria', 'Desbloquear com impressão digital ou Face ID', _bio, _toggleBio),
+                  _actionTile(isDark, Icons.key_outlined, 'Alterar PIN', 'Mudar o PIN de acesso à conta', _changePin),
+                  const SizedBox(height: 8),
+                  _sectionLabel('CONFIGURAÇÕES', isDark),
+                  _toggleTile(isDark, Icons.dark_mode_outlined, 'Tema escuro', 'Alternar entre modo claro e escuro', _darkMode, (v) async {
+                    await ThemeController.instance.setDark(v);
+                    if (mounted) setState(() => _darkMode = v);
+                  }),
+                  _toggleTile(isDark, Icons.notifications_outlined, 'Notificações', 'Receber alertas e novidades', _notifications, (v) => setState(() => _notifications = v)),
+                  _actionTile(isDark, Icons.info_outline_rounded, 'Sobre', 'Versão e informações do aplicativo', () => _showAbout(isDark)),
+                  _actionTile(isDark, Icons.description_outlined, 'Termos e Condições', 'Política de uso e privacidade', () => _showTerms(isDark)),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            _buildNavTile(
-              isDark: isDark,
-              icon: Icons.person_outline_rounded,
-              title: 'Perfil',
-              subtitle: 'Dados pessoais e conta',
-              onTap: () => _openSubModal(const _ProfileModal()),
-            ),
-            const SizedBox(height: 10),
-            _buildNavTile(
-              isDark: isDark,
-              icon: Icons.shield_outlined,
-              title: 'Segurança',
-              subtitle: 'PIN, biometria e privacidade',
-              onTap: () => _openSubModal(const _SecurityModal()),
-            ),
-            const SizedBox(height: 10),
-            _buildNavTile(
-              isDark: isDark,
-              icon: Icons.settings_outlined,
-              title: 'Configurações',
-              subtitle: 'Tema, notificações e informações',
-              onTap: () => _openSubModal(const _SettingsModal()),
-            ),
-            const Spacer(),
+            // ── Logout ──────────────────────────────────────────────────────
             GestureDetector(
               onTap: () {
                 Navigator.pop(context);
@@ -720,19 +949,14 @@ class _MenuModalState extends State<_MenuModal> {
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.22), width: 1.0),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.22), width: 1.0),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.logout_rounded, color: Colors.red, size: 18),
                     SizedBox(width: 8),
-                    Text('Sair',
-                        style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
+                    Text('Sair', style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -743,77 +967,51 @@ class _MenuModalState extends State<_MenuModal> {
     );
   }
 
-  Widget _buildNavTile({
-    required bool isDark,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
+  Widget _sectionLabel(String label, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.9,
+              color: isDark ? Colors.white.withValues(alpha: 0.35) : Colors.black.withValues(alpha: 0.3))),
+    );
+  }
+
+  Widget _actionTile(bool isDark, IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.07),
-            width: 1.0,
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04),
-                border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.5),
-                    width: 1.2),
-              ),
-              child: Icon(icon,
-                  size: 19,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.75)
-                      : AppColors.textDark.withValues(alpha: 0.65)),
-            ),
+            Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
             const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : AppColors.textDark)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.45)
-                              : Colors.black.withValues(alpha: 0.4))),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                size: 20,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.3)
-                    : Colors.black.withValues(alpha: 0.22)),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+            ])),
+            Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _toggleTile(bool isDark, IconData icon, String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+          ])),
+          Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        ],
       ),
     );
   }
