@@ -762,6 +762,43 @@ class ApiService {
     }
   }
 
+  // ============ CONTACTOS DE EMERGÊNCIA ============
+
+  Future<ApiResponse<List<EmergencyContact>>> getEmergencyContacts() async {
+    try {
+      final response = await _dio.get('/safety/emergency-contacts');
+      final list = ((response.data['contacts'] ?? response.data) as List)
+          .map((e) => EmergencyContact.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(list);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<EmergencyContact>> addEmergencyContact({
+    required String name,
+    required String phoneNumber,
+  }) async {
+    try {
+      final response = await _dio.post('/safety/emergency-contacts',
+          data: {'name': name, 'phoneNumber': phoneNumber});
+      return ApiResponse.success(
+          EmergencyContact.fromJson(response.data['contact'] ?? response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> deleteEmergencyContact(String id) async {
+    try {
+      await _dio.delete('/safety/emergency-contacts/$id');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ FAQ ============
 
   /// Listar perguntas frequentes
@@ -1007,4 +1044,23 @@ class RecipientInfo {
       phone: json['phoneNumber'] ?? json['phone'] ?? '',
     );
   }
+}
+
+class EmergencyContact {
+  final String id;
+  final String name;
+  final String phoneNumber;
+
+  const EmergencyContact({
+    required this.id,
+    required this.name,
+    required this.phoneNumber,
+  });
+
+  factory EmergencyContact.fromJson(Map<String, dynamic> json) =>
+      EmergencyContact(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        phoneNumber: json['phoneNumber'] as String,
+      );
 }

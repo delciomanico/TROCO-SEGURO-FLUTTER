@@ -24,7 +24,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/payment_service.dart';
-import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/api_service.dart' show ApiService, EmergencyContact, AppNotification, QrValidationResult;
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
@@ -1112,6 +1112,21 @@ class _SecurityModalState extends State<_SecurityModal> {
 
   bool _validPin(String p) => RegExp(r'^\d{6}$').hasMatch(p);
 
+  void _openEmergencyContacts() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: const _EmergencyContactsPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1127,6 +1142,8 @@ class _SecurityModalState extends State<_SecurityModal> {
                 'Desbloquear com impressão digital ou Face ID', _bio, _toggleBio),
             _actionTile(isDark, Icons.key_outlined, 'Alterar PIN',
                 'Mudar o PIN de acesso à conta', _changePin),
+            _actionTile(isDark, Icons.people_outline_rounded, 'Contactos de emergência',
+                'Gerir contactos a notificar em caso de pânico', _openEmergencyContacts),
           ],
         ),
       ),
@@ -1274,6 +1291,255 @@ class _SettingsModalState extends State<_SettingsModal> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Emergency Contacts Page ─────────────────────────────────────────────────
+class _EmergencyContactsPage extends StatefulWidget {
+  const _EmergencyContactsPage();
+  @override
+  State<_EmergencyContactsPage> createState() => _EmergencyContactsPageState();
+}
+
+class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
+  final ApiService _api = ApiService();
+  List<EmergencyContact> _contacts = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await _api.loadTokens();
+    final res = await _api.getEmergencyContacts();
+    if (mounted) setState(() { _contacts = res.data ?? []; _loading = false; });
+  }
+
+  Future<void> _delete(EmergencyContact c) async {
+    final res = await _api.deleteEmergencyContact(c.id);
+    if (res.isSuccess && mounted) {
+      setState(() => _contacts.removeWhere((x) => x.id == c.id));
+      FeedbackService.showSuccess(context, message: '${c.name} removido');
+    } else if (mounted) {
+      FeedbackService.showError(context, message: res.error ?? 'Erro ao remover');
+    }
+  }
+
+  void _showAddSheet(bool isDark) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    bool busy = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4,
+                    decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 20),
+                Text('Adicionar contacto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+                const SizedBox(height: 4),
+                Text('Será notificado quando acionar o botão de pânico', style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+                const SizedBox(height: 20),
+                _field('Nome', nameCtrl, isDark, Icons.person_outline),
+                const SizedBox(height: 12),
+                _field('Telefone (+244...)', phoneCtrl, isDark, Icons.phone_outlined, type: TextInputType.phone),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: busy ? null : () async {
+                      final name = nameCtrl.text.trim();
+                      final phone = phoneCtrl.text.trim();
+                      if (name.isEmpty || phone.isEmpty) {
+                        FeedbackService.showError(context, message: 'Preencha todos os campos');
+                        return;
+                      }
+                      setSheet(() => busy = true);
+                      final res = await _api.addEmergencyContact(name: name, phoneNumber: phone);
+                      setSheet(() => busy = false);
+                      if (res.isSuccess && res.data != null) {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) setState(() => _contacts.add(res.data!));
+                        if (mounted) FeedbackService.showSuccess(context, message: '$name adicionado');
+                      } else {
+                        if (mounted) FeedbackService.showError(context, message: res.error ?? 'Erro ao adicionar');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold, foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: busy
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Text('Adicionar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl, bool isDark, IconData icon, {TextInputType type = TextInputType.text}) {
+    return TextField(
+      controller: ctrl, keyboardType: type,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.primaryGold),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5)),
+        filled: true,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canAdd = _contacts.length < 3;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Contactos de Emergência', isDark, () => Navigator.pop(context)),
+            // limit badge
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Row(
+                children: [
+                  Expanded(child: Text('${_contacts.length}/3 contactos',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4)))),
+                  if (canAdd)
+                    GestureDetector(
+                      onTap: () => _showAddSheet(isDark),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.add_rounded, size: 15, color: Colors.black),
+                          SizedBox(width: 4),
+                          Text('Adicionar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+                        ]),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text('Limite atingido', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.orange)),
+                    ),
+                ],
+              ),
+            ),
+            Container(height: 1, margin: const EdgeInsets.only(top: 12),
+                color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
+                  : _contacts.isEmpty
+                      ? _buildEmpty(isDark)
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: _contacts.length,
+                          separatorBuilder: (_, __) => Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20),
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05)),
+                          itemBuilder: (_, i) => _contactTile(_contacts[i], isDark),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _contactTile(EmergencyContact c, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+              border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4), width: 1.2),
+            ),
+            child: Center(child: Text(c.name[0].toUpperCase(),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryGold))),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(c.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+            const SizedBox(height: 2),
+            Text(c.phoneNumber, style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+          ])),
+          GestureDetector(
+            onTap: () => _delete(c),
+            child: Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.red.withValues(alpha: 0.08)),
+              child: const Icon(Icons.delete_outline_rounded, size: 17, color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty(bool isDark) {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 72, height: 72,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4), width: 1.5)),
+            child: Icon(Icons.people_outline_rounded, size: 32,
+                color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.3))),
+        const SizedBox(height: 16),
+        Text('Nenhum contacto', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppColors.textDark)),
+        const SizedBox(height: 6),
+        Text('Adicione até 3 pessoas a notificar\nem caso de emergência.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.5,
+                color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+      ]),
     );
   }
 }
