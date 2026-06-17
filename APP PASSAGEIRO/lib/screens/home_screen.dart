@@ -13,6 +13,7 @@ import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
+import 'package:troco_seguro/services/api_service.dart' show AppNotification;
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenScanner;
@@ -439,9 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? Colors.white.withValues(alpha: 0.06)
                           : Colors.black.withValues(alpha: 0.05),
                     ),
-                    SizedBox(height: responsive.scaledHeight(8)),
+                    SizedBox(height: responsive.scaledHeight(24)),
                     _buildQuickActions(responsive),
-                    SizedBox(height: responsive.scaledHeight(20)),
+                    SizedBox(height: responsive.scaledHeight(32)),
                     _buildRecentTransactions(responsive, provider, isDark),
                     SizedBox(height: responsive.scaledHeight(100)),
                   ],
@@ -456,7 +457,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeader(ResponsiveHelper responsive, User? user) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final initials = _getInitials(user?.fullName ?? 'U');
 
     return Container(
       color: isDark ? AppColors.darkBackground : Colors.white,
@@ -466,6 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
+          // Avatar com ícone de pessoa
           GestureDetector(
             onTap: () => widget.onOpenProfile?.call(),
             child: Container(
@@ -473,18 +474,17 @@ class _HomeScreenState extends State<HomeScreen> {
               height: responsive.scaledWidth(42),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04),
                 border: Border.all(color: AppColors.primaryGold, width: 1.5),
               ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    color: AppColors.primaryGold,
-                    fontWeight: FontWeight.w700,
-                    fontSize: responsive.responsiveFontSize(14),
-                  ),
-                ),
+              child: Icon(
+                Icons.person_rounded,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : AppColors.textDark.withValues(alpha: 0.7),
+                size: responsive.scaledWidth(22),
               ),
             ),
           ),
@@ -511,8 +511,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(width: responsive.scaledWidth(8)),
               _headerIconButton(
-                icon: Icons.more_vert_rounded,
-                onTap: () => widget.onOpenProfile?.call(),
+                icon: Icons.notifications_outlined,
+                onTap: _showNotificationsModal,
                 isDark: isDark,
                 responsive: responsive,
               ),
@@ -520,6 +520,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showNotificationsModal() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, animation, _) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: const _NotificationsSheet(),
+        );
+      },
     );
   }
 
@@ -602,56 +622,194 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickActions(ResponsiveHelper responsive) {
-    final actions = [
-      (
-        icon: Icons.qr_code,
-        label: 'Pagar com QR',
-        onTap: _handlePayWithQr,
-      ),
-      (
-        icon: Icons.qr_code_scanner,
-        label: 'Identificar QR',
-        onTap: _handleIdentifyQr,
-      ),
-      (
-        icon: Icons.account_balance_wallet_outlined,
-        label: 'Recarregar',
-        onTap: _handleTopup,
-      ),
-      (
-        icon: Icons.warning_amber_rounded,
-        label: 'Pânico',
-        onTap: _isPanicLoading ? () {} : _confirmPanicAction,
-      ),
-      (
-        icon: Icons.qr_code_2_rounded,
-        label: 'Meu QR',
-        onTap: _handleShowMyQrCode,
-      ),
+    final mainActions = [
+      (icon: Icons.qr_code, label: 'Pagar QR', onTap: _handlePayWithQr),
+      (icon: Icons.account_balance_wallet_outlined, label: 'Recarregar', onTap: _handleTopup),
+      (icon: Icons.qr_code_2_rounded, label: 'Meu QR', onTap: _handleShowMyQrCode),
+      (icon: Icons.grid_view_rounded, label: 'Mais', onTap: _showMoreActionsModal),
     ];
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: actions.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: responsive.scaledHeight(12),
-          crossAxisSpacing: responsive.scaledWidth(8),
-          childAspectRatio: 0.9,
-        ),
-        itemBuilder: (context, index) {
-          final action = actions[index];
-          return _buildCircularActionButton(
-            responsive,
-            icon: action.icon,
-            label: action.label,
-            onTap: action.onTap,
-          );
-        },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: mainActions
+            .map((a) => Expanded(
+                  child: _buildCircularActionButton(
+                    responsive,
+                    icon: a.icon,
+                    label: a.label,
+                    onTap: a.onTap,
+                  ),
+                ))
+            .toList(),
       ),
+    );
+  }
+
+  void _showMoreActionsModal() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, animation, _) {
+        final responsive = ResponsiveHelper(ctx);
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: _buildMoreActionsSheet(ctx, responsive, isDark),
+        );
+      },
+    );
+  }
+
+  Widget _buildMoreActionsSheet(
+      BuildContext ctx, ResponsiveHelper responsive, bool isDark) {
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                responsive.scaledWidth(20),
+                responsive.scaledHeight(16),
+                responsive.scaledWidth(20),
+                0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Ações rápidas',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(18),
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : AppColors.textDark,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      width: responsive.scaledWidth(36),
+                      height: responsive.scaledWidth(36),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: responsive.scaledWidth(18),
+                        color: isDark ? Colors.white : AppColors.textDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding:
+                    EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildActionCategory(
+                      ctx: ctx,
+                      responsive: responsive,
+                      isDark: isDark,
+                      title: 'Pagamentos',
+                      items: [
+                        (icon: Icons.qr_code, label: 'Pagar com QR', onTap: _handlePayWithQr),
+                        (icon: Icons.qr_code_scanner, label: 'Identificar QR', onTap: _handleIdentifyQr),
+                        (icon: Icons.qr_code_2_rounded, label: 'Meu QR', onTap: _handleShowMyQrCode),
+                      ],
+                    ),
+                    _buildActionCategory(
+                      ctx: ctx,
+                      responsive: responsive,
+                      isDark: isDark,
+                      title: 'Carteira',
+                      items: [
+                        (icon: Icons.account_balance_wallet_outlined, label: 'Recarregar', onTap: _handleTopup),
+                      ],
+                    ),
+                    _buildActionCategory(
+                      ctx: ctx,
+                      responsive: responsive,
+                      isDark: isDark,
+                      title: 'Segurança',
+                      items: [
+                        (icon: Icons.warning_amber_rounded, label: 'Pânico', onTap: _isPanicLoading ? () {} : _confirmPanicAction),
+                      ],
+                    ),
+                    SizedBox(height: responsive.scaledHeight(24)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCategory({
+    required BuildContext ctx,
+    required ResponsiveHelper responsive,
+    required bool isDark,
+    required String title,
+    required List<({IconData icon, String label, VoidCallback onTap})> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: responsive.scaledHeight(20)),
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(11),
+            fontWeight: FontWeight.w700,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.35),
+            letterSpacing: 0.8,
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(12)),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: responsive.scaledHeight(12),
+            crossAxisSpacing: responsive.scaledWidth(8),
+            childAspectRatio: 0.85,
+          ),
+          itemBuilder: (_, index) {
+            final item = items[index];
+            return _buildCircularActionButton(
+              responsive,
+              icon: item.icon,
+              label: item.label,
+              onTap: () {
+                Navigator.pop(ctx);
+                item.onTap();
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -989,16 +1147,19 @@ class _HomeScreenState extends State<HomeScreen> {
             height: responsive.scaledWidth(58),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryGold
-                  .withValues(alpha: isDark ? 0.12 : 0.08),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
               border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.35),
+                color: AppColors.primaryGold.withValues(alpha: 0.5),
                 width: 1.2,
               ),
             ),
             child: Icon(
               icon,
-              color: AppColors.primaryGold,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : AppColors.textDark.withValues(alpha: 0.75),
               size: responsive.scaledWidth(24),
             ),
           ),
@@ -1019,16 +1180,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
-  }
-
-  String _getInitials(String fullName) {
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2 && parts[1].isNotEmpty) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return parts.isNotEmpty && parts[0].isNotEmpty
-        ? parts[0][0].toUpperCase()
-        : 'U';
   }
 
   Widget _headerIconButton({
@@ -1207,6 +1358,366 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Colors.black.withValues(alpha: 0.06),
           ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Notifications fullscreen sheet
+// ---------------------------------------------------------------------------
+
+class _NotificationsSheet extends StatefulWidget {
+  const _NotificationsSheet();
+
+  @override
+  State<_NotificationsSheet> createState() => _NotificationsSheetState();
+}
+
+class _NotificationsSheetState extends State<_NotificationsSheet> {
+  List<AppNotification> _notifications = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = context.read<AppProvider>().apiService;
+    final result = await api.getNotifications();
+    if (!mounted) return;
+    if (result.isSuccess && result.data != null) {
+      setState(() {
+        _notifications = result.data!.notifications;
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _error = result.error ?? 'Erro ao carregar notificações';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _markRead(String id) async {
+    final api = context.read<AppProvider>().apiService;
+    await api.markNotificationRead(id);
+    setState(() {
+      _notifications = _notifications
+          .map((n) => n.id == id ? _copyRead(n) : n)
+          .toList();
+    });
+  }
+
+  Future<void> _markAllRead() async {
+    final api = context.read<AppProvider>().apiService;
+    await api.markAllNotificationsRead();
+    setState(() {
+      _notifications = _notifications.map(_copyRead).toList();
+    });
+  }
+
+  AppNotification _copyRead(AppNotification n) => AppNotification(
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        read: true,
+        createdAt: n.createdAt,
+      );
+
+  int get _unreadCount => _notifications.where((n) => !n.read).length;
+
+  IconData _iconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'payment':
+        return Icons.payments_outlined;
+      case 'topup':
+      case 'deposit':
+        return Icons.account_balance_wallet_outlined;
+      case 'security':
+        return Icons.security_outlined;
+      case 'alert':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkBackground : Colors.white;
+    final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final textMain = isDark ? Colors.white : AppColors.textDark;
+    final textSub = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : Colors.black.withValues(alpha: 0.4);
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notificações',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: textMain,
+                        ),
+                      ),
+                      if (_unreadCount > 0)
+                        Text(
+                          '$_unreadCount não lida${_unreadCount > 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      if (_unreadCount > 0)
+                        GestureDetector(
+                          onTap: _markAllRead,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGold
+                                  .withValues(alpha: isDark ? 0.15 : 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color:
+                                    AppColors.primaryGold.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              'Ler todas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryGold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.05),
+                          ),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: textMain,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Body
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryGold))
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  color: textSub, size: 40),
+                              const SizedBox(height: 12),
+                              Text(_error!,
+                                  style: TextStyle(color: textSub,
+                                      fontSize: 14)),
+                              const SizedBox(height: 16),
+                              GestureDetector(
+                                onTap: _loadNotifications,
+                                child: Text(
+                                  'Tentar novamente',
+                                  style: TextStyle(
+                                    color: AppColors.primaryGold,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _notifications.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.notifications_none_rounded,
+                                      size: 52,
+                                      color: textSub),
+                                  const SizedBox(height: 12),
+                                  Text('Sem notificações',
+                                      style: TextStyle(
+                                          color: textSub, fontSize: 15)),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _loadNotifications,
+                              color: AppColors.primaryGold,
+                              child: ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                itemCount: _notifications.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (_, i) {
+                                  final n = _notifications[i];
+                                  return GestureDetector(
+                                    onTap: n.read ? null : () => _markRead(n.id),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: n.read
+                                            ? cardBg
+                                            : isDark
+                                                ? AppColors.primaryGold
+                                                    .withValues(alpha: 0.08)
+                                                : AppColors.primaryGold
+                                                    .withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: n.read
+                                              ? (isDark
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.06)
+                                                  : Colors.black
+                                                      .withValues(alpha: 0.05))
+                                              : AppColors.primaryGold
+                                                  .withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: isDark
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.07)
+                                                  : Colors.black
+                                                      .withValues(alpha: 0.04),
+                                              border: Border.all(
+                                                color: AppColors.primaryGold
+                                                    .withValues(alpha: 0.4),
+                                                width: 1.0,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              _iconForType(n.type),
+                                              size: 18,
+                                              color: AppColors.primaryGold,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        n.title,
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          color: textMain,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (!n.read)
+                                                      Container(
+                                                        width: 8,
+                                                        height: 8,
+                                                        decoration:
+                                                            const BoxDecoration(
+                                                          shape: BoxShape.circle,
+                                                          color: AppColors
+                                                              .primaryGold,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  n.message,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: textSub,
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  DateFormat(
+                                                          'dd/MM/yyyy HH:mm',
+                                                          'pt_AO')
+                                                      .format(n.createdAt),
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: textSub,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

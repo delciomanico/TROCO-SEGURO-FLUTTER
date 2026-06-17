@@ -530,6 +530,40 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Depositar da carteira para cartão virtual (usa API /wallet/card/deposit)
+  Future<String?> depositToVirtualCard({
+    required String cardId,
+    required int amount,
+  }) async {
+    try {
+      final result =
+          await _api.depositToVirtualCard(cardId: cardId, amount: amount);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1 && result.data != null) {
+          if (result.data!.newBalance != null) {
+            _virtualCards[idx] =
+                _virtualCards[idx].copyWith(balance: result.data!.newBalance!);
+          }
+          if (_user != null && result.data!.newBalance != null) {
+            _user = _user!.copyWith(balance: _user!.balance - amount);
+            await _prefs?.setString(
+                'ts_user', json.encode(_user!.toJson()));
+          }
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao depositar no cartão.';
+    } catch (e) {
+      return 'Erro ao depositar no cartão.';
+    }
+  }
+
   /// Atualizar perfil do usuário
   Future<bool> updateProfile({
     String? fullName,
@@ -672,6 +706,91 @@ class AppProvider extends ChangeNotifier {
       json.encode(_transactions.map((t) => t.toJson()).toList()),
     );
     notifyListeners();
+  }
+
+  /// Recarregar cartão virtual via API
+  Future<String?> topupVirtualCard({
+    required String cardId,
+    required int amount,
+  }) async {
+    try {
+      final result = await _api.topupVirtualCard(cardId: cardId, amount: amount);
+      if (result.isSuccess && result.data != null) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(balance: result.data!.cardBalance);
+          if (_user != null) {
+            _user = _user!.copyWith(balance: result.data!.walletBalance);
+            await _prefs?.setString('ts_user', json.encode(_user!.toJson()));
+          }
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao recarregar cartão';
+    } catch (e) {
+      return 'Erro ao recarregar cartão';
+    }
+  }
+
+  /// Congelar ou ativar cartão virtual
+  Future<String?> updateVirtualCardStatus({
+    required String cardId,
+    required String status,
+  }) async {
+    try {
+      final result =
+          await _api.updateCardStatus(cardId: cardId, status: status);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          final newStatus =
+              status == 'frozen' ? CardStatus.frozen : CardStatus.active;
+          _virtualCards[idx] = _virtualCards[idx].copyWith(status: newStatus);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao alterar status do cartão';
+    } catch (e) {
+      return 'Erro ao alterar status do cartão';
+    }
+  }
+
+  /// Alterar limite diário do cartão virtual
+  Future<String?> updateVirtualCardLimit({
+    required String cardId,
+    required int dailyLimit,
+  }) async {
+    try {
+      final result =
+          await _api.updateCardLimit(cardId: cardId, dailyLimit: dailyLimit);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(dailyLimit: dailyLimit);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao alterar limite';
+    } catch (e) {
+      return 'Erro ao alterar limite';
+    }
   }
 
   /// Acionar botão de pânico

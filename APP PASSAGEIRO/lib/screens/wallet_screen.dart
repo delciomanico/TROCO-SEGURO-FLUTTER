@@ -5,8 +5,10 @@ import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
+import 'package:troco_seguro/utils/responsive_helper.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenTopup;
@@ -26,10 +28,23 @@ class _WalletScreenState extends State<WalletScreen> {
   String activeFilter = 'all';
   String searchQuery = '';
   bool showBalance = false;
+  bool _showSearch = false;
+  final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   List<Transaction> getFilteredTransactions(List<Transaction> transactions) {
     return transactions.where((tx) {
-      final matchesType = activeFilter == 'all' || tx.type == activeFilter;
+      final type = tx.type.toLowerCase();
+      final matchesType = activeFilter == 'all' ||
+          type == activeFilter ||
+          (activeFilter == 'topup' && type == 'deposit');
       final matchesSearch =
           tx.description.toLowerCase().contains(searchQuery.toLowerCase()) ||
               (tx.driver?.toLowerCase().contains(searchQuery.toLowerCase()) ??
@@ -38,181 +53,337 @@ class _WalletScreenState extends State<WalletScreen> {
     }).toList();
   }
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)}kzs';
-  }
+  // ── Modais ──────────────────────────────────────────────────
 
-  Future<void> _showWalletToCardTransferModal() async {
+  Future<void> _showDepositToCardModal() async {
     final provider = context.read<AppProvider>();
-
     final didTransfer = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _WalletToCardTransferSheet(
+      builder: (_) => _DepositToCardSheet(
         cards: provider.virtualCards,
-        onTransfer: (cardId, amount) {
-          return provider.transferFromWalletToVirtualCard(
-            cardId: cardId,
-            amount: amount,
-          );
-        },
+        onDeposit: (cardId, amount) =>
+            provider.depositToVirtualCard(cardId: cardId, amount: amount),
       ),
     );
-
     if (!mounted) return;
     if (didTransfer == true) {
-      FeedbackService.showSuccess(
-        context,
-        message: 'Transferência para cartão virtual concluída!',
-      );
+      FeedbackService.showSuccess(context,
+          message: 'Depósito para cartão virtual concluído!');
     }
   }
 
+  Future<void> _showExternalCardModal() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ExternalCardSheet(),
+    );
+    if (!mounted) return;
+  }
+
+  Future<void> _showTransferModal() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _TransferSheet(),
+    );
+    if (!mounted) return;
+  }
+
+  // ── Build ────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<AppProvider>();
     final user = provider.user;
-    final transactions = provider.transactions;
-    final filteredTxs = getFilteredTransactions(transactions);
+    final filteredTxs = getFilteredTransactions(provider.transactions);
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? Theme.of(context).scaffoldBackgroundColor : Colors.white,
-      body: provider.isLoadingTransactions
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async {
-                await Future.wait([
-                  provider.refreshUserData(),
-                  provider.refreshTransactions(),
-                ]);
-              },
-              child: SafeArea(
-                top: true,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        color: isDark
-                            ? Theme.of(context).colorScheme.surface
-                            : Colors.white,
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
-                          children: [
-                            _buildBalanceCard(isDark, user),
-                            const SizedBox(height: 24),
-                            _buildQuickActions(isDark),
-                            const SizedBox(height: 24),
-                            _buildFilters(isDark),
-                            const SizedBox(height: 16),
-                            _buildSearchBar(isDark),
-                            const SizedBox(height: 16),
-                            if (filteredTxs.isEmpty)
-                              _buildEmptyState(isDark)
-                            else
-                              ...filteredTxs.map(
-                                  (tx) => _buildTransactionItem(tx, isDark)),
-                          ],
-                        ),
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _buildWalletHeader(isDark, responsive),
+            Expanded(
+              child: provider.isLoadingTransactions
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryGold))
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        await Future.wait([
+                          provider.refreshUserData(),
+                          provider.refreshTransactions(),
+                        ]);
+                      },
+                      color: AppColors.primaryGold,
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          _buildBalanceSection(isDark, user, responsive),
+                          Container(
+                            height: 1,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.05),
+                          ),
+                          SizedBox(height: responsive.scaledHeight(24)),
+                          _buildQuickActions(isDark, responsive),
+                          SizedBox(height: responsive.scaledHeight(28)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: responsive.scaledWidth(20)),
+                            child: _buildFilters(isDark),
+                          ),
+                          SizedBox(height: responsive.scaledHeight(12)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: responsive.scaledWidth(20)),
+                            child: filteredTxs.isEmpty
+                                ? _buildEmptyState(isDark)
+                                : Column(
+                                    children: filteredTxs
+                                        .map((tx) => _buildTransactionItem(
+                                            tx, isDark, responsive))
+                                        .toList(),
+                                  ),
+                          ),
+                          SizedBox(height: responsive.scaledHeight(100)),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildBalanceCard(bool isDark, User? user) {
-    final isDarkLocal = Theme.of(context).brightness == Brightness.dark;
+  // ── Widgets ──────────────────────────────────────────────────
+
+  Widget _buildWalletHeader(bool isDark, ResponsiveHelper responsive) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 40,
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(10),
       ),
-      decoration: BoxDecoration(
-        color: isDarkLocal ? Theme.of(context).cardColor : null,
-        gradient: isDarkLocal ? null : AppColors.silverGradient,
-        image: const DecorationImage(
-          image: AssetImage('assets/images/card_fundo.jpg'),
-          fit: BoxFit.cover,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.04, 0),
+              end: Offset.zero,
+            ).animate(anim),
+            child: child,
+          ),
         ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-            color: AppColors.primaryGold.withAlpha((0.9 * 255).round()),
-            width: 1.2),
-        boxShadow: [
-          // Sombra inferior (profundidade)
-          BoxShadow(
-            color: isDarkLocal
-                ? Colors.black.withAlpha((0.6 * 255).round())
-                : Colors.black.withAlpha((0.2 * 255).round()),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-            spreadRadius: 0,
-          ),
-          // Sombra superior (destaque 3D)
-          BoxShadow(
-            color: isDarkLocal
-                ? Colors.white.withAlpha((0.05 * 255).round())
-                : Colors.white.withAlpha((0.9 * 255).round()),
-            blurRadius: 6,
-            offset: const Offset(0, -3),
-            spreadRadius: 0,
-          ),
-          // Sombra lateral para profundidade
-          BoxShadow(
-            color: isDarkLocal
-                ? Colors.black.withAlpha((0.4 * 255).round())
-                : Colors.black.withAlpha((0.12 * 255).round()),
-            blurRadius: 8,
-            offset: const Offset(3, 3),
-            spreadRadius: -1,
-          ),
-        ],
+        child: _showSearch
+            ? Row(
+                key: const ValueKey('search'),
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      focusNode: _searchFocus,
+                      autofocus: true,
+                      onChanged: (v) => setState(() => searchQuery = v),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textDark,
+                        fontSize: responsive.responsiveFontSize(14),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar transações...',
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.38)
+                              : Colors.black.withValues(alpha: 0.32),
+                          fontSize: responsive.responsiveFontSize(14),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: AppColors.primaryGold,
+                          size: responsive.scaledWidth(20),
+                        ),
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.04),
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: AppColors.primaryGold.withValues(alpha: 0.7),
+                            width: 1.2,
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(8)),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showSearch = false;
+                        searchQuery = '';
+                      });
+                      _searchCtrl.clear();
+                      _searchFocus.unfocus();
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: responsive.scaledWidth(18),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : AppColors.textDark.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                key: const ValueKey('title'),
+                children: [
+                  Text(
+                    'Carteira',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(22),
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : AppColors.textDark,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() => _showSearch = true),
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.search_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : AppColors.textDark.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceSection(
+      bool isDark, User? user, ResponsiveHelper responsive) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(20),
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(12),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Saldo disponível',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark
-                  ? Colors.white.withAlpha((0.9 * 255).round())
-                  : AppColors.primaryGold.withAlpha((0.9 * 255).round()),
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            children: [
+              Text(
+                'Saldo disponível',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(13),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              GestureDetector(
+                onTap: () => setState(() => showBalance = !showBalance),
+                child: Icon(
+                  showBalance
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: responsive.scaledWidth(16),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.scaledHeight(10)),
           GestureDetector(
             onTap: () => setState(() => showBalance = !showBalance),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  showBalance ? _formatCurrency(user?.balance ?? 0) : '••••••',
+                  showBalance
+                      ? NumberFormat('#,##0', 'pt_AO')
+                          .format(user?.balance ?? 0)
+                      : '••••••',
                   style: TextStyle(
-                    fontSize: 36,
-                    color: isDark ? Colors.white : AppColors.primaryGold,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1,
+                    fontSize: responsive.responsiveFontSize(38),
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                    height: 1.0,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  showBalance ? Icons.visibility : Icons.visibility_off,
-                  color: isDark
-                      ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha((0.8 * 255).round())
-                      : AppColors.primaryGold,
-                  size: 20,
+                SizedBox(width: responsive.scaledWidth(6)),
+                Padding(
+                  padding:
+                      EdgeInsets.only(bottom: responsive.scaledHeight(5)),
+                  child: Text(
+                    'kzs',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(16),
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.6)
+                          : AppColors.textDark.withValues(alpha: 0.5),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -222,124 +393,89 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildQuickActions(bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 64,
-            child: _buildActionButton(
-              icon: Icons.person_outline_rounded,
-              label: 'Outra conta',
-              isPrimary: false,
-              onTap: widget.onOpenTransfer ?? () {},
-              isDark: isDark,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: SizedBox(
-            height: 64,
-            child: _buildActionButton(
-              icon: Icons.credit_card,
-              label: 'Cartão virtual',
-              isPrimary: false,
-              onTap: _showWalletToCardTransferModal,
-              isDark: isDark,
-            ),
-          ),
-        ),
-      ],
+  Widget _buildQuickActions(bool isDark, ResponsiveHelper responsive) {
+    final actions = [
+      (icon: Icons.add_circle_outline_rounded, label: 'Recarregar',
+          onTap: () => widget.onOpenTopup?.call()),
+      (icon: Icons.send_rounded, label: 'Transferir',
+          onTap: _showTransferModal),
+      (icon: Icons.credit_card_rounded, label: 'P/ Cartão',
+          onTap: _showDepositToCardModal),
+      (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
+          onTap: _showExternalCardModal),
+    ];
+
+    return Padding(
+      padding:
+          EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: actions
+            .map((a) => Expanded(
+                  child: _buildCircularActionButton(
+                    responsive,
+                    isDark: isDark,
+                    icon: a.icon,
+                    label: a.label,
+                    onTap: a.onTap,
+                  ),
+                ))
+            .toList(),
+      ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildCircularActionButton(
+    ResponsiveHelper responsive, {
+    required bool isDark,
     required IconData icon,
     required String label,
-    required bool isPrimary,
     required VoidCallback onTap,
-    required bool isDark,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: isPrimary
-              ? Colors.transparent
-              : (isDark ? Colors.transparent : Theme.of(context).cardColor),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isPrimary
-                ? (isDark ? AppColors.primaryGold : AppColors.textDark)
-                : (isDark
-                    ? Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withAlpha((0.18 * 255).round())
-                    : Colors.grey.withAlpha((0.3 * 255).round())),
-            width: isPrimary ? 2 : 2,
-          ),
-          boxShadow: [
-            // Sombra inferior (profundidade)
-            BoxShadow(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: responsive.scaledWidth(58),
+            height: responsive.scaledWidth(58),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
               color: isDark
-                  ? Colors.black.withAlpha((0.5 * 255).round())
-                  : Colors.black.withAlpha((0.15 * 255).round()),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
-            ),
-            // Sombra superior (destaque 3D)
-            BoxShadow(
-              color: isDark
-                  ? Colors.white.withAlpha((0.05 * 255).round())
-                  : Colors.white.withAlpha((0.8 * 255).round()),
-              blurRadius: 4,
-              offset: const Offset(0, -2),
-              spreadRadius: 0,
-            ),
-            // Sombra lateral para profundidade
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withAlpha((0.3 * 255).round())
-                  : Colors.black.withAlpha((0.08 * 255).round()),
-              blurRadius: 6,
-              offset: const Offset(2, 2),
-              spreadRadius: -1,
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isPrimary
-                  ? (isDark ? AppColors.primaryGold : AppColors.textDark)
-                  : (isDark
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).colorScheme.onSurface),
-              size: 22,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isPrimary
-                    ? (isDark ? AppColors.primaryGold : AppColors.textDark)
-                    : (isDark
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Theme.of(context).colorScheme.onSurface),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.5),
+                width: 1.2,
               ),
             ),
-          ],
-        ),
+            child: Icon(
+              icon,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : AppColors.textDark.withValues(alpha: 0.75),
+              size: responsive.scaledWidth(24),
+            ),
+          ),
+          SizedBox(height: responsive.scaledHeight(8)),
+          SizedBox(
+            width: responsive.scaledWidth(68),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(11),
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.75)
+                    : AppColors.textDark.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -354,6 +490,8 @@ class _WalletScreenState extends State<WalletScreen> {
           _buildFilterChip('payment', 'Pagamentos', isDark),
           const SizedBox(width: 8),
           _buildFilterChip('topup', 'Recargas', isDark),
+          const SizedBox(width: 8),
+          _buildFilterChip('transfer', 'Transferências', isDark),
         ],
       ),
     );
@@ -363,24 +501,23 @@ class _WalletScreenState extends State<WalletScreen> {
     final isActive = activeFilter == value;
     return GestureDetector(
       onTap: () => setState(() => activeFilter = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
-        ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.darkBackground
+              ? AppColors.primaryGold
               : (isDark
-                  ? AppColors.darkCard.withValues(alpha: 0.06)
-                  : AppColors.lightBackground),
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.04)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? AppColors.darkBackground
+                ? AppColors.primaryGold
                 : (isDark
-                    ? AppColors.textLight.withValues(alpha: 0.18)
-                    : Colors.grey.withValues(alpha: 0.3)),
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : Colors.black.withValues(alpha: 0.07)),
           ),
         ),
         child: Text(
@@ -389,40 +526,19 @@ class _WalletScreenState extends State<WalletScreen> {
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: isActive
-                ? AppColors.textLight
+                ? Colors.black
                 : (isDark
-                    ? AppColors.textLight.withValues(alpha: 0.9)
-                    : Colors.grey[600]),
+                    ? Colors.white.withValues(alpha: 0.8)
+                    : AppColors.textDark.withValues(alpha: 0.65)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSearchBar(bool isDark) {
-    return TextField(
-      onChanged: (value) => setState(() => searchQuery = value),
-      style:
-          TextStyle(color: isDark ? AppColors.textLight : AppColors.textDark),
-      decoration: InputDecoration(
-        hintText: 'Buscar transações...',
-        hintStyle: TextStyle(
-            color: isDark ? AppColors.textLight.withValues(alpha: 0.6) : Colors.grey),
-        prefixIcon: Icon(Icons.search,
-            color: isDark ? AppColors.textLight.withValues(alpha: 0.6) : Colors.grey),
-        filled: true,
-        fillColor: isDark ? AppColors.darkCard : AppColors.lightCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
       child: Center(
         child: Column(
           children: [
@@ -430,8 +546,8 @@ class _WalletScreenState extends State<WalletScreen> {
               Icons.inbox_outlined,
               size: 48,
               color: isDark
-                  ? AppColors.textLight.withValues(alpha: 0.38)
-                  : Colors.grey[400],
+                  ? Colors.white.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.2),
             ),
             const SizedBox(height: 12),
             Text(
@@ -439,8 +555,8 @@ class _WalletScreenState extends State<WalletScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: isDark
-                    ? AppColors.textLight.withValues(alpha: 0.6)
-                    : Colors.grey[500],
+                    ? Colors.white.withValues(alpha: 0.45)
+                    : Colors.black.withValues(alpha: 0.4),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -450,97 +566,95 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildTransactionItem(Transaction tx, bool isDark) {
-    // Use direction or displayAmount to determine if incoming/outgoing
+  Widget _buildTransactionItem(
+      Transaction tx, bool isDark, ResponsiveHelper responsive) {
     final isIncoming = tx.isIncoming;
     final displayValue = (tx.originalAmount ?? tx.amount).abs();
     final counterpartyName = tx.counterparty ?? tx.driver ?? '';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: responsive.scaledHeight(10)),
+      padding: EdgeInsets.all(responsive.scaledWidth(14)),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: responsive.scaledWidth(44),
+            height: responsive.scaledWidth(44),
             decoration: BoxDecoration(
-              color: isIncoming
-                  ? Colors.green.withValues(alpha: 0.1)
-                  : Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              shape: BoxShape.circle,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.04),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.3),
+                width: 1.0,
+              ),
             ),
             child: Icon(
               isIncoming
                   ? Icons.arrow_downward_rounded
                   : Icons.arrow_upward_rounded,
-              color: isIncoming ? Colors.green : Colors.red,
-              size: 22,
+              color: isIncoming ? Colors.greenAccent : Colors.redAccent,
+              size: responsive.scaledWidth(20),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: responsive.scaledWidth(12)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tx.description,
+                  tx.description.isNotEmpty ? tx.description : tx.type,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: responsive.responsiveFontSize(13),
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textLight : AppColors.textDark,
+                    color: isDark ? Colors.white : AppColors.textDark,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
-                if (counterpartyName.isNotEmpty)
+                if (counterpartyName.isNotEmpty) ...[
+                  SizedBox(height: responsive.scaledHeight(2)),
                   Text(
                     counterpartyName,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: responsive.responsiveFontSize(11),
                       color: isDark
-                          ? AppColors.textLight.withValues(alpha: 0.6)
-                          : Colors.grey[500],
+                          ? Colors.white.withValues(alpha: 0.45)
+                          : Colors.black.withValues(alpha: 0.4),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                ],
+                SizedBox(height: responsive.scaledHeight(2)),
+                Text(
+                  '${tx.date} ${tx.time}'.trim(),
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(11),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.4)
+                        : Colors.black.withValues(alpha: 0.38),
+                  ),
+                ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${isIncoming ? '+' : '-'}${_formatCurrency(displayValue)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: isIncoming ? Colors.green : Colors.red,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                tx.time ?? '',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textLight.withValues(alpha: 0.6)
-                      : Colors.grey[500],
-                ),
-              ),
-            ],
+          Text(
+            '${isIncoming ? "+" : "-"}${NumberFormat('#,##0', 'pt_AO').format(displayValue)} kzs',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(13),
+              fontWeight: FontWeight.w700,
+              color: isIncoming ? Colors.greenAccent : Colors.redAccent,
+            ),
           ),
         ],
       ),
@@ -548,84 +662,440 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
-class _WalletToCardTransferSheet extends StatefulWidget {
-  final List<VirtualCard> cards;
-  final Future<String?> Function(String cardId, int amount) onTransfer;
+// ── Sheet: Depositar em cartão virtual próprio ──────────────────────────────
 
-  const _WalletToCardTransferSheet({
-    required this.cards,
-    required this.onTransfer,
-  });
+class _DepositToCardSheet extends StatefulWidget {
+  final List<VirtualCard> cards;
+  final Future<String?> Function(String cardId, int amount) onDeposit;
+
+  const _DepositToCardSheet({required this.cards, required this.onDeposit});
 
   @override
-  State<_WalletToCardTransferSheet> createState() =>
-      _WalletToCardTransferSheetState();
+  State<_DepositToCardSheet> createState() => _DepositToCardSheetState();
 }
 
-class _WalletToCardTransferSheetState
-    extends State<_WalletToCardTransferSheet> {
-  final TextEditingController _amountController = TextEditingController();
+class _DepositToCardSheetState extends State<_DepositToCardSheet> {
+  final _amountCtrl = TextEditingController();
   String? _selectedCardId;
-  String? _formError;
-  bool _isSubmitting = false;
+  String? _error;
+  bool _loading = false;
 
   @override
   void dispose() {
-    _amountController.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final amount = int.tryParse(_amountController.text.trim());
-
-    if (_selectedCardId == null || amount == null) {
-      setState(() {
-        _formError = 'Selecione o cartão de destino e informe o montante.';
-      });
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    if (_selectedCardId == null || amount == null || amount <= 0) {
+      setState(() => _error = 'Selecione o cartão e informe um montante válido.');
       return;
     }
-
-    if (amount <= 0) {
-      setState(() {
-        _formError = 'O montante deve ser maior que zero.';
-      });
-      return;
-    }
-
     setState(() {
-      _formError = null;
-      _isSubmitting = true;
+      _error = null;
+      _loading = true;
     });
-
-    final transferError = await widget.onTransfer(_selectedCardId!, amount);
+    final err = await widget.onDeposit(_selectedCardId!, amount);
     if (!mounted) return;
-
-    if (transferError == null) {
+    if (err == null) {
       Navigator.of(context).pop(true);
       return;
     }
-
     setState(() {
-      _isSubmitting = false;
-      _formError = transferError;
+      _loading = false;
+      _error = err;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _BottomSheetWrapper(
+      title: 'DEPOSITAR NO CARTÃO',
+      subtitle: 'Mova saldo da carteira para um dos seus cartões virtuais.',
+      icon: Icons.credit_card_rounded,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null) _ErrorBanner(_error!),
+          if (widget.cards.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Nenhum cartão virtual disponível.',
+                style: TextStyle(color: Colors.red[400]),
+              ),
+            )
+          else
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                  labelText: 'Cartão de destino',
+                  border: OutlineInputBorder()),
+              items: widget.cards
+                  .map((c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text('${c.name}  •  ${c.balance} Kz'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedCardId = v),
+            ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+                labelText: 'Montante (Kz)', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 18),
+          _ActionRow(
+            loading: _loading,
+            onConfirm: _submit,
+            confirmLabel: 'Depositar',
+          ),
+        ],
+      ),
+    );
+  }
+}
 
+// ── Sheet: Transferir para cartão externo ───────────────────────────────────
+
+class _ExternalCardSheet extends StatefulWidget {
+  const _ExternalCardSheet();
+
+  @override
+  State<_ExternalCardSheet> createState() => _ExternalCardSheetState();
+}
+
+class _ExternalCardSheetState extends State<_ExternalCardSheet> {
+  final _cardCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
+  String? _error;
+  bool _loading = false;
+  bool _showPin = false;
+
+  @override
+  void dispose() {
+    _cardCtrl.dispose();
+    _amountCtrl.dispose();
+    _pinCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final cardNumber = _cardCtrl.text.trim();
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    final pin = _pinCtrl.text.trim();
+
+    if (cardNumber.isEmpty || amount == null || amount <= 0 || pin.length < 6) {
+      setState(() => _error =
+          'Preencha todos os campos. O PIN deve ter 6 dígitos.');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    final api = ApiService();
+    final result = await api.transferToExternalCard(
+      cardNumber: cardNumber,
+      amount: amount,
+      pin: pin,
+    );
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      Navigator.of(context).pop();
+      FeedbackService.showSuccess(context,
+          message: 'Transferência para cartão externo realizada!');
+      return;
+    }
+
+    setState(() {
+      _loading = false;
+      _error = result.error ?? 'Erro ao transferir para cartão externo.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _BottomSheetWrapper(
+      title: 'CARTÃO EXTERNO',
+      subtitle: 'Transfira para um cartão virtual de terceiros.',
+      icon: Icons.swap_horiz_rounded,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null) _ErrorBanner(_error!),
+          TextField(
+            controller: _cardCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+                labelText: 'Número do cartão',
+                border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+                labelText: 'Montante (Kz)', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pinCtrl,
+            obscureText: !_showPin,
+            maxLength: 6,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'PIN da conta (6 dígitos)',
+              border: const OutlineInputBorder(),
+              counterText: '',
+              suffixIcon: IconButton(
+                icon: Icon(_showPin
+                    ? Icons.visibility_off
+                    : Icons.visibility),
+                onPressed: () => setState(() => _showPin = !_showPin),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _ActionRow(
+            loading: _loading,
+            onConfirm: _submit,
+            confirmLabel: 'Transferir',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sheet: Transferência P2P com verificação ────────────────────────────────
+
+class _TransferSheet extends StatefulWidget {
+  const _TransferSheet();
+
+  @override
+  State<_TransferSheet> createState() => _TransferSheetState();
+}
+
+class _TransferSheetState extends State<_TransferSheet> {
+  final _phoneCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String? _error;
+  String? _recipientName;
+  bool _loading = false;
+  bool _verified = false;
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verify() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _error = 'Informe o número de telefone.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final api = ApiService();
+    final result = await api.verifyTransferRecipient(phone);
+    if (!mounted) return;
+    if (result.isSuccess && result.data != null) {
+      setState(() {
+        _recipientName = result.data!.name.isNotEmpty
+            ? result.data!.name
+            : 'Utilizador verificado';
+        _verified = true;
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _error = result.error ?? 'Destinatário não encontrado.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Informe um montante válido.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final provider = context.read<AppProvider>();
+    final ok = await provider.transfer(
+      amount: amount,
+      receiverPhone: _phoneCtrl.text.trim(),
+      description: _descCtrl.text.trim().isEmpty
+          ? null
+          : _descCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+      FeedbackService.showSuccess(context,
+          message: 'Transferência realizada com sucesso!');
+      return;
+    }
+    final errMsg = provider.error;
+    setState(() {
+      _loading = false;
+      _error = errMsg ?? 'Erro ao realizar transferência.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _BottomSheetWrapper(
+      title: 'TRANSFERIR',
+      subtitle: 'Envie saldo para outra conta Troco Seguro.',
+      icon: Icons.send_rounded,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null) _ErrorBanner(_error!),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  enabled: !_verified,
+                  decoration: const InputDecoration(
+                    labelText: 'Nº de telefone',
+                    hintText: '+244 9XX XXX XXX',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 56,
+                child: _verified
+                    ? IconButton.filled(
+                        onPressed: () =>
+                            setState(() {
+                              _verified = false;
+                              _recipientName = null;
+                            }),
+                        icon: const Icon(Icons.edit),
+                        tooltip: 'Alterar',
+                      )
+                    : ElevatedButton(
+                        onPressed: _loading ? null : _verify,
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2))
+                            : const Text('Verificar'),
+                      ),
+              ),
+            ],
+          ),
+          if (_recipientName != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(20),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle,
+                      color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    _recipientName!,
+                    style: const TextStyle(
+                        color: Colors.green, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            enabled: _verified,
+            decoration: const InputDecoration(
+                labelText: 'Montante (Kz)',
+                border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _descCtrl,
+            enabled: _verified,
+            decoration: const InputDecoration(
+                labelText: 'Descrição (opcional)',
+                border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 18),
+          _ActionRow(
+            loading: _loading && _verified,
+            onConfirm: _verified ? _submit : null,
+            confirmLabel: 'Transferir',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Helpers partilhados ──────────────────────────────────────────────────────
+
+class _BottomSheetWrapper extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget child;
+
+  const _BottomSheetWrapper({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       top: false,
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 120),
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+            bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            color: isDark
+                ? Theme.of(context).cardColor
+                : AppColors.lightCard,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -645,121 +1115,109 @@ class _WalletToCardTransferSheetState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .outline
-                        .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outline
+                          .withAlpha((0.3 * 255).round()),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                Icon(
-                  Icons.credit_card,
-                  size: 42,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 12),
+                Icon(icon,
+                    size: 40,
+                    color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 10),
                 Text(
-                  'TRANSFERIR PARA CARTÃO VIRTUAL',
-                  textAlign: TextAlign.center,
+                  title,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
-                  'Escolha o cartão de destino e o valor a sair da carteira principal.',
+                  subtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
-                        .withAlpha((0.7 * 255).round()),
+                        .withAlpha((0.6 * 255).round()),
                   ),
                 ),
-                const SizedBox(height: 18),
-                if (_formError != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withAlpha((0.08 * 255).round()),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _formError!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedCardId,
-                  decoration: const InputDecoration(
-                    labelText: 'Cartão de destino',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: widget.cards
-                      .map(
-                        (card) => DropdownMenuItem<String>(
-                          value: card.id,
-                          child: Text('${card.name} - ${card.balance} Kz'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: widget.cards.isEmpty
-                      ? null
-                      : (value) {
-                          setState(() => _selectedCardId = value);
-                        },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Montante (Kz)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isSubmitting
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submit,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Transferir'),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 20),
+                child,
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withAlpha((0.08 * 255).round()),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(message,
+          style: const TextStyle(color: Colors.red, fontSize: 13)),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final bool loading;
+  final VoidCallback? onConfirm;
+  final String confirmLabel;
+
+  const _ActionRow({
+    required this.loading,
+    required this.onConfirm,
+    required this.confirmLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: loading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: (loading || onConfirm == null) ? null : onConfirm,
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(confirmLabel),
+          ),
+        ),
+      ],
     );
   }
 }

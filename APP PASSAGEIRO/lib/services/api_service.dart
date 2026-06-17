@@ -359,6 +359,74 @@ class ApiService {
     }
   }
 
+  // ============ CARTEIRA ============
+
+  /// Verificar destinatário por telefone antes de transferir
+  Future<ApiResponse<RecipientInfo>> verifyTransferRecipient(
+      String phone) async {
+    try {
+      final response =
+          await _dio.get('/wallet/transfer/verify/${Uri.encodeComponent(phone)}');
+      return ApiResponse.success(RecipientInfo.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Transferir entre cartões virtuais próprios
+  Future<ApiResponse<TransactionResult>> transferBetweenCards({
+    required String fromCardId,
+    required String toCardId,
+    required int amount,
+    required String pin,
+  }) async {
+    try {
+      final response = await _dio.post('/wallet/transfer', data: {
+        'fromCardId': fromCardId,
+        'toCardId': toCardId,
+        'amount': amount,
+        'pin': pin,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Transferir para cartão de terceiros por número
+  Future<ApiResponse<TransactionResult>> transferToExternalCard({
+    required String cardNumber,
+    required int amount,
+    required String pin,
+  }) async {
+    try {
+      final response = await _dio.post('/wallet/transfer-to-card', data: {
+        'cardNumber': cardNumber,
+        'amount': amount,
+        'pin': pin,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Depositar da carteira principal para cartão virtual próprio
+  Future<ApiResponse<TransactionResult>> depositToVirtualCard({
+    required String cardId,
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.post('/wallet/card/deposit', data: {
+        'cardId': cardId,
+        'amount': amount,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ QR CODE ============
 
   /// Obter QR Code de identidade
@@ -921,6 +989,22 @@ class NotificationsResult {
     return NotificationsResult(
       notifications: notifs.map((e) => AppNotification.fromJson(e)).toList(),
       unreadCount: json['unreadCount'] ?? 0,
+    );
+  }
+}
+
+class RecipientInfo {
+  final String id;
+  final String name;
+  final String phone;
+
+  RecipientInfo({required this.id, required this.name, required this.phone});
+
+  factory RecipientInfo.fromJson(Map<String, dynamic> json) {
+    return RecipientInfo(
+      id: json['id'] ?? json['userId'] ?? '',
+      name: json['fullName'] ?? json['name'] ?? '',
+      phone: json['phoneNumber'] ?? json['phone'] ?? '',
     );
   }
 }
