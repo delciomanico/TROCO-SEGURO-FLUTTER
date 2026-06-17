@@ -1145,21 +1145,13 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             width: responsive.scaledWidth(58),
             height: responsive.scaledWidth(58),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
-              border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.5),
-                width: 1.2,
-              ),
+              color: AppColors.primaryGold,
             ),
             child: Icon(
               icon,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.85)
-                  : AppColors.textDark.withValues(alpha: 0.75),
+              color: Colors.black.withValues(alpha: 0.8),
               size: responsive.scaledWidth(24),
             ),
           ),
