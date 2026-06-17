@@ -475,9 +475,9 @@ class _MainScreenState extends State<MainScreen> {
                       children: [
                         Icon(
                           item.icon,
-                          color: isSelected
+                          color: isSelected 
                               ? Colors.black
-                              : Colors.white.withValues(alpha: 0.55),
+                              : isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.55),
                           size: 22,
                         ),
                         const SizedBox(height: 4),
@@ -486,7 +486,7 @@ class _MainScreenState extends State<MainScreen> {
                           style: TextStyle(
                             color: isSelected
                                 ? Colors.black
-                                : Colors.white.withValues(alpha: 0.55),
+                                : isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.55),
                             fontSize: 11,
                             fontWeight: isSelected
                                 ? FontWeight.w700

@@ -477,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.06)
                     : Colors.black.withValues(alpha: 0.04),
-                border: Border.all(color: AppColors.primaryGold, width: 1.5),
+                border: Border.all(color: Colors.transparent, width: 1.5),
               ),
               child: Icon(
                 Icons.person_rounded,

@@ -929,7 +929,7 @@ class _CardsScreenState extends State<CardsScreen> {
                     ? Colors.white.withValues(alpha: 0.08)
                     : Colors.black.withValues(alpha: 0.05),
                 border: Border.all(
-                  color: AppColors.primaryGold.withValues(alpha: 0.65),
+                  color: Colors.transparent,
                   width: 1.2,
                 ),
               ),
