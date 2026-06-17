@@ -14,6 +14,7 @@ import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
+import 'package:troco_seguro/utils/responsive_helper.dart';
 
 class CardsScreen extends StatefulWidget {
   const CardsScreen({super.key});
@@ -898,40 +899,46 @@ class _CardsScreenState extends State<CardsScreen> {
   }
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+  Widget _buildHeader(bool isDark, ResponsiveHelper responsive) {
+    return Container(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(10),
+      ),
       child: Row(
         children: [
           Text(
             'Cartões',
             style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+              fontSize: responsive.responsiveFontSize(22),
+              fontWeight: FontWeight.w900,
               color: isDark ? Colors.white : AppColors.textDark,
+              letterSpacing: 0.3,
             ),
           ),
           const Spacer(),
           GestureDetector(
             onTap: _showCreateCardSheet,
             child: Container(
-              width: 42,
-              height: 42,
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkCard : AppColors.lightCard,
                 shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
                 border: Border.all(
-                  color: AppColors.primaryGold.withAlpha((0.75 * 255).round()),
-                  width: 1.5,
+                  color: AppColors.primaryGold.withValues(alpha: 0.65),
+                  width: 1.2,
                 ),
               ),
               child: Icon(
                 Icons.add_card_rounded,
-                size: 20,
+                size: responsive.scaledWidth(18),
                 color: isDark
-                    ? Colors.white.withAlpha((0.85 * 255).round())
-                    : AppColors.textDark,
+                    ? Colors.white.withValues(alpha: 0.75)
+                    : AppColors.textDark.withValues(alpha: 0.65),
               ),
             ),
           ),
@@ -947,15 +954,15 @@ class _CardsScreenState extends State<CardsScreen> {
     final cards = provider.virtualCards;
     final isLoading = provider.isLoadingCards;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
-      backgroundColor: isDark ? theme.scaffoldBackgroundColor : Colors.white,
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildHeader(isDark, responsive),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => provider.refreshVirtualCards(),
@@ -985,26 +992,34 @@ class _CardsScreenState extends State<CardsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 100,
-                              height: 100,
+                              width: 80,
+                              height: 80,
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary
-                                    .withAlpha((0.08 * 255).round()),
                                 shape: BoxShape.circle,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.04),
+                                border: Border.all(
+                                  color: AppColors.primaryGold
+                                      .withValues(alpha: 0.4),
+                                  width: 1.2,
+                                ),
                               ),
                               child: Icon(
                                 Icons.credit_card_off_rounded,
-                                size: 48,
-                                color: theme.colorScheme.primary,
+                                size: 34,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.45)
+                                    : Colors.black.withValues(alpha: 0.35),
                               ),
                             ),
                             const SizedBox(height: 20),
                             Text(
                               'Nenhum cartão virtual',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.onSurface,
+                                color: isDark ? Colors.white : AppColors.textDark,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1012,26 +1027,57 @@ class _CardsScreenState extends State<CardsScreen> {
                               'Crie o seu primeiro cartão virtual para pagamentos seguros.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 14,
-                                color: theme.colorScheme.onSurface
-                                    .withAlpha((0.6 * 255).round()),
+                                fontSize: 13,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.45)
+                                    : Colors.black.withValues(alpha: 0.4),
                                 height: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 32),
-                            FilledButton.icon(
-                              onPressed: _showCreateCardSheet,
-                              icon: const Icon(Icons.add_card_rounded),
-                              label: const Text(
-                                'Criar cartão virtual',
-                                style: TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w700),
-                              ),
-                              style: FilledButton.styleFrom(
+                            const SizedBox(height: 28),
+                            GestureDetector(
+                              onTap: _showCreateCardSheet,
+                              child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 28, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
+                                    horizontal: 24, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.07)
+                                      : Colors.black.withValues(alpha: 0.04),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.primaryGold
+                                        .withValues(alpha: 0.6),
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.add_card_rounded,
+                                      size: 18,
+                                      color: isDark
+                                          ? Colors.white
+                                              .withValues(alpha: 0.85)
+                                          : AppColors.textDark
+                                              .withValues(alpha: 0.75),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Criar cartão virtual',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
+                                            ? Colors.white
+                                                .withValues(alpha: 0.85)
+                                            : AppColors.textDark
+                                                .withValues(alpha: 0.75),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -1109,18 +1155,19 @@ class _CardsScreenState extends State<CardsScreen> {
                       final card = cards[_currentPage];
                       return Padding(
                         padding:
-                            const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                            const EdgeInsets.fromLTRB(20, 20, 20, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Acções rápidas',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface
-                                    .withAlpha((0.6 * 255).round()),
-                                letterSpacing: 0.3,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.45)
+                                    : Colors.black.withValues(alpha: 0.4),
+                                letterSpacing: 0.5,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1188,23 +1235,14 @@ class _CardsScreenState extends State<CardsScreen> {
                             const EdgeInsets.fromLTRB(20, 20, 20, 0),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? theme.cardColor
-                                : Colors.white,
+                            color: isDark ? AppColors.darkCard : Colors.white,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.primaryGold
-                                  .withAlpha((0.35 * 255).round()),
-                              width: 1.2,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.07),
+                              width: 1.0,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black
-                                    .withAlpha((0.06 * 255).round()),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
                           ),
                           child: Column(
                             children: [
@@ -1212,7 +1250,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                 icon: Icons.account_balance_wallet_rounded,
                                 label: 'Saldo',
                                 value: '${_fmt(card.balance)} Kz',
-                                valueColor: theme.colorScheme.primary,
+                                valueColor: AppColors.primaryGold,
                               ),
                               _Divider(),
                               _InfoRow(
@@ -1659,47 +1697,37 @@ class _ActionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const silver = Color(0xFFC0C0C0);
     final disabled = onTap == null;
 
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedOpacity(
-          opacity: disabled ? 0.38 : 1.0,
+          opacity: disabled ? 0.35 : 1.0,
           duration: const Duration(milliseconds: 200),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
                   shape: BoxShape.circle,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.05),
                   border: Border.all(
-                    color: AppColors.primaryGold
-                        .withAlpha((0.75 * 255).round()),
-                    width: 1.5,
+                    color: AppColors.primaryGold.withValues(alpha: 0.5),
+                    width: 1.2,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark
-                          ? Colors.black.withAlpha((0.5 * 255).round())
-                          : Colors.black.withAlpha((0.12 * 255).round()),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: isDark
-                          ? Colors.white.withAlpha((0.05 * 255).round())
-                          : Colors.white.withAlpha((0.8 * 255).round()),
-                      blurRadius: 4,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
                 ),
-                child: Icon(icon, size: 22, color: silver),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.75)
+                      : AppColors.textDark.withValues(alpha: 0.65),
+                ),
               ),
               const SizedBox(height: 7),
               Text(
@@ -1708,8 +1736,8 @@ class _ActionChip extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: isDark
-                      ? Colors.white.withAlpha((0.85 * 255).round())
-                      : AppColors.textDark,
+                      ? Colors.white.withValues(alpha: 0.75)
+                      : AppColors.textDark.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -1739,27 +1767,31 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
           Icon(icon,
-              size: 18,
-              color: theme.colorScheme.onSurface.withAlpha((0.5 * 255).round())),
+              size: 17,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.38)
+                  : Colors.black.withValues(alpha: 0.3)),
           const SizedBox(width: 12),
           Text(label,
               style: TextStyle(
-                fontSize: 14,
-                color: theme.colorScheme.onSurface
-                    .withAlpha((0.7 * 255).round()),
+                fontSize: 13,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.55)
+                    : Colors.black.withValues(alpha: 0.5),
               )),
           const Spacer(),
           Text(value,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: valueColor ?? theme.colorScheme.onSurface,
+                color: valueColor ??
+                    (isDark ? Colors.white : AppColors.textDark),
               )),
         ],
       ),
