@@ -1198,55 +1198,23 @@ class _SettingsModalState extends State<_SettingsModal> {
     if (mounted) setState(() => _darkMode = prefs.getString('ts_theme_mode') == 'dark');
   }
 
-  void _showAbout() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
+  void _openFullscreen(Widget page) {
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Troco Seguro',
-            style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Versão 1.0.0', style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
-          const SizedBox(height: 10),
-          Text('Plataforma segura para pagamentos digitais de táxis em Luanda.', style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white : AppColors.textDark)),
-        ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.w600)))],
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: page,
       ),
     );
   }
 
-  void _showTerms() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Termos e Condições',
-            style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
-        content: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _term('Aceitação', 'Ao usar este aplicativo, concorda com estes termos.', isDark),
-            const SizedBox(height: 10),
-            _term('Privacidade', 'Dados protegidos com criptografia. Nunca partilhamos sem consentimento.', isDark),
-            const SizedBox(height: 10),
-            _term('Responsabilidades', 'É responsável pela confidencialidade da sua conta e PIN.', isDark),
-          ]),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Aceitar', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.w600)))],
-      ),
-    );
-  }
-
-  Widget _term(String title, String body, bool isDark) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryGold)),
-      const SizedBox(height: 3),
-      Text(body, style: TextStyle(fontSize: 11, height: 1.5, color: isDark ? Colors.white : AppColors.textDark)),
-    ]);
-  }
+  void _showAbout() => _openFullscreen(const _AboutPage());
+  void _showTerms() => _openFullscreen(const _TermsPage());
 
   @override
   Widget build(BuildContext context) {
@@ -1306,6 +1274,158 @@ class _SettingsModalState extends State<_SettingsModal> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── About Page ───────────────────────────────────────────────────────────────
+class _AboutPage extends StatelessWidget {
+  const _AboutPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Sobre', isDark, () => Navigator.pop(context)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 72, height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                          border: Border.all(color: AppColors.primaryGold, width: 1.5),
+                        ),
+                        child: Icon(Icons.security_rounded, size: 34,
+                            color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Text('Troco Seguro',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : AppColors.textDark)),
+                    ),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: Text('Versão 1.0.0',
+                          style: TextStyle(fontSize: 12,
+                              color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+                    ),
+                    const SizedBox(height: 32),
+                    _section('O que é o Troco Seguro?', isDark),
+                    const SizedBox(height: 8),
+                    _body('Plataforma digital que elimina a necessidade de troco físico nas viagens de táxi em Luanda. Passageiros e motoristas fazem pagamentos via QR code de forma rápida, simples e segura.', isDark),
+                    const SizedBox(height: 24),
+                    _section('Como funciona?', isDark),
+                    const SizedBox(height: 8),
+                    _step('1', 'Carregue a sua carteira com o saldo desejado.', isDark),
+                    const SizedBox(height: 10),
+                    _step('2', 'No final da viagem, escaneie o QR code do motorista.', isDark),
+                    const SizedBox(height: 10),
+                    _step('3', 'Confirme o pagamento com o seu PIN de 6 dígitos.', isDark),
+                    const SizedBox(height: 24),
+                    _section('Segurança', isDark),
+                    const SizedBox(height: 8),
+                    _body('Todos os pagamentos são protegidos por PIN e opcionalmente por biometria. Os tokens de sessão expiram automaticamente e os dados sensíveis nunca são armazenados em texto simples.', isDark),
+                    const SizedBox(height: 24),
+                    _section('Contacto', isDark),
+                    const SizedBox(height: 8),
+                    _body('Para suporte ou esclarecimentos, contacte-nos em suporte@trocoseguro.ao', isDark),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _section(String text, bool isDark) => Text(text,
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+          color: isDark ? Colors.white : AppColors.textDark));
+
+  Widget _body(String text, bool isDark) => Text(text,
+      style: TextStyle(fontSize: 13, height: 1.65,
+          color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55)));
+
+  Widget _step(String num, String text, bool isDark) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        width: 22, height: 22,
+        decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryGold),
+        child: Center(child: Text(num, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.black))),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Text(text,
+          style: TextStyle(fontSize: 13, height: 1.55,
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55)))),
+    ]);
+  }
+}
+
+// ─── Terms Page ───────────────────────────────────────────────────────────────
+class _TermsPage extends StatelessWidget {
+  const _TermsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Termos e Condições', isDark, () => Navigator.pop(context)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _clause('1. Aceitação dos Termos', 'Ao registar-se e utilizar o Troco Seguro, concorda expressamente com estes Termos e Condições. Caso não concorde, deverá cessar imediatamente a utilização da aplicação.', isDark),
+                    _clause('2. Descrição do Serviço', 'O Troco Seguro é uma plataforma de pagamentos digitais destinada a facilitar transações entre passageiros e motoristas de táxi em Angola. O serviço inclui carteira digital, pagamentos via QR code e histórico de transações.', isDark),
+                    _clause('3. Conta e Segurança', 'É da sua exclusiva responsabilidade manter a confidencialidade do PIN e das credenciais de acesso à conta. Qualquer atividade realizada com as suas credenciais é da sua responsabilidade. Em caso de suspeita de acesso não autorizado, contacte-nos imediatamente.', isDark),
+                    _clause('4. Pagamentos e Saldo', 'O saldo da carteira é expresso em Kwanzas (Kz) e não é convertível em dinheiro físico exceto mediante solicitação formal. Todos os pagamentos são definitivos e não reversíveis, salvo em casos de erro técnico comprovado.', isDark),
+                    _clause('5. Privacidade dos Dados', 'Os seus dados pessoais são tratados de acordo com a legislação angolana de proteção de dados. Não partilhamos informações pessoais com terceiros sem o seu consentimento, exceto quando exigido por lei.', isDark),
+                    _clause('6. Limitação de Responsabilidade', 'O Troco Seguro não se responsabiliza por falhas causadas por problemas de conectividade, interrupções de serviço de terceiros ou utilização indevida da aplicação pelo utilizador.', isDark),
+                    _clause('7. Alterações aos Termos', 'Reservamo-nos o direito de atualizar estes termos a qualquer momento. Será notificado de alterações significativas através da aplicação. O uso continuado após as alterações implica aceitação dos novos termos.', isDark),
+                    _clause('8. Contacto', 'Para questões relacionadas com estes termos, contacte: termos@trocoseguro.ao', isDark),
+                    const SizedBox(height: 8),
+                    Text('Última atualização: Junho 2026',
+                        style: TextStyle(fontSize: 11,
+                            color: isDark ? Colors.white.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.3))),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _clause(String title, String body, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryGold)),
+        const SizedBox(height: 6),
+        Text(body,
+            style: TextStyle(fontSize: 13, height: 1.65,
+                color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55))),
+      ]),
     );
   }
 }
