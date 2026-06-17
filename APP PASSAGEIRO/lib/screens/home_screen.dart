@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/models/user.dart';
+import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
-import 'package:troco_seguro/widgets/card_transfer_modal.dart';
 import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
@@ -16,7 +16,6 @@ import 'package:troco_seguro/services/secure_storage_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenScanner;
-  final VoidCallback onOpenVirtualCards;
   final VoidCallback? onOpenTopup;
   final Future<bool> Function(double latitude, double longitude)? onPanic;
   final VoidCallback? onOpenProfile;
@@ -25,7 +24,6 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.onOpenScanner,
-    required this.onOpenVirtualCards,
     this.onOpenTopup,
     this.onPanic,
     this.onOpenProfile,
@@ -39,23 +37,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool showBalance = false;
   bool _isPanicLoading = false;
-
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)}kzs';
-  }
-
-  String _getFirstName(String fullName) {
-    final normalized = fullName.trim();
-    if (normalized.isEmpty) {
-      return 'Usuário';
-    }
-    final parts = normalized.split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts[0]} ${parts[1]}';
-    }
-    return parts.first;
-  }
 
   Future<void> _confirmTerminateSession() async {
     final responsive = ResponsiveHelper(context);
@@ -439,222 +420,178 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = provider.user;
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.transparent : Colors.white,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF0F1115),
-                    Color(0xFF1A1D24),
-                    Color(0xFF2A2416),
-                    Color(0xFF13151A),
-                  ],
-                  stops: [0.0, 0.42, 0.72, 1.0],
-                )
-              : const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white,
-                    Color(0xFFFFFCF6),
-                    Colors.white,
-                  ],
-                  stops: [0.0, 0.55, 1.0],
-                ),
-          color: isDark ? null : Colors.white,
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await provider.refreshUserData();
-            },
-            child: ListView(
-              padding: EdgeInsets.only(top: responsive.scaledHeight(0)),
-              children: [
-                _buildHeader(responsive, user),
-                // Corpo principal: usar único container escuro sem divisão
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height -
-                        responsive.scaledHeight(200),
-                  ),
-                  child: Container(
-                    color: Colors.transparent,
-                    padding: EdgeInsets.only(top: responsive.scaledHeight(6)),
-                    child: Column(
-                      children: [
-                        SizedBox(height: responsive.scaledHeight(12)),
-                        _buildQuickActions(responsive),
-                        SizedBox(height: responsive.scaledHeight(24)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(ResponsiveHelper responsive, User? user) {
-    return Container(
-      color: Colors.transparent,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: responsive.scaledWidth(20),
-          vertical: responsive.scaledHeight(28),
-        ),
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        bottom: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // Title row centered
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Bem vindo, ${_getFirstName(user?.fullName ?? 'Usuário')}',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(18),
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
+            _buildHeader(responsive, user),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async => provider.refreshUserData(),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _buildBalanceCard(responsive, user),
+                    Container(
+                      height: 1,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.black.withValues(alpha: 0.05),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    SizedBox(height: responsive.scaledHeight(8)),
+                    _buildQuickActions(responsive),
+                    SizedBox(height: responsive.scaledHeight(20)),
+                    _buildRecentTransactions(responsive, provider, isDark),
+                    SizedBox(height: responsive.scaledHeight(100)),
+                  ],
                 ),
-                SizedBox(width: responsive.scaledWidth(12)),
-                InkWell(
-                  onTap: () => widget.onOpenProfile?.call(),
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(
-                    width: responsive.scaledWidth(42),
-                    height: responsive.scaledWidth(42),
-                    child: Icon(
-                      Icons.more_vert_rounded,
-                      color: Colors.white,
-                      size: responsive.scaledWidth(22),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            SizedBox(height: responsive.scaledHeight(18)),
-            _buildBalanceCard(responsive, user),
-            SizedBox(height: responsive.scaledHeight(18)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBalanceCard(ResponsiveHelper responsive, User? user) {
+  Widget _buildHeader(ResponsiveHelper responsive, User? user) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final initials = _getInitials(user?.fullName ?? 'U');
+
     return Container(
-      width: double.infinity,
+      color: isDark ? AppColors.darkBackground : Colors.white,
       padding: EdgeInsets.symmetric(
         horizontal: responsive.scaledWidth(20),
-        vertical: responsive.scaledHeight(40),
+        vertical: responsive.scaledHeight(14),
       ),
-      decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).cardColor : null,
-        gradient: isDark
-            ? null
-            : const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFF7F8FA), Color(0xFFEFEFF2)],
-              ),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/card_fundo.jpg'),
-          fit: BoxFit.cover,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-            color: Theme.of(context)
-                .colorScheme
-                .primary
-                .withAlpha((0.9 * 255).round()),
-            width: 1.2),
-        boxShadow: [
-          // Sombra inferior (profundidade)
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withAlpha((0.6 * 255).round())
-                : Colors.black.withAlpha((0.2 * 255).round()),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-            spreadRadius: 0,
-          ),
-          // Sombra superior (destaque 3D)
-          BoxShadow(
-            color: isDark
-                ? Colors.white.withAlpha((0.05 * 255).round())
-                : Colors.white.withAlpha((0.9 * 255).round()),
-            blurRadius: 6,
-            offset: const Offset(0, -3),
-            spreadRadius: 0,
-          ),
-          // Sombra lateral para profundidade
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withAlpha((0.4 * 255).round())
-                : Colors.black.withAlpha((0.12 * 255).round()),
-            blurRadius: 8,
-            offset: const Offset(3, 3),
-            spreadRadius: -1,
-          ),
-        ],
-      ),
-      child: Column(
+      child: Row(
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Current saldo',
-              style: TextStyle(
-                fontSize: responsive.responsiveFontSize(12),
-                color: isDark
-                    ? Colors.white.withAlpha((0.9 * 255).round())
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withAlpha((0.78 * 255).round()),
-                fontWeight: FontWeight.w500,
+          GestureDetector(
+            onTap: () => widget.onOpenProfile?.call(),
+            child: Container(
+              width: responsive.scaledWidth(42),
+              height: responsive.scaledWidth(42),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                border: Border.all(color: AppColors.primaryGold, width: 1.5),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: AppColors.primaryGold,
+                    fontWeight: FontWeight.w700,
+                    fontSize: responsive.responsiveFontSize(14),
+                  ),
+                ),
               ),
             ),
           ),
-          SizedBox(height: responsive.scaledHeight(8)),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Troco Seguro',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(17),
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              _headerIconButton(
+                icon: Icons.qr_code_scanner_rounded,
+                onTap: widget.onOpenScanner,
+                isDark: isDark,
+                responsive: responsive,
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              _headerIconButton(
+                icon: Icons.more_vert_rounded,
+                onTap: () => widget.onOpenProfile?.call(),
+                isDark: isDark,
+                responsive: responsive,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceCard(ResponsiveHelper responsive, User? user) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(20),
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Saldo total',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(13),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              GestureDetector(
+                onTap: () => setState(() => showBalance = !showBalance),
+                child: Icon(
+                  showBalance
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: responsive.scaledWidth(16),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(10)),
           GestureDetector(
             onTap: () => setState(() => showBalance = !showBalance),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  showBalance ? _formatCurrency(user?.balance ?? 0) : '••••••',
+                  showBalance
+                      ? NumberFormat('#,##0', 'pt_AO').format(user?.balance ?? 0)
+                      : '••••••',
                   style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(30),
-                    color: isDark
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.primary,
+                    fontSize: responsive.responsiveFontSize(38),
                     fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                    height: 1.0,
                   ),
                 ),
-                Icon(
-                  Icons.credit_card,
-                  color: isDark
-                      ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha((0.85 * 255).round())
-                      : Theme.of(context).colorScheme.primary,
-                  size: responsive.scaledWidth(28),
+                SizedBox(width: responsive.scaledWidth(6)),
+                Padding(
+                  padding: EdgeInsets.only(bottom: responsive.scaledHeight(5)),
+                  child: Text(
+                    'kzs',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(16),
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.6)
+                          : AppColors.textDark.withValues(alpha: 0.5),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -677,16 +614,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _handleIdentifyQr,
       ),
       (
-        icon: Icons.credit_card,
-        label: 'Cartões',
-        onTap: widget.onOpenVirtualCards,
-      ),
-      (
-        icon: Icons.sync_alt_rounded,
-        label: 'Entre cartões',
-        onTap: _showCardTransferModal,
-      ),
-      (
         icon: Icons.account_balance_wallet_outlined,
         label: 'Recarregar',
         onTap: _handleTopup,
@@ -700,11 +627,6 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.qr_code_2_rounded,
         label: 'Meu QR',
         onTap: _handleShowMyQrCode,
-      ),
-      (
-        icon: Icons.more_horiz_rounded,
-        label: 'Outros',
-        onTap: () {},
       ),
     ];
 
@@ -887,27 +809,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showCardTransferModal() async {
-    final provider = context.read<AppProvider>();
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => CardTransferModal(
-        cards: provider.virtualCards,
-        onTransfer: (fromCardId, toCardId, amount) async {
-          return await provider.transferBetweenVirtualCards(
-            fromCardId: fromCardId,
-            toCardId: toCardId,
-            amount: amount,
-          );
-        },
-        onClose: () => Navigator.pop(context),
-      ),
-    );
-  }
-
   Future<void> _handleIdentifyQr() async {
     final qrData = await showModalBottomSheet<String>(
       context: context,
@@ -1079,57 +980,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
           onTap: onTap,
           child: Container(
-            width: responsive.scaledWidth(64),
-            height: responsive.scaledWidth(64),
+            width: responsive.scaledWidth(58),
+            height: responsive.scaledWidth(58),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
               shape: BoxShape.circle,
+              color: AppColors.primaryGold
+                  .withValues(alpha: isDark ? 0.12 : 0.08),
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withAlpha((0.1 * 255).round())
-                    : Colors.black.withAlpha((0.05 * 255).round()),
-                width: 1.5,
+                color: AppColors.primaryGold.withValues(alpha: 0.35),
+                width: 1.2,
               ),
-              boxShadow: [
-                // Sombra inferior (profundidade)
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withAlpha((0.5 * 255).round())
-                      : Colors.black.withAlpha((0.15 * 255).round()),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                  spreadRadius: 0,
-                ),
-                // Sombra superior (destaque 3D)
-                BoxShadow(
-                  color: isDark
-                      ? Colors.white.withAlpha((0.05 * 255).round())
-                      : Colors.white.withAlpha((0.8 * 255).round()),
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                  spreadRadius: 0,
-                ),
-                // Sombra lateral para profundidade
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withAlpha((0.3 * 255).round())
-                      : Colors.black.withAlpha((0.08 * 255).round()),
-                  blurRadius: 6,
-                  offset: const Offset(2, 2),
-                  spreadRadius: -1,
-                ),
-              ],
             ),
             child: Icon(
               icon,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : AppColors.textDark,
-              size: responsive.scaledWidth(28),
+              color: AppColors.primaryGold,
+              size: responsive.scaledWidth(24),
             ),
           ),
         ),
@@ -1138,16 +1008,204 @@ class _HomeScreenState extends State<HomeScreen> {
           label,
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(11),
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.78 * 255).round()),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.75)
+                : AppColors.textDark.withValues(alpha: 0.7),
             fontWeight: FontWeight.w600,
           ),
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
+      ],
+    );
+  }
+
+  String _getInitials(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts.isNotEmpty && parts[0].isNotEmpty
+        ? parts[0][0].toUpperCase()
+        : 'U';
+  }
+
+  Widget _headerIconButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    required bool isDark,
+    required ResponsiveHelper responsive,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: responsive.scaledWidth(38),
+        height: responsive.scaledWidth(38),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+        child: Icon(
+          icon,
+          size: responsive.scaledWidth(20),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.85)
+              : AppColors.textDark.withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentTransactions(
+    ResponsiveHelper responsive,
+    AppProvider provider,
+    bool isDark,
+  ) {
+    final recent = provider.transactions.take(3).toList();
+    if (recent.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            responsive.scaledWidth(20),
+            0,
+            responsive.scaledWidth(20),
+            responsive.scaledHeight(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Transações recentes',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(15),
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                ),
+              ),
+              Text(
+                'Ver todas',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(12),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          margin:
+              EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Column(
+            children: recent.asMap().entries.map((entry) {
+              final tx = entry.value;
+              final isLast = entry.key == recent.length - 1;
+              return _buildTransactionTile(responsive, tx, isDark, isLast);
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionTile(
+    ResponsiveHelper responsive,
+    Transaction tx,
+    bool isDark,
+    bool isLast,
+  ) {
+    final isOutgoing = tx.isOutgoing;
+    final displayAmount = (tx.displayAmount ?? tx.amount).abs();
+
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: responsive.scaledWidth(16),
+            vertical: responsive.scaledHeight(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: responsive.scaledWidth(40),
+                height: responsive.scaledWidth(40),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.04),
+                ),
+                child: Icon(
+                  isOutgoing
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
+                  color: isOutgoing ? Colors.redAccent : Colors.greenAccent,
+                  size: responsive.scaledWidth(18),
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tx.description.isNotEmpty ? tx.description : tx.type,
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(13),
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : AppColors.textDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: responsive.scaledHeight(2)),
+                    Text(
+                      '${tx.date} ${tx.time}'.trim(),
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(11),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.4)
+                            : Colors.black.withValues(alpha: 0.38),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${isOutgoing ? "-" : "+"}${NumberFormat('#,##0', 'pt_AO').format(displayAmount)} kzs',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(13),
+                  fontWeight: FontWeight.w700,
+                  color:
+                      isOutgoing ? Colors.redAccent : Colors.greenAccent,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!isLast)
+          Divider(
+            height: 1,
+            indent: responsive.scaledWidth(68),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
       ],
     );
   }

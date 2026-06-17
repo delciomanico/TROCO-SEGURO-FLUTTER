@@ -11,7 +11,7 @@ import 'package:troco_seguro/screens/auth_screen.dart';
 import 'package:troco_seguro/screens/home_screen.dart';
 import 'package:troco_seguro/screens/wallet_screen.dart';
 import 'package:troco_seguro/screens/trips_screen.dart';
-import 'package:troco_seguro/widgets/virtual_cards_fullscreen.dart';
+import 'package:troco_seguro/screens/cards_screen.dart';
 import 'package:troco_seguro/widgets/topup_modal.dart';
 import 'package:troco_seguro/widgets/transfer_modal.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
@@ -387,38 +387,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showVirtualCardsFullscreen() {
-    final provider = context.read<AppProvider>();
-    final cardHolderName = provider.user?.fullName.trim().isNotEmpty == true
-        ? provider.user!.fullName
-        : 'Utilizador';
-
-    showVirtualCardsFullscreen(
-      context,
-      cards: provider.virtualCards,
-      cardHolderName: cardHolderName,
-      onCreateCard: ({
-        required String name,
-        required int initialBalance,
-        required int dailyLimit,
-        required String userPin,
-        required String cardPin,
-      }) async {
-        return provider.createVirtualCard(
-          name: name,
-          initialBalance: initialBalance,
-          dailyLimit: dailyLimit,
-          userPin: userPin,
-          cardPin: cardPin,
-        );
-      },
-      onDeleteCard: (cardId) async {
-        await provider.deleteVirtualCard(cardId);
-      },
-      onClose: () {},
-    );
-  }
-
   void _showProfileModal() {
     showGeneralDialog(
       context: context,
@@ -461,7 +429,6 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           HomeScreen(
             onOpenScanner: _showPaymentModal,
-            onOpenVirtualCards: _showVirtualCardsFullscreen,
             onOpenTopup: _showTopupModal,
             onPanic: _handlePanic,
             onOpenProfile: _showProfileModal,
@@ -471,6 +438,7 @@ class _MainScreenState extends State<MainScreen> {
             onOpenTopup: _showTopupModal,
             onOpenTransfer: _showTransferModal,
           ),
+          const CardsScreen(),
           const TripsScreen(),
         ],
       ),
@@ -479,39 +447,68 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildBottomNavigationBar() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final items = [
+      (icon: Icons.home_rounded, label: 'Início'),
+      (icon: Icons.account_balance_wallet_rounded, label: 'Carteira'),
+      (icon: Icons.credit_card_rounded, label: 'Cartões'),
+      (icon: Icons.route_rounded, label: 'Viagens'),
+    ];
 
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (index) => setState(() => _currentIndex = index),
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: theme.colorScheme.surface,
-      selectedItemColor: theme.colorScheme.primary,
-      unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-      selectedLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
+    return Container(
+      color: isDark ? const Color(0xFF1A1D24) : const Color(0xFF111318),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: items.asMap().entries.map((entry) {
+              final i = entry.key;
+              final item = entry.value;
+              final isSelected = _currentIndex == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primaryGold
+                          : Colors.transparent,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          item.icon,
+                          color: isSelected
+                              ? Colors.black
+                              : Colors.white.withValues(alpha: 0.55),
+                          size: 22,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.black
+                                : Colors.white.withValues(alpha: 0.55),
+                            fontSize: 11,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
-      unselectedLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
-      elevation: isDark ? 10 : 6,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_rounded),
-          label: 'Início',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.account_balance_wallet_rounded),
-          label: 'Carteira',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.route_rounded),
-          label: 'Viagens',
-        ),
-      ],
     );
   }
 }
