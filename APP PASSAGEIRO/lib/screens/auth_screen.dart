@@ -135,10 +135,18 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _handleRecover() {
-    // simple placeholder: show a SnackBar. Integrate real recovery flow if available.
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Iniciar recuperação de credenciais'),
-    ));
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: const _PasswordRecoveryModal(),
+      ),
+    );
   }
 
   User _createUserFromInput(String phone) {
@@ -806,5 +814,281 @@ class _AuthScreenState extends State<AuthScreen> {
 
     // On register: do not show link to login (choice screen handles switching)
     return const SizedBox.shrink();
+  }
+}
+
+// ─── Password Recovery Modal (3 steps) ───────────────────────────────────────
+class _PasswordRecoveryModal extends StatefulWidget {
+  const _PasswordRecoveryModal();
+  @override
+  State<_PasswordRecoveryModal> createState() => _PasswordRecoveryModalState();
+}
+
+class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
+  final ApiService _api = ApiService();
+  int _step = 1;
+  bool _busy = false;
+
+  final _phoneCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  final _newPinCtrl = TextEditingController();
+  final _cfmPinCtrl = TextEditingController();
+  bool _obscurePin = true;
+  bool _obscureCfm = true;
+
+  String? _resetToken;
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _otpCtrl.dispose();
+    _newPinCtrl.dispose();
+    _cfmPinCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _step1() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) { _err('Insira o número de telefone'); return; }
+    setState(() => _busy = true);
+    final res = await _api.forgotPassword(phone);
+    setState(() => _busy = false);
+    if (res.isSuccess) {
+      setState(() => _step = 2);
+    } else {
+      _err(res.error ?? 'Erro ao enviar código');
+    }
+  }
+
+  Future<void> _step2() async {
+    final otp = _otpCtrl.text.trim();
+    if (otp.length != 6) { _err('Código deve ter 6 dígitos'); return; }
+    setState(() => _busy = true);
+    final res = await _api.verifyForgotPasswordOtp(
+        phoneNumber: _phoneCtrl.text.trim(), otp: otp);
+    setState(() => _busy = false);
+    if (res.isSuccess && res.data != null) {
+      _resetToken = res.data;
+      setState(() => _step = 3);
+    } else {
+      _err(res.error ?? 'Código inválido ou expirado');
+    }
+  }
+
+  Future<void> _step3() async {
+    final pin = _newPinCtrl.text.trim();
+    final cfm = _cfmPinCtrl.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) { _err('PIN deve ter 6 dígitos numéricos'); return; }
+    if (pin != cfm) { _err('PINs não coincidem'); return; }
+    setState(() => _busy = true);
+    final res = await _api.resetPassword(resetToken: _resetToken!, newPassword: pin);
+    setState(() => _busy = false);
+    if (res.isSuccess) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Senha redefinida com sucesso. Faça login.'),
+          backgroundColor: Color(0xFFD4AF37),
+        ));
+      }
+    } else {
+      _err(res.error ?? 'Erro ao redefinir senha');
+    }
+  }
+
+  void _err(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red.shade700,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD4AF37);
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2F2);
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
+              child: Row(
+                children: [
+                  if (_step > 1)
+                    GestureDetector(
+                      onTap: () => setState(() => _step--),
+                      child: Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(shape: BoxShape.circle,
+                            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+                        child: Icon(Icons.arrow_back_rounded, size: 18, color: textColor),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 36),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text('Recuperar Senha',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor))),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(shape: BoxShape.circle,
+                          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+                      child: Icon(Icons.close_rounded, size: 18, color: textColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Step indicator
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: List.generate(3, (i) {
+                  final active = i + 1 <= _step;
+                  return Expanded(child: Container(
+                    height: 3,
+                    margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                    decoration: BoxDecoration(
+                      color: active ? gold : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.1)),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ));
+                }),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _step == 1 ? _buildStep1(isDark, gold, cardBg, textColor)
+                    : _step == 2 ? _buildStep2(isDark, gold, cardBg, textColor)
+                    : _buildStep3(isDark, gold, cardBg, textColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep1(bool isDark, Color gold, Color cardBg, Color textColor) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Passo 1 de 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8,
+          color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.35))),
+      const SizedBox(height: 8),
+      Text('Qual é o seu número?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
+      const SizedBox(height: 8),
+      Text('Enviaremos um código por SMS ou WhatsApp.',
+          style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.5))),
+      const SizedBox(height: 28),
+      _inputField('Número de telefone (+244...)', _phoneCtrl, isDark, gold, cardBg, icon: Icons.phone_outlined, type: TextInputType.phone),
+      const SizedBox(height: 28),
+      _submitButton('Enviar código', _step1, isDark, gold),
+    ]);
+  }
+
+  Widget _buildStep2(bool isDark, Color gold, Color cardBg, Color textColor) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Passo 2 de 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8,
+          color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.35))),
+      const SizedBox(height: 8),
+      Text('Insira o código recebido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
+      const SizedBox(height: 8),
+      Text('Código de 6 dígitos enviado para ${_phoneCtrl.text.trim()}',
+          style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.5))),
+      const SizedBox(height: 28),
+      _inputField('Código OTP (6 dígitos)', _otpCtrl, isDark, gold, cardBg,
+          icon: Icons.lock_outline, type: TextInputType.number, maxLen: 6),
+      const SizedBox(height: 28),
+      _submitButton('Verificar código', _step2, isDark, gold),
+      const SizedBox(height: 16),
+      Center(child: TextButton(
+        onPressed: _busy ? null : _step1,
+        child: Text('Reenviar código', style: TextStyle(color: gold, fontSize: 13)),
+      )),
+    ]);
+  }
+
+  Widget _buildStep3(bool isDark, Color gold, Color cardBg, Color textColor) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Passo 3 de 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8,
+          color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.35))),
+      const SizedBox(height: 8),
+      Text('Defina um novo PIN', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
+      const SizedBox(height: 8),
+      Text('O PIN deve ter exactamente 6 dígitos numéricos.',
+          style: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.5))),
+      const SizedBox(height: 28),
+      _inputField('Novo PIN', _newPinCtrl, isDark, gold, cardBg,
+          icon: Icons.lock_outline, type: TextInputType.number, maxLen: 6,
+          obscure: _obscurePin, onToggleObscure: () => setState(() => _obscurePin = !_obscurePin)),
+      const SizedBox(height: 14),
+      _inputField('Confirmar PIN', _cfmPinCtrl, isDark, gold, cardBg,
+          icon: Icons.lock_outline, type: TextInputType.number, maxLen: 6,
+          obscure: _obscureCfm, onToggleObscure: () => setState(() => _obscureCfm = !_obscureCfm)),
+      const SizedBox(height: 28),
+      _submitButton('Confirmar novo PIN', _step3, isDark, gold),
+    ]);
+  }
+
+  Widget _inputField(String label, TextEditingController ctrl, bool isDark, Color gold, Color cardBg, {
+    required IconData icon,
+    TextInputType type = TextInputType.text,
+    int? maxLen,
+    bool obscure = false,
+    VoidCallback? onToggleObscure,
+  }) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: type,
+      obscureText: obscure,
+      maxLength: maxLen,
+      decoration: InputDecoration(
+        labelText: label,
+        counterText: '',
+        prefixIcon: Icon(icon, color: gold),
+        suffixIcon: onToggleObscure != null
+            ? IconButton(icon: Icon(obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: gold, size: 20), onPressed: onToggleObscure)
+            : null,
+        filled: true,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: gold, width: 1.5)),
+        labelStyle: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45)),
+      ),
+    );
+  }
+
+  Widget _submitButton(String label, Future<void> Function() onPressed, bool isDark, Color gold) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _busy ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: gold,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
+        ),
+        child: _busy
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+            : Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ),
+    );
   }
 }

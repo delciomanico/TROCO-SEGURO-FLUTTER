@@ -230,6 +230,45 @@ class ApiService {
     }
   }
 
+  /// Solicitar código OTP para recuperação de senha
+  Future<ApiResponse<void>> forgotPassword(String phoneNumber) async {
+    try {
+      await _dio.post('/auth/forgot-password', data: {'phoneNumber': phoneNumber});
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Validar OTP e obter resetToken
+  Future<ApiResponse<String>> verifyForgotPasswordOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    try {
+      final response = await _dio.post('/auth/forgot-password/verify-otp',
+          data: {'phoneNumber': phoneNumber, 'otp': otp});
+      final token = response.data['resetToken'] as String;
+      return ApiResponse.success(token);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Definir nova senha com resetToken
+  Future<ApiResponse<void>> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post('/auth/reset-password',
+          data: {'resetToken': resetToken, 'newPassword': newPassword});
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Renovar tokens
   Future<bool> _refreshTokens() async {
     if (_refreshToken == null) return false;
@@ -904,6 +943,7 @@ class QrValidationResult {
   final String? licensePlate;
   final double? rating;
   final int? amount;
+  final String? seatLabel;
   final String? sessionToken;
   final String? paymentToken;
 
@@ -914,6 +954,7 @@ class QrValidationResult {
     this.licensePlate,
     this.rating,
     this.amount,
+    this.seatLabel,
     this.sessionToken,
     this.paymentToken,
   });
@@ -927,7 +968,7 @@ class QrValidationResult {
       licensePlate: driver?['licensePlate'] ?? json['licensePlate'],
       rating: (driver?['rating'] ?? json['rating'])?.toDouble(),
       amount: json['amount'],
-      // Some backends return the session/payment token under different keys
+      seatLabel: json['seatLabel'],
       sessionToken: json['sessionToken'] ?? json['paymentToken'],
       paymentToken: json['paymentToken'] ?? json['sessionToken'],
     );

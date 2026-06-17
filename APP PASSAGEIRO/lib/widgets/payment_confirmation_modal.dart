@@ -198,6 +198,27 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                                 .colorScheme
                                 .onSurface
                                 .withValues(alpha: 0.6))),
+                    if (widget.driverInfo.seatLabel != null) ...[
+                      SizedBox(height: responsive.scaledHeight(8)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.airline_seat_recline_normal_rounded,
+                              size: 14, color: AppColors.primaryGold),
+                          const SizedBox(width: 5),
+                          Text(widget.driverInfo.seatLabel!,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryGold)),
+                        ]),
+                      ),
+                    ],
                   ],
                 ),
 
