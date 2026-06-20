@@ -12,6 +12,7 @@ import 'package:troco_seguro_motorista/models/vehicle.dart';
 import 'package:troco_seguro_motorista/models/emergency_contact.dart';
 import 'package:troco_seguro_motorista/models/notification.dart';
 import 'package:troco_seguro_motorista/screens/onboarding_screen.dart';
+import 'package:troco_seguro_motorista/screens/splash_screen.dart';
 import 'package:troco_seguro_motorista/screens/auth_screen.dart';
 import 'package:troco_seguro_motorista/screens/home_screen.dart';
 import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
@@ -85,12 +86,13 @@ class AppController extends StatefulWidget {
 
 class _AppControllerState extends State<AppController>
     with WidgetsBindingObserver {
-  bool hasSeenOnboarding = true; // Onboarding desativado por padrÃ£o
+  bool hasSeenOnboarding = true; // Onboarding desativado por padrão
   DriverUser? driver;
   List<Transaction> transactions = [];
   bool isLoading = true;
   bool _isLocked = false;
   bool isOnline = false;
+  bool _showSplash = true;
   String? activeVehicleId;
   final ApiService _api = ApiService();
 
@@ -384,6 +386,12 @@ class _AppControllerState extends State<AppController>
 
   @override
   Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashScreen(
+        onComplete: () => setState(() => _showSplash = false),
+      );
+    }
+
     if (isLoading) {
       return const Scaffold(
         body: Center(
