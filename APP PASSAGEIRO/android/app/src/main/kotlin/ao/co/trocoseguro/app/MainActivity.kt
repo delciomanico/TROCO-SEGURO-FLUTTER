@@ -1,4 +1,4 @@
-package com.example.troco_seguro
+package ao.co.trocoseguro.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

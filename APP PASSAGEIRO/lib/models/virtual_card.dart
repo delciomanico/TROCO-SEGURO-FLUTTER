@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 enum CardStatus { active, frozen, blocked }
 
 /// Payload sent to POST /api/v1/virtual-cards
@@ -179,8 +177,6 @@ class VirtualCard {
       qrToken: json['qrToken']?.toString(),
       lastModified: json['lastModified']?.toString(),
     );
-    
-    debugPrint('💳 Parsed VirtualCard: name=${card.name}, balance=${card.balance}, dailyLimit=${card.dailyLimit}, status=${card.status}');
     
     return card;
   }

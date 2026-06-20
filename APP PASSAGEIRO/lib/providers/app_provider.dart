@@ -6,6 +6,7 @@ import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/models/trip.dart';
 import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/notification_service.dart';
 
 /// Domínios de dados gerenciados pelo AppProvider.
 /// Usado em [AppProvider.invalidate] para refrescar apenas o domínio afetado.
@@ -77,6 +78,7 @@ class AppProvider extends ChangeNotifier {
     if (_user != null) {
       _isAuthenticated = _user!.isLoggedIn;
       _refreshAllDataInBackground();
+      _registerFcmToken();
     }
   }
 
@@ -127,6 +129,18 @@ class AppProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> _registerFcmToken() async {
+    try {
+      await NotificationService().initialize();
+      final token = await NotificationService().getToken();
+      if (token != null) {
+        await _api.updateFcmToken(token);
+      }
+    } catch (e) {
+      debugPrint('Erro ao registar FCM token: $e');
+    }
   }
 
   /// Refresh de todos os dados em background (sem loading state)
@@ -609,8 +623,9 @@ class AppProvider extends ChangeNotifier {
     await _prefs?.setString('ts_user', json.encode(user.toJson()));
     notifyListeners();
 
-    // Carregar todos os dados após login
+    // Carregar todos os dados e registar FCM após login
     await _refreshAllDataInBackground();
+    _registerFcmToken();
   }
 
   /// Transferir para outro usuário (P2P)
@@ -687,6 +702,28 @@ class AppProvider extends ChangeNotifier {
     await _prefs?.remove('ts_trips');
 
     notifyListeners();
+  }
+
+  Future<bool> deleteAccount() async {
+    final result = await _api.deleteAccount();
+    if (!result.isSuccess) return false;
+
+    _user = null;
+    _isAuthenticated = false;
+    _virtualCards = [];
+    _transactions = [];
+    _trips = [];
+    _cardsLastFetch = null;
+    _transactionsLastFetch = null;
+    _tripsLastFetch = null;
+
+    await _prefs?.remove('ts_user');
+    await _prefs?.remove('ts_cards');
+    await _prefs?.remove('ts_transactions');
+    await _prefs?.remove('ts_trips');
+
+    notifyListeners();
+    return true;
   }
 
   /// Atualizar saldo local (após pagamento/transferência)
@@ -793,6 +830,62 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Retirar saldo do cartão virtual para a carteira principal
+  Future<bool> withdrawFromCard({
+    required String cardId,
+    required int amount,
+    required String cardPin,
+  }) async {
+    try {
+      final result = await _api.withdrawFromVirtualCard(
+        cardId: cardId,
+        amount: amount,
+        pin: cardPin,
+      );
+      if (result.isSuccess) {
+        if (result.data?.newBalance != null) {
+          updateUserBalance(result.data!.newBalance!);
+        }
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(balance: _virtualCards[idx].balance - amount);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        invalidate(AppDomain.user);
+        invalidate(AppDomain.cards);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Erro ao levantar do cartão: $e');
+      return false;
+    }
+  }
+
+  /// Solicitar levantamento para IBAN
+  Future<bool> requestWithdrawal({
+    required int amount,
+    required String iban,
+  }) async {
+    try {
+      final result = await _api.requestWithdrawal(amount: amount, iban: iban);
+      if (result.isSuccess) {
+        invalidate(AppDomain.user);
+        invalidate(AppDomain.transactions);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Erro ao solicitar levantamento: $e');
+      return false;
+    }
+  }
+
   /// Acionar botão de pânico
   Future<bool> triggerPanic({
     required double latitude,
@@ -801,24 +894,19 @@ class AppProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      debugPrint('🚨 Acionando pânico em: $latitude, $longitude');
-
       final result = await _api.triggerPanic(
         latitude: latitude,
         longitude: longitude,
       );
 
       if (result.isSuccess) {
-        debugPrint('✅ Alerta de pânico registrado com sucesso!');
         return true;
       } else {
         _error = result.error ?? 'Erro ao registrar alerta de pânico';
-        debugPrint('❌ Erro: ${result.error}');
         return false;
       }
     } catch (e) {
       _error = 'Erro ao acionar pânico: $e';
-      debugPrint('❌ Exceção: $e');
       return false;
     }
   }

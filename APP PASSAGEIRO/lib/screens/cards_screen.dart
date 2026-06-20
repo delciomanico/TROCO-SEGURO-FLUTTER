@@ -208,6 +208,171 @@ class _CardsScreenState extends State<CardsScreen> {
     );
   }
 
+  // ── Withdraw modal ─────────────────────────────────────────────────────────
+  void _showWithdrawModal(VirtualCard card) {
+    final provider = context.read<AppProvider>();
+    final amountController = TextEditingController();
+    final pinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isLoading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .onSurface
+                          .withAlpha((0.25 * 255).round()),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Levantar de "${card.name}"',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(ctx).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Saldo disponível: ${_fmt(card.balance)} Kz',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(ctx)
+                        .colorScheme
+                        .onSurface
+                        .withAlpha((0.6 * 255).round()),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Valor a levantar',
+                    suffixText: 'Kz',
+                    prefixIcon: const Icon(Icons.arrow_upward_rounded),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.2 * 255).round()),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: isDark ? Theme.of(ctx).colorScheme.surface : Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinController,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  maxLength: 4,
+                  decoration: InputDecoration(
+                    labelText: 'PIN do cartão (4 dígitos)',
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.2 * 255).round()),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: isDark ? Theme.of(ctx).colorScheme.surface : Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            final amount = int.tryParse(amountController.text.trim()) ?? 0;
+                            final pin = pinController.text.trim();
+                            if (amount <= 0) {
+                              FeedbackService.showError(ctx, message: 'Valor deve ser maior que 0');
+                              return;
+                            }
+                            if (amount > card.balance) {
+                              FeedbackService.showError(ctx, message: 'Saldo insuficiente no cartão');
+                              return;
+                            }
+                            if (pin.length != 4) {
+                              FeedbackService.showError(ctx, message: 'PIN do cartão deve ter 4 dígitos');
+                              return;
+                            }
+                            setSheet(() => isLoading = true);
+                            final ok = await provider.withdrawFromCard(
+                              cardId: card.id,
+                              amount: amount,
+                              cardPin: pin,
+                            );
+                            if (!ctx.mounted) return;
+                            Navigator.pop(ctx);
+                            if (ok) {
+                              FeedbackService.showSuccess(context,
+                                  message: '${_fmt(amount)} Kz devolvidos à carteira');
+                            } else {
+                              FeedbackService.showError(context, message: 'Erro ao levantar do cartão');
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Levantar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Freeze/Unfreeze ────────────────────────────────────────────────────────
   Future<void> _toggleFreeze(VirtualCard card) async {
     final provider = context.read<AppProvider>();
@@ -1179,6 +1344,15 @@ class _CardsScreenState extends State<CardsScreen> {
                                   onTap: card.isBlocked
                                       ? null
                                       : () => _showTopupModal(card),
+                                ),
+                                const SizedBox(width: 8),
+                                _ActionChip(
+                                  icon: Icons.arrow_upward_rounded,
+                                  label: 'Levantar',
+                                  color: Colors.orange,
+                                  onTap: (card.isBlocked || card.isFrozen)
+                                      ? null
+                                      : () => _showWithdrawModal(card),
                                 ),
                                 const SizedBox(width: 8),
                                 _ActionChip(

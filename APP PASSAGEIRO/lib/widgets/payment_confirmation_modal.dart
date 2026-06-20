@@ -120,8 +120,8 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
               driverName: widget.driverInfo.driverName ?? 'Motorista',
               onSubmitRating: (tripId, rating, comment) async {
                 final api = ApiService();
-                final response = await api.createRating(
-                  targetUserId: widget.driverInfo.driverId ?? '',
+                final response = await api.rateTrip(
+                  tripId: tripId,
                   stars: rating,
                   comment: comment,
                 );

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/models/transaction.dart';
@@ -9,6 +10,7 @@ import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
+import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenTopup;
@@ -80,6 +82,35 @@ class _WalletScreenState extends State<WalletScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _ExternalCardSheet(),
+    );
+    if (!mounted) return;
+  }
+
+  Future<void> _showQrBalanceModal() async {
+    final qrData = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QRScannerModal(
+        onCancel: () {},
+        onQRScanned: (data) => Navigator.pop(context, data),
+      ),
+    );
+    if (qrData == null || !mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _QrBalanceSheet(qrData: qrData),
+    );
+  }
+
+  Future<void> _showWithdrawalModal() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _WithdrawalSheet(),
     );
     if (!mounted) return;
   }
@@ -403,6 +434,10 @@ class _WalletScreenState extends State<WalletScreen> {
           onTap: _showDepositToCardModal),
       (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
           onTap: _showExternalCardModal),
+      (icon: Icons.account_balance_rounded, label: 'Levantar',
+          onTap: _showWithdrawalModal),
+      (icon: Icons.qr_code_scanner_rounded, label: 'Saldo QR',
+          onTap: _showQrBalanceModal),
     ];
 
     return Padding(
@@ -766,6 +801,35 @@ class _ExternalCardSheetState extends State<_ExternalCardSheet> {
   String? _error;
   bool _loading = false;
   bool _showPin = false;
+  String? _resolvedOwner;
+
+  Future<void> _scanCardQr() async {
+    final qrData = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QRScannerModal(
+        onCancel: () {},
+        onQRScanned: (data) => Navigator.pop(context, data),
+      ),
+    );
+    if (qrData == null || !mounted) return;
+
+    setState(() => _loading = true);
+    final result = await ApiService().resolveVirtualCardQr(qrData);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (result.isSuccess && result.data?.cardNumber != null) {
+      setState(() {
+        _cardCtrl.text = result.data!.cardNumber!;
+        _resolvedOwner = result.data!.ownerName;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = result.error ?? 'QR inválido ou não é um cartão virtual.');
+    }
+  }
 
   @override
   void dispose() {
@@ -823,13 +887,46 @@ class _ExternalCardSheetState extends State<_ExternalCardSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (_error != null) _ErrorBanner(_error!),
-          TextField(
-            controller: _cardCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-                labelText: 'Número do cartão',
-                border: OutlineInputBorder()),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _cardCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Número do cartão',
+                      border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 56,
+                child: IconButton.filled(
+                  onPressed: _loading ? null : _scanCardQr,
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  tooltip: 'Ler QR do cartão',
+                ),
+              ),
+            ],
           ),
+          if (_resolvedOwner != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                  const SizedBox(width: 8),
+                  Text(_resolvedOwner!, style: const TextStyle(color: Colors.green, fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _amountCtrl,
@@ -884,6 +981,36 @@ class _TransferSheetState extends State<_TransferSheet> {
   String? _recipientName;
   bool _loading = false;
   bool _verified = false;
+
+  Future<void> _scanQr() async {
+    final qrData = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QRScannerModal(
+        onCancel: () {},
+        onQRScanned: (data) => Navigator.pop(context, data),
+      ),
+    );
+    if (qrData == null || !mounted) return;
+
+    try {
+      final decoded = jsonDecode(qrData) as Map<String, dynamic>;
+      final phone = decoded['phoneNumber'] ?? decoded['phone'] ?? decoded['receiverPhone'];
+      if (phone != null) {
+        setState(() {
+          _phoneCtrl.text = phone.toString();
+          _verified = false;
+          _recipientName = null;
+          _error = null;
+        });
+      } else {
+        setState(() => _error = 'QR não contém número de telefone.');
+      }
+    } catch (_) {
+      setState(() => _error = 'QR inválido.');
+    }
+  }
 
   @override
   void dispose() {
@@ -980,15 +1107,25 @@ class _TransferSheetState extends State<_TransferSheet> {
                 ),
               ),
               const SizedBox(width: 8),
+              if (!_verified) ...[
+                SizedBox(
+                  height: 56,
+                  child: IconButton.outlined(
+                    onPressed: _loading ? null : _scanQr,
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    tooltip: 'Ler QR do destinatário',
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               SizedBox(
                 height: 56,
                 child: _verified
                     ? IconButton.filled(
-                        onPressed: () =>
-                            setState(() {
-                              _verified = false;
-                              _recipientName = null;
-                            }),
+                        onPressed: () => setState(() {
+                          _verified = false;
+                          _recipientName = null;
+                        }),
                         icon: const Icon(Icons.edit),
                         tooltip: 'Alterar',
                       )
@@ -998,8 +1135,7 @@ class _TransferSheetState extends State<_TransferSheet> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2))
+                                child: CircularProgressIndicator(strokeWidth: 2))
                             : const Text('Verificar'),
                       ),
               ),
@@ -1058,6 +1194,112 @@ class _TransferSheetState extends State<_TransferSheet> {
 }
 
 // ── Helpers partilhados ──────────────────────────────────────────────────────
+
+class _QrBalanceSheet extends StatefulWidget {
+  final String qrData;
+  const _QrBalanceSheet({required this.qrData});
+  @override
+  State<_QrBalanceSheet> createState() => _QrBalanceSheetState();
+}
+
+class _QrBalanceSheetState extends State<_QrBalanceSheet> {
+  bool _loading = true;
+  String? _error;
+  CardBalanceResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    String qrId = widget.qrData;
+    try {
+      final decoded = jsonDecode(widget.qrData);
+      qrId = decoded['qrId'] ?? decoded['id'] ?? decoded['cardId'] ?? widget.qrData;
+    } catch (_) {}
+
+    final result = await ApiService().getWalletBalanceByQr(qrId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (result.isSuccess) {
+        _result = result.data;
+      } else {
+        _error = result.error ?? 'Não foi possível obter o saldo.';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _BottomSheetWrapper(
+      title: 'SALDO DO CARTÃO',
+      subtitle: 'Consulta via QR code.',
+      icon: Icons.qr_code_scanner_rounded,
+      child: _loading
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : _error != null
+              ? _ErrorBanner(_error!)
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_result!.ownerName != null)
+                      Text(
+                        _result!.ownerName!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                      ),
+                    if (_result!.cardName != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _result!.cardName!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Text(
+                      '${_result!.balance} Kz',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Saldo disponível',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white38 : Colors.black38,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Fechar'),
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
+}
 
 class _BottomSheetWrapper extends StatelessWidget {
   final String title;
@@ -1210,6 +1452,184 @@ class _ActionRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Withdrawal Sheet (IBAN) ──────────────────────────────────────────────────
+class _WithdrawalSheet extends StatefulWidget {
+  const _WithdrawalSheet();
+
+  @override
+  State<_WithdrawalSheet> createState() => _WithdrawalSheetState();
+}
+
+class _WithdrawalSheetState extends State<_WithdrawalSheet> {
+  final _amountCtrl = TextEditingController();
+  final _ibanCtrl = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _ibanCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _validIban(String v) => v.isNotEmpty && v.toUpperCase().startsWith('AO06');
+
+  Future<void> _submit() async {
+    final amount = int.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final iban = _ibanCtrl.text.trim();
+
+    if (amount <= 0) {
+      FeedbackService.showError(context, message: 'Valor deve ser maior que 0');
+      return;
+    }
+    if (!_validIban(iban)) {
+      FeedbackService.showError(context, message: 'IBAN inválido (deve começar por AO06)');
+      return;
+    }
+
+    setState(() => _busy = true);
+    final provider = context.read<AppProvider>();
+    final ok = await provider.requestWithdrawal(amount: amount, iban: iban);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    if (ok) {
+      Navigator.pop(context);
+      FeedbackService.showSuccess(context,
+          message: 'Pedido de levantamento submetido. Prazo: 1-3 dias úteis.');
+    } else {
+      FeedbackService.showError(context, message: 'Erro ao solicitar levantamento');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final onSurface = isDark ? Colors.white : AppColors.textDark;
+    final subtle = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15);
+    final fillColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Levantar para IBAN',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onSurface)),
+            const SizedBox(height: 4),
+            Text('Transferência bancária em 1-3 dias úteis',
+                style: TextStyle(fontSize: 12, color: subtle)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Valor a levantar',
+                suffixText: 'Kz',
+                prefixIcon: const Icon(Icons.account_balance_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                ),
+                filled: true,
+                fillColor: fillColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _ibanCtrl,
+              decoration: InputDecoration(
+                labelText: 'IBAN (AO06...)',
+                prefixIcon: const Icon(Icons.credit_score_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                ),
+                filled: true,
+                fillColor: fillColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: Colors.orange.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'O valor será transferido para a sua conta bancária em 1-3 dias úteis',
+                      style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _busy ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: _busy
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    : const Text('Solicitar Levantamento',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

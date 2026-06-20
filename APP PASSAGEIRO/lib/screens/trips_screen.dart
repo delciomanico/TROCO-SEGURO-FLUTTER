@@ -6,6 +6,7 @@ import 'package:troco_seguro/utils/constants.dart';
 
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/api_service.dart' show ApiService, TripStats;
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -19,6 +20,20 @@ class _TripsScreenState extends State<TripsScreen> {
   String _searchQuery = '';
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  TripStats? _apiStats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final result = await ApiService().getTripStats();
+    if (result.isSuccess && result.data != null && mounted) {
+      setState(() => _apiStats = result.data);
+    }
+  }
 
   @override
   void dispose() {
@@ -75,8 +90,8 @@ class _TripsScreenState extends State<TripsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final filtered = _filtered(trips);
-    final completed = trips.where((t) => t.status == 'completed').length;
-    final totalSpent = trips.fold<int>(0, (s, t) => s + t.amount);
+    final completed = _apiStats?.totalTrips ?? trips.where((t) => t.status == 'completed').length;
+    final totalSpent = _apiStats?.totalSpentMonth ?? trips.fold<int>(0, (s, t) => s + t.amount);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
@@ -91,8 +106,10 @@ class _TripsScreenState extends State<TripsScreen> {
                       child: CircularProgressIndicator(
                           color: AppColors.primaryGold))
                   : RefreshIndicator(
-                      onRefresh: () async =>
-                          context.read<AppProvider>().refreshTrips(),
+                      onRefresh: () async {
+                        await context.read<AppProvider>().refreshTrips();
+                        await _loadStats();
+                      },
                       color: AppColors.primaryGold,
                       child: ListView(
                         padding: EdgeInsets.fromLTRB(
@@ -292,7 +309,7 @@ class _TripsScreenState extends State<TripsScreen> {
               isDark,
               responsive,
               Icons.check_circle_outline_rounded,
-              'Concluídas',
+              _apiStats != null ? 'Total viagens' : 'Concluídas',
               '$completed',
               Colors.green,
             ),
@@ -309,7 +326,7 @@ class _TripsScreenState extends State<TripsScreen> {
               isDark,
               responsive,
               Icons.payments_outlined,
-              'Total gasto',
+              _apiStats != null ? 'Kz este mês' : 'Total gasto',
               _fmt(totalSpent),
               AppColors.primaryGold,
             ),

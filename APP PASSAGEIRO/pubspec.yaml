@@ -20,11 +20,14 @@ dependencies:
   qr_flutter: ^4.1.0
   share_plus: ^7.2.1
   path_provider: ^2.1.1
-  screenshot: ^3.0.0
   http: ^1.6.0
   dio: ^5.9.1
   provider: ^6.1.1
-  google_fonts: any
+  google_fonts: ^6.2.1
+  geolocator: ^13.0.2
+  firebase_core: ^3.13.1
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

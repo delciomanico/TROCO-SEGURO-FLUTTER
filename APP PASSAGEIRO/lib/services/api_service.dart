@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
@@ -38,21 +38,15 @@ class ApiService {
       onRequest: (options, handler) async {
         if (_accessToken != null) {
           options.headers['Authorization'] = 'Bearer $_accessToken';
-          debugPrint('🔑 Token anexado: ${_accessToken!.substring(0, 10)}...');
-        } else {
-          debugPrint('⚠️ Token ausente no request');
         }
         options.headers['user-agent'] = 'TrocoSeguroApp/1.0';
-        debugPrint('🌐 ${options.method} ${options.path}');
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        debugPrint('✅ ${response.statusCode} ${response.requestOptions.path}');
         return handler.next(response);
       },
       onError: (error, handler) async {
-        debugPrint(
-            '❌ ${error.response?.statusCode} ${error.requestOptions.path}');
+        debugPrint('API error: ${error.response?.statusCode} ${error.requestOptions.path}');
 
         // Tentar renovar token se expirado
         if (error.response?.statusCode == 401 && _refreshToken != null) {
@@ -76,23 +70,30 @@ class ApiService {
 
   /// Carregar tokens salvos
   Future<void> loadTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('accessToken');
-    _refreshToken = prefs.getString('refreshToken');
-    debugPrint(
-        '💾 Tokens carregados: Access=${_accessToken != null}, Refresh=${_refreshToken != null}');
+    final secure = SecureStorageService();
+    _accessToken = await secure.readAccessToken();
+    _refreshToken = await secure.readRefreshToken();
+
+    // Migrar tokens legados do SharedPreferences se existirem
+    if (_accessToken == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final legacyAccess = prefs.getString('accessToken');
+      final legacyRefresh = prefs.getString('refreshToken');
+      if (legacyAccess != null) {
+        await secure.saveAuthTokens(legacyAccess, legacyRefresh);
+        await prefs.remove('accessToken');
+        await prefs.remove('refreshToken');
+        _accessToken = legacyAccess;
+        _refreshToken = legacyRefresh;
+      }
+    }
   }
 
   /// Salvar tokens externamente e na memória
   Future<void> saveTokens(String accessToken, String? refreshToken) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('accessToken', accessToken);
-    if (refreshToken != null) {
-      await prefs.setString('refreshToken', refreshToken);
-    }
+    await SecureStorageService().saveAuthTokens(accessToken, refreshToken);
   }
 
   /// Definir tokens manualmente (ex: vindos de outra fonte)
@@ -105,9 +106,7 @@ class ApiService {
   Future<void> clearTokens() async {
     _accessToken = null;
     _refreshToken = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('accessToken');
-    await prefs.remove('refreshToken');
+    await SecureStorageService().deleteAuthTokens();
   }
 
   /// Verificar se está autenticado
@@ -214,6 +213,16 @@ class ApiService {
     }
   }
 
+  Future<ApiResponse<void>> deleteAccount() async {
+    try {
+      await _dio.delete('/users/me');
+      await clearTokens();
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Alterar senha/PIN
   Future<ApiResponse<void>> changePassword({
     required String currentPassword,
@@ -261,8 +270,11 @@ class ApiService {
     required String newPassword,
   }) async {
     try {
-      await _dio.post('/auth/reset-password',
-          data: {'resetToken': resetToken, 'newPassword': newPassword});
+      await _dio.post('/auth/reset-password', data: {
+        'resetToken': resetToken,
+        'newPassword': newPassword,
+        'confirmPassword': newPassword,
+      });
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -544,32 +556,20 @@ class ApiService {
   Future<ApiResponse<List<VirtualCard>>> getVirtualCards() async {
     try {
       final response = await _dio.get('/virtual-cards');
-      debugPrint('💳 Response /virtual-cards (raw): ${response.data}');
-
       final dynamic data = response.data;
       List<dynamic> list;
 
       if (data is Map && data.containsKey('cards')) {
         list = data['cards'];
-        debugPrint('💳 Formato com "cards": ${list.length} itens');
       } else if (data is List) {
         list = data;
-        debugPrint('💳 Formato direto List: ${list.length} itens');
       } else {
-        debugPrint(
-            '⚠️ Formato de resposta inesperado para cartões: ${data.runtimeType}');
         list = [];
       }
 
-      final cards = list.map((e) {
-        debugPrint('💳 Parseando cartão: $e');
-        return VirtualCard.fromJson(e);
-      }).toList();
-
-      debugPrint('💳 Total de cartões parseados: ${cards.length}');
+      final cards = list.map((e) => VirtualCard.fromJson(e)).toList();
       return ApiResponse.success(cards);
     } on DioException catch (e) {
-      debugPrint('❌ Erro ao listar cartões: ${e.message}');
       return ApiResponse.error(_parseError(e));
     }
   }
@@ -580,10 +580,8 @@ class ApiService {
     CreateCardPayload payload,
   ) async {
     try {
-      debugPrint('💳 POST /virtual-cards payload: ${payload.toJson()}');
       final response =
           await _dio.post('/virtual-cards', data: payload.toJson());
-      debugPrint('💳 Response createVirtualCard: ${response.data}');
       return ApiResponse.success(VirtualCardResponse.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -591,6 +589,24 @@ class ApiService {
   }
 
   /// Detalhes do cartão
+  Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(String qrData) async {
+    try {
+      final response = await _dio.post('/virtual-cards/resolve-qr', data: {'qrData': qrData});
+      return ApiResponse.success(VirtualCardQrResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<CardBalanceResult>> getWalletBalanceByQr(String qrId) async {
+    try {
+      final response = await _dio.get('/wallet/balance-by-qr/${Uri.encodeComponent(qrId)}');
+      return ApiResponse.success(CardBalanceResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   Future<ApiResponse<VirtualCard>> getVirtualCard(String cardId) async {
     try {
       final response = await _dio.get('/virtual-cards/$cardId');
@@ -853,6 +869,105 @@ class ApiService {
     }
   }
 
+  // ============ FCM ============
+
+  Future<ApiResponse<void>> updateFcmToken(String token) async {
+    try {
+      await _dio.put('/users/me/fcm-token', data: {'token': token});
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ AVALIAÇÃO DE VIAGEM ============
+
+  Future<ApiResponse<void>> rateTrip({
+    required String tripId,
+    required int stars,
+    String? comment,
+  }) async {
+    try {
+      final data = <String, dynamic>{'stars': stars};
+      if (comment != null) data['comment'] = comment;
+      await _dio.post('/trips/$tripId/rate', data: data);
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ LEVANTAMENTO CARTÃO ============
+
+  Future<ApiResponse<TransactionResult>> withdrawFromVirtualCard({
+    required String cardId,
+    required int amount,
+    required String pin,
+  }) async {
+    try {
+      final response = await _dio.post('/wallet/card/withdraw', data: {
+        'cardId': cardId,
+        'amount': amount,
+        'pin': pin,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ ESTATÍSTICAS DE VIAGENS ============
+
+  Future<ApiResponse<TripStats>> getTripStats() async {
+    try {
+      final response = await _dio.get('/trips/stats');
+      return ApiResponse.success(TripStats.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ RECLAMAÇÕES ============
+
+  Future<ApiResponse<void>> createComplaint({
+    required String category,
+    required String reasonCode,
+    required String description,
+    String? transactionId,
+    String? tripId,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'category': category,
+        'reasonCode': reasonCode,
+        'description': description,
+      };
+      if (transactionId != null) data['transactionId'] = transactionId;
+      if (tripId != null) data['tripId'] = tripId;
+      await _dio.post('/complaints', data: data);
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ LEVANTAMENTO IBAN ============
+
+  Future<ApiResponse<void>> requestWithdrawal({
+    required int amount,
+    required String iban,
+  }) async {
+    try {
+      await _dio.post('/transactions/withdraw', data: {
+        'amount': amount,
+        'iban': iban,
+      });
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ HELPERS ============
 
   String _parseError(DioException e) {
@@ -1085,6 +1200,51 @@ class RecipientInfo {
       phone: json['phoneNumber'] ?? json['phone'] ?? '',
     );
   }
+}
+
+class TripStats {
+  final int totalTrips;
+  final int totalSpentMonth;
+
+  TripStats({required this.totalTrips, required this.totalSpentMonth});
+
+  factory TripStats.fromJson(Map<String, dynamic> json) => TripStats(
+        totalTrips: json['totalTrips'] ?? json['total'] ?? 0,
+        totalSpentMonth:
+            json['totalSpentMonth'] ?? json['totalSpent'] ?? json['monthlySpent'] ?? 0,
+      );
+}
+
+class VirtualCardQrResult {
+  final String? cardNumber;
+  final String? ownerName;
+  final String? cardId;
+
+  VirtualCardQrResult({this.cardNumber, this.ownerName, this.cardId});
+
+  factory VirtualCardQrResult.fromJson(Map<String, dynamic> json) {
+    final card = json['card'] as Map<String, dynamic>?;
+    return VirtualCardQrResult(
+      cardNumber: card?['cardNumber'] ?? json['cardNumber'] ?? json['number'],
+      ownerName: card?['ownerName'] ?? json['ownerName'] ?? json['name'],
+      cardId: card?['id'] ?? json['id'] ?? json['cardId'],
+    );
+  }
+}
+
+class CardBalanceResult {
+  final int balance;
+  final String? ownerName;
+  final String? cardName;
+
+  CardBalanceResult({required this.balance, this.ownerName, this.cardName});
+
+  factory CardBalanceResult.fromJson(Map<String, dynamic> json) =>
+      CardBalanceResult(
+        balance: json['balance'] ?? json['saldo'] ?? 0,
+        ownerName: json['ownerName'] ?? json['name'],
+        cardName: json['cardName'] ?? json['card']?['name'],
+      );
 }
 
 class EmergencyContact {

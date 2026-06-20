@@ -409,29 +409,39 @@ class AppService extends ChangeNotifier {
     required int initialBalance,
     required int dailyLimit,
     required String pin,
+    String cardPin = '000000',
   }) async {
     _setLoading(true);
     _setError(null);
 
-    final result = await _api.createVirtualCard(
+    final payload = CreateCardPayload(
       name: name,
       initialBalance: initialBalance,
       dailyLimit: dailyLimit,
-      pin: pin,
+      userPin: pin,
+      cardPin: cardPin,
     );
+
+    final result = await _api.createVirtualCard(payload);
 
     _setLoading(false);
 
     if (result.isSuccess && result.data != null) {
-      virtualCards.add(result.data!);
-      // Deduzir do saldo principal
+      final r = result.data!;
+      final newCard = VirtualCard(
+        id: r.id,
+        name: r.name,
+        balance: r.balance,
+        createdAt: DateTime.now().toString().split(' ')[0],
+        dailyLimit: dailyLimit,
+      );
+      virtualCards.add(newCard);
       user = user?.copyWith(balance: (user?.balance ?? 0) - initialBalance);
       notifyListeners();
       return true;
     } else {
       _setError(result.error);
 
-      // Fallback local
       final newCard = VirtualCard(
         id: 'CARD-${DateTime.now().millisecondsSinceEpoch}-XXXX',
         name: name,

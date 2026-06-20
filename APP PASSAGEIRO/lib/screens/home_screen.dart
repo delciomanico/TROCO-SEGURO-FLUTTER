@@ -14,6 +14,7 @@ import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart' show AppNotification;
+import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenScanner;
@@ -365,15 +366,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<(double, double)> _getCurrentLocation() async {
+    const double defaultLat = -8.839988;
+    const double defaultLng = 13.289437;
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return (defaultLat, defaultLng);
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      return (pos.latitude, pos.longitude);
+    } catch (_) {
+      return (defaultLat, defaultLng);
+    }
+  }
+
   /// Acionar botão de pânico com localização
   Future<void> _triggerPanic() async {
     setState(() => _isPanicLoading = true);
 
     try {
-      // Use default location (Luanda) for now
-      // In production, this should get real location via geolocator
-      const double latitude = -8.839988;
-      const double longitude = 13.289437;
+      final (latitude, longitude) = await _getCurrentLocation();
 
       final success = widget.onPanic != null
           ? await widget.onPanic!(latitude, longitude)

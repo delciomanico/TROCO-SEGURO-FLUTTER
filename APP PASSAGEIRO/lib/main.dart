@@ -24,7 +24,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/payment_service.dart';
-import 'package:troco_seguro/services/api_service.dart' show ApiService, EmergencyContact, AppNotification, QrValidationResult;
+import 'package:troco_seguro/services/api_service.dart' show ApiService, EmergencyContact, QrValidationResult;
+import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
@@ -1164,7 +1165,7 @@ class _SecurityModalState extends State<_SecurityModal> {
               Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
             ]),
           ),
-          Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ],
       ),
     );
@@ -1233,6 +1234,51 @@ class _SettingsModalState extends State<_SettingsModal> {
   void _showAbout() => _openFullscreen(const _AboutPage());
   void _showTerms() => _openFullscreen(const _TermsPage());
 
+  Future<void> _showDeleteAccountDialog(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final provider = context.read<AppProvider>();
+    final navigator = Navigator.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        title: Text('Excluir Conta',
+            style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+        content: Text(
+          'Esta ação é irreversível. O seu saldo, histórico de viagens e dados pessoais serão permanentemente eliminados.',
+          style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Excluir Conta'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final success = await provider.deleteAccount();
+
+    if (!context.mounted) return;
+
+    if (success) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppController()),
+        (route) => false,
+      );
+    } else {
+      FeedbackService.showError(context, message: 'Não foi possível excluir a conta. Contacte suporte@trocoseguro.ao');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1249,8 +1295,29 @@ class _SettingsModalState extends State<_SettingsModal> {
             }),
             _toggleTile(isDark, Icons.notifications_outlined, 'Notificações', 'Receber alertas e novidades', _notifications, (v) => setState(() => _notifications = v)),
             Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            _actionTile(isDark, Icons.report_problem_outlined, 'Reclamações', 'Reportar um problema ou incidente', () => ComplaintModal.show(context)),
             _actionTile(isDark, Icons.info_outline_rounded, 'Sobre', 'Versão e informações do aplicativo', _showAbout),
             _actionTile(isDark, Icons.description_outlined, 'Termos e Condições', 'Política de uso e privacidade', _showTerms),
+            Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            InkWell(
+              onTap: () => _showDeleteAccountDialog(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_forever_outlined, size: 20, color: Colors.red),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Excluir Conta', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red)),
+                        Text('Eliminar permanentemente conta e dados', style: TextStyle(fontSize: 11, color: Colors.red.withValues(alpha: 0.6))),
+                      ]),
+                    ),
+                    Icon(Icons.chevron_right_rounded, size: 18, color: Colors.red.withValues(alpha: 0.4)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1268,7 +1335,7 @@ class _SettingsModalState extends State<_SettingsModal> {
             Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
             Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
           ])),
-          Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ],
       ),
     );
@@ -1583,7 +1650,7 @@ class _AboutPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Center(
-                      child: Text('Versão 1.0.0',
+                      child: Text('Versão 1.0.4',
                           style: TextStyle(fontSize: 12,
                               color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
                     ),
