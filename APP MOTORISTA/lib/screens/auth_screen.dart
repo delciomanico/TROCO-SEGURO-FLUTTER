@@ -25,6 +25,7 @@ class _AuthScreenState extends State<AuthScreen> {
   AuthMode _mode = AuthMode.choice;
   bool _obscurePin = true;
   bool isLoading = false;
+  bool _agreedToTerms = false;
   String? errorMessage;
 
   final ApiService _api = ApiService();
@@ -73,6 +74,10 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     if (pinController.text.length != 6) {
       setState(() => errorMessage = 'PIN deve ter 6 dígitos');
+      return;
+    }
+    if (_mode == AuthMode.register && !_agreedToTerms) {
+      setState(() => errorMessage = 'Aceite os Termos de Uso para continuar');
       return;
     }
 
@@ -224,6 +229,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                         _mode = AuthMode.choice;
                                         errorMessage = null;
                                         otpController.clear();
+                                        _agreedToTerms = false;
                                       }),
                               icon: Icon(Icons.arrow_back, color: primaryGold),
                             ),
@@ -463,7 +469,98 @@ class _AuthScreenState extends State<AuthScreen> {
             onPressed: () => setState(() => _obscurePin = !_obscurePin),
           ),
         ),
+        if (_mode == AuthMode.register) ...[
+          SizedBox(height: r.scaledHeight(14)),
+          _buildTermsRow(r),
+        ],
       ],
+    );
+  }
+
+  Widget _buildTermsRow(ResponsiveHelper r) {
+    return GestureDetector(
+      onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Custom checkbox
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: r.scaledWidth(22),
+            height: r.scaledWidth(22),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              color: _agreedToTerms
+                  ? primaryGold
+                  : Colors.transparent,
+              border: Border.all(
+                color: _agreedToTerms
+                    ? primaryGold
+                    : (isDark ? Colors.grey[500]! : Colors.grey[400]!),
+                width: 2,
+              ),
+            ),
+            child: _agreedToTerms
+                ? Icon(Icons.check,
+                    size: r.scaledWidth(14),
+                    color: isDark ? Colors.black : Colors.white)
+                : null,
+          ),
+          SizedBox(width: r.scaledWidth(10)),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: r.responsiveFontSize(12.5),
+                  color: isDark ? Colors.white70 : Colors.grey[700],
+                  height: 1.4,
+                ),
+                children: [
+                  const TextSpan(text: 'Li e aceito os '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: GestureDetector(
+                      onTap: _showTermsModal,
+                      child: Text(
+                        'Termos de Uso',
+                        style: TextStyle(
+                          fontSize: r.responsiveFontSize(12.5),
+                          color: primaryGold,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                          decorationColor: primaryGold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const TextSpan(text: ' da aplicação'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTermsModal() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(
+                parent: animation, curve: Curves.easeOutCubic)),
+        child: _TermsOfUseModal(
+          onAccept: () {
+            setState(() => _agreedToTerms = true);
+            Navigator.pop(ctx);
+          },
+        ),
+      ),
     );
   }
 
@@ -650,11 +747,13 @@ class _AuthScreenState extends State<AuthScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: isLoading
+        onPressed: isLoading || (_mode == AuthMode.register && !_agreedToTerms)
             ? null
             : (_mode == AuthMode.otp ? _handleOtp : _handleContinue),
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryGold,
+          backgroundColor: (_mode == AuthMode.register && !_agreedToTerms)
+              ? (isDark ? Colors.grey[800] : Colors.grey[300])
+              : primaryGold,
           foregroundColor: isDark ? Colors.black : darkBg,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -700,6 +799,247 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+// ─── Terms of Use Modal ───────────────────────────────────────────────────────
+
+class _TermsOfUseModal extends StatefulWidget {
+  final VoidCallback onAccept;
+  const _TermsOfUseModal({required this.onAccept});
+
+  @override
+  State<_TermsOfUseModal> createState() => _TermsOfUseModalState();
+}
+
+class _TermsOfUseModalState extends State<_TermsOfUseModal> {
+  final ScrollController _scroll = ScrollController();
+  bool _reachedEnd = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (!_reachedEnd &&
+          _scroll.offset >= _scroll.position.maxScrollExtent - 40) {
+        setState(() => _reachedEnd = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const gold = Color(0xFFD4AF37);
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final textCol = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    final subCol = isDark
+        ? Colors.white.withValues(alpha: 0.60)
+        : Colors.black.withValues(alpha: 0.55);
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Termos de Uso',
+                            style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: textCol)),
+                        const SizedBox(height: 2),
+                        Text('Leia com atenção antes de continuar',
+                            style: TextStyle(fontSize: 12, color: subCol)),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(Icons.close_rounded,
+                          size: 18, color: textCol),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 4),
+            Divider(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.07)),
+
+            // ── Content ─────────────────────────────────────────────
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: _buildContent(textCol, subCol, gold),
+              ),
+            ),
+
+            // ── Footer ──────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              decoration: BoxDecoration(
+                color: bg,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.07),
+                  ),
+                ),
+              ),
+              child: Column(
+                children: [
+                  if (!_reachedEnd)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 16, color: subCol),
+                          const SizedBox(width: 4),
+                          Text('Role para ler tudo',
+                              style:
+                                  TextStyle(fontSize: 11, color: subCol)),
+                        ],
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: widget.onAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Aceitar e continuar',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(Color textCol, Color subCol, Color gold) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _section('1. Aceitação dos Termos', textCol, gold),
+        _body(
+          'Ao criar uma conta na aplicação Troco Seguro — Motorista, declara que leu, compreendeu e aceita os presentes Termos de Uso. Se não concordar com algum dos termos aqui descritos, não deverá utilizar a aplicação.',
+          subCol,
+        ),
+        _section('2. Sobre a Aplicação', textCol, gold),
+        _body(
+          'O Troco Seguro é uma plataforma digital de pagamento destinada a motoristas de táxi em Angola. Permite receber pagamentos dos passageiros de forma segura, gerir a carteira digital e acompanhar as viagens realizadas.',
+          subCol,
+        ),
+        _section('3. Elegibilidade', textCol, gold),
+        _body(
+          'Para utilizar a aplicação como motorista, deverá:\n\n• Ter idade mínima de 18 anos;\n• Possuir carta de condução válida emitida em Angola;\n• Dispor de um veículo devidamente registado e seguro;\n• Fornecer informações verdadeiras e exactas no registo.',
+          subCol,
+        ),
+        _section('4. Conta e Segurança', textCol, gold),
+        _body(
+          'É responsável pela confidencialidade do seu PIN de acesso. Não deverá partilhá-lo com terceiros. Em caso de suspeita de acesso não autorizado, deve contactar imediatamente o suporte.\n\nA Troco Seguro reserva-se o direito de suspender ou encerrar contas que violem estes termos.',
+          subCol,
+        ),
+        _section('5. Pagamentos e Carteira', textCol, gold),
+        _body(
+          'Os valores recebidos são creditados na carteira digital do motorista após confirmação do pagamento pelo passageiro. Os levantamentos estão sujeitos às condições e limites definidos pela plataforma.\n\nA Troco Seguro não se responsabiliza por atrasos causados por falhas nas instituições bancárias.',
+          subCol,
+        ),
+        _section('6. Comportamento do Motorista', textCol, gold),
+        _body(
+          'O motorista compromete-se a:\n\n• Prestar um serviço seguro e de qualidade;\n• Não utilizar a plataforma para fins fraudulentos;\n• Respeitar os passageiros e as leis de trânsito vigentes em Angola;\n• Não manipular avaliações ou transações.',
+          subCol,
+        ),
+        _section('7. Privacidade dos Dados', textCol, gold),
+        _body(
+          'Os dados recolhidos (nome, número de telefone, localização, histórico de viagens) são utilizados exclusivamente para o funcionamento da plataforma e melhoria dos serviços. Não serão vendidos a terceiros sem o seu consentimento explícito.',
+          subCol,
+        ),
+        _section('8. Alterações aos Termos', textCol, gold),
+        _body(
+          'A Troco Seguro pode actualizar estes Termos de Uso a qualquer momento. As alterações serão notificadas através da aplicação. O uso continuado após a notificação implica a aceitação dos novos termos.',
+          subCol,
+        ),
+        _section('9. Contacto', textCol, gold),
+        _body(
+          'Para dúvidas ou reclamações relacionadas com estes Termos de Uso, entre em contacto connosco através do suporte disponível na aplicação ou pelo e-mail de suporte oficial da plataforma.',
+          subCol,
+        ),
+        const SizedBox(height: 8),
+        Divider(color: gold.withValues(alpha: 0.20)),
+        const SizedBox(height: 8),
+        Text(
+          'Última actualização: Junho de 2025',
+          style: TextStyle(fontSize: 11, color: subCol),
+        ),
+      ],
+    );
+  }
+
+  Widget _section(String title, Color textCol, Color gold) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 6),
+      child: Row(
+        children: [
+          Container(width: 3, height: 16, color: gold,
+              margin: const EdgeInsets.only(right: 8)),
+          Expanded(
+            child: Text(title,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: textCol)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(String text, Color subCol) {
+    return Text(text,
+        style: TextStyle(fontSize: 13, color: subCol, height: 1.65));
   }
 }
 
