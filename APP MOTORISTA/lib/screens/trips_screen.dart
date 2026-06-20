@@ -129,38 +129,21 @@ class _TripsScreenState extends State<TripsScreen> {
     }
   }
 
+  bool _searchActive = false;
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageGradient = isDark
-        ? AppColors.darkScreenGradient
-        : const LinearGradient(
-            colors: [AppColors.lightBackground, AppColors.lightSurface],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          );
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Viagens'),
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        foregroundColor: isDark ? Colors.white : AppColors.textDark,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Text(
-                '${trips.length} viagens',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
       backgroundColor:
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
       bottomNavigationBar: widget.showBottomDock
@@ -168,49 +151,146 @@ class _TripsScreenState extends State<TripsScreen> {
               selectedTab: DriverDockTab.wallet,
             )
           : null,
-      body: Container(
-        decoration: BoxDecoration(gradient: pageGradient),
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: _loadTrips,
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.adaptiveAccent(context),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadTrips,
+          child: isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryGold,
+                  ),
+                )
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildFlatHeader(responsive, isDark),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          responsive.scaledWidth(20),
+                          responsive.scaledHeight(4),
+                          responsive.scaledWidth(20),
+                          responsive.scaledHeight(110),
+                        ),
+                        child: _buildTripsList(responsive),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlatHeader(ResponsiveHelper responsive, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(14),
+      ),
+      child: Row(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _searchActive
+                ? GestureDetector(
+                    key: const ValueKey('close'),
+                    onTap: () {
+                      setState(() {
+                        _searchActive = false;
+                        searchQuery = '';
+                        _searchController.clear();
+                      });
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.85)
+                            : AppColors.textDark.withValues(alpha: 0.7),
+                      ),
                     ),
                   )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: responsive.scaledHeight(20),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildSearchAndFilters(responsive),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: responsive.scaledHeight(16),
-                                  ),
-                                  child: _buildTripsList(responsive),
-                                ),
-                                SizedBox(height: responsive.scaledHeight(12)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                : SizedBox(
+                    key: const ValueKey('spacer'),
+                    width: responsive.scaledWidth(38),
+                    height: responsive.scaledWidth(38),
                   ),
           ),
-        ),
+          Expanded(
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: _searchActive
+                    ? TextField(
+                        key: const ValueKey('search'),
+                        controller: _searchController,
+                        autofocus: true,
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(15),
+                          color: isDark ? Colors.white : AppColors.textDark,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Pesquisar viagens...',
+                          hintStyle: TextStyle(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.3),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                        onChanged: (v) => setState(() => searchQuery = v),
+                      )
+                    : Text(
+                        key: const ValueKey('title'),
+                        'Viagens',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(17),
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textDark,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _searchActive = !_searchActive),
+            child: Container(
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+              child: Icon(
+                _searchActive
+                    ? Icons.search_off_rounded
+                    : Icons.search_rounded,
+                size: responsive.scaledWidth(20),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : AppColors.textDark.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -242,13 +322,13 @@ class _TripsScreenState extends State<TripsScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isDark
-                    ? Colors.white.withOpacity(0.1)
-                    : AppColors.textDark.withOpacity(0.1),
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : AppColors.textDark.withValues(alpha: 0.1),
               ),
               child: Icon(
                 Icons.local_taxi_rounded,
                 color: isDark
-                    ? AppColors.adaptiveAccent(context)
+                    ? AppColors.primaryGold
                     : AppColors.textDark,
                 size: responsive.scaledWidth(24),
               ),
@@ -270,8 +350,8 @@ class _TripsScreenState extends State<TripsScreen> {
                 vertical: responsive.scaledHeight(6),
               ),
               decoration: BoxDecoration(
-                color: AppColors.adaptiveAccent(context)
-                    .withOpacity(isDark ? 0.2 : 0.3),
+                color: AppColors.primaryGold
+                    .withValues(alpha: isDark ? 0.2 : 0.3),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -279,7 +359,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(12),
                   color: isDark
-                      ? AppColors.adaptiveAccent(context)
+                      ? AppColors.primaryGold
                       : AppColors.textDark,
                   fontWeight: FontWeight.w600,
                 ),
@@ -308,7 +388,7 @@ class _TripsScreenState extends State<TripsScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -321,11 +401,11 @@ class _TripsScreenState extends State<TripsScreen> {
               decoration: InputDecoration(
                 hintText: 'Buscar passagem...',
                 hintStyle: TextStyle(
-                  color: Colors.grey.shade400,
+                  color: Colors.grey,
                   fontSize: responsive.responsiveFontSize(14),
                 ),
                 border: InputBorder.none,
-                icon: Icon(Icons.search, color: Colors.grey.shade400),
+                icon: Icon(Icons.search, color: Colors.grey),
               ),
             ),
           ),
@@ -350,6 +430,7 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Widget _buildEmptyState(ResponsiveHelper responsive) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(60)),
       child: Column(
@@ -358,23 +439,196 @@ class _TripsScreenState extends State<TripsScreen> {
           Icon(
             Icons.local_taxi_outlined,
             size: 64,
-            color: Colors.grey.shade300,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.15),
           ),
           SizedBox(height: responsive.scaledHeight(16)),
           Text(
             'Nenhuma viagem encontrada',
             style: TextStyle(
-              fontSize: responsive.responsiveFontSize(16),
+              fontSize: responsive.responsiveFontSize(14),
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade500,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.4)
+                  : Colors.black.withValues(alpha: 0.35),
             ),
           ),
           SizedBox(height: responsive.scaledHeight(8)),
           Text(
-            'Suas viagens aparecerão aqui',
+            'As suas viagens aparecerão aqui',
             style: TextStyle(
-              fontSize: responsive.responsiveFontSize(14),
-              color: Colors.grey.shade400,
+              fontSize: responsive.responsiveFontSize(12),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.25),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTripDetail(Trip trip) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textDark;
+    final statusColor = _getStatusColor(trip.status);
+    final statusLabel = _getStatusLabel(trip.status);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Detalhes da Viagem',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.06),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _detailRow(ctx, isDark, Icons.person, 'Passageiro',
+                        trip.passengerName),
+                    if (trip.passengerPhone != null)
+                      _detailRow(ctx, isDark, Icons.phone_outlined, 'Telefone',
+                          trip.passengerPhone!),
+                    _detailRow(ctx, isDark, Icons.calendar_today_outlined,
+                        'Data', '${trip.date} às ${trip.time}'),
+                    _detailRow(ctx, isDark, Icons.trip_origin, 'Origem',
+                        trip.origin.isNotEmpty ? trip.origin : '—'),
+                    _detailRow(ctx, isDark, Icons.location_on_outlined,
+                        'Destino',
+                        trip.destination.isNotEmpty ? trip.destination : '—'),
+                    _detailRow(ctx, isDark, Icons.payments_outlined, 'Valor',
+                        _formatCurrency(trip.amount)),
+                    if (trip.distance != null)
+                      _detailRow(
+                          ctx,
+                          isDark,
+                          Icons.straighten_outlined,
+                          'Distância',
+                          '${trip.distance!.toStringAsFixed(1)} km'),
+                    if (trip.duration != null)
+                      _detailRow(ctx, isDark, Icons.timer_outlined, 'Duração',
+                          '${trip.duration} min'),
+                    if (trip.rating != null)
+                      _detailRow(
+                          ctx,
+                          isDark,
+                          Icons.star_outline_rounded,
+                          'Avaliação',
+                          '${trip.rating!.toStringAsFixed(1)} estrelas'),
+                    if (trip.comment != null && trip.comment!.isNotEmpty)
+                      _detailRow(ctx, isDark, Icons.comment_outlined,
+                          'Comentário', trip.comment!),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(BuildContext ctx, bool isDark, IconData icon, String label,
+      String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.4),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.4)
+                        : Colors.black.withValues(alpha: 0.38),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -388,19 +642,19 @@ class _TripsScreenState extends State<TripsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : AppColors.textDark;
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showTripDetail(trip),
+      child: Container(
       margin: EdgeInsets.only(bottom: responsive.scaledHeight(12)),
       padding: EdgeInsets.all(responsive.scaledWidth(16)),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,12 +666,12 @@ class _TripsScreenState extends State<TripsScreen> {
                 width: responsive.scaledWidth(44),
                 height: responsive.scaledWidth(44),
                 decoration: BoxDecoration(
-                  color: AppColors.adaptiveAccent(context).withOpacity(0.12),
+                  color: AppColors.primaryGold.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.person,
-                  color: AppColors.adaptiveAccent(context),
+                  color: AppColors.primaryGold,
                   size: responsive.scaledWidth(24),
                 ),
               ),
@@ -439,7 +693,7 @@ class _TripsScreenState extends State<TripsScreen> {
                       '${trip.date} às ${trip.time}',
                       style: TextStyle(
                         fontSize: responsive.responsiveFontSize(11),
-                        color: Colors.grey.shade500,
+                        color: Colors.grey,
                       ),
                     ),
                   ],
@@ -451,7 +705,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   vertical: responsive.scaledHeight(4),
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -491,13 +745,13 @@ class _TripsScreenState extends State<TripsScreen> {
                     Container(
                       width: 2,
                       height: 20,
-                      color: Colors.grey.shade300,
+                      color: Colors.grey.withValues(alpha: 0.3),
                     ),
                     Container(
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: AppColors.adaptiveAccent(context),
+                        color: AppColors.primaryGold,
                         shape: BoxShape.circle,
                         border: Border.all(
                             color: isDark ? AppColors.darkCard : Colors.white,
@@ -547,7 +801,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 Row(
                   children: [
                     Icon(Icons.star,
-                        color: AppColors.adaptiveAccent(context), size: 16),
+                        color: AppColors.primaryGold, size: 16),
                     SizedBox(width: responsive.scaledWidth(4)),
                     Text(
                       trip.rating!.toStringAsFixed(1),
@@ -573,6 +827,7 @@ class _TripsScreenState extends State<TripsScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

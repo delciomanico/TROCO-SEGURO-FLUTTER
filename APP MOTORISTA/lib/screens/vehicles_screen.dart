@@ -74,7 +74,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryOrange,
+        backgroundColor: AppColors.primaryGold,
         onPressed: _showAddVehicleModal,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Adicionar', style: TextStyle(color: Colors.white)),
@@ -140,21 +140,28 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final v = _vehicles[index];
-          return Card(
-            elevation: 2,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+            ),
             child: ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                  color: AppColors.primaryGold.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.directions_car,
-                    color: AppColors.primaryOrange),
+                    color: AppColors.primaryGold),
               ),
               title: Text(v.model,
                   style: const TextStyle(
@@ -296,7 +303,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
+                  backgroundColor: AppColors.primaryGold,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(

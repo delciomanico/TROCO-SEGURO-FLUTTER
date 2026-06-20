@@ -27,16 +27,12 @@ class _WalletScreenState extends State<WalletScreen> {
   int balance = 0;
   List<Transaction> transactions = [];
   String activeFilter = 'all';
-  String searchQuery = '';
   bool isLoading = true;
   bool showBalance = true;
+  bool _searchActive = false;
+  String searchQuery = '';
+  final _searchController = TextEditingController();
   final ApiService _api = ApiService();
-
-
-  Color _accentColor() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? AppColors.adaptiveAccent(context) : AppColors.primaryOrange;
-  }
 
   @override
   void initState() {
@@ -44,21 +40,23 @@ class _WalletScreenState extends State<WalletScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     setState(() => isLoading = true);
-
     await _api.loadTokens();
 
     final prefs = await SharedPreferences.getInstance();
-    
-    // Fallback: Tentar carregar do cache do perfil se a API de saldo demorar ou falhar
     if (balance == 0) {
       final driverJson = prefs.getString('ts_driver');
       if (driverJson != null) {
         try {
-          final cachedDriver = DriverUser.fromJson(json.decode(driverJson));
-          setState(() => balance = cachedDriver.balance);
-          debugPrint('💰 Saldo carregado do cache: $balance');
+          final cached = DriverUser.fromJson(json.decode(driverJson));
+          setState(() => balance = cached.balance);
         } catch (_) {}
       }
     }
@@ -66,18 +64,14 @@ class _WalletScreenState extends State<WalletScreen> {
     final balanceResult = await _api.getBalance();
     if (balanceResult.isSuccess && balanceResult.data != null) {
       setState(() => balance = balanceResult.data!);
-      debugPrint('💰 Saldo atualizado da API: $balance');
     }
 
     final txResult = await _api.getTransactionHistory();
     if (txResult.isSuccess && txResult.data != null) {
       setState(() => transactions = txResult.data!);
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ts_driver_transactions',
           json.encode(transactions.map((t) => t.toJson()).toList()));
     } else {
-      // Fallback: cache local
-      final prefs = await SharedPreferences.getInstance();
       final txsJson = prefs.getString('ts_driver_transactions');
       if (txsJson != null && txsJson.trim().isNotEmpty) {
         try {
@@ -100,25 +94,14 @@ class _WalletScreenState extends State<WalletScreen> {
   List<Transaction> get filteredTransactions {
     return transactions.where((tx) {
       final matchesType = activeFilter == 'all' || tx.type == activeFilter;
-      final matchesSearch =
+      final matchesSearch = searchQuery.isEmpty ||
           tx.description.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              (tx.passengerName
-                      ?.toLowerCase()
-                      .contains(searchQuery.toLowerCase()) ??
-                  false);
+          (tx.passengerName
+                  ?.toLowerCase()
+                  .contains(searchQuery.toLowerCase()) ??
+              false);
       return matchesType && matchesSearch;
     }).toList();
-  }
-
-  Map<String, int> get stats {
-    final totalReceived = transactions
-        .where((t) => t.type == 'received')
-        .fold(0, (sum, t) => sum + t.amount);
-    final totalWithdrawn = transactions
-        .where((t) => t.type == 'withdrawal')
-        .fold(0,
-            (sum, t) => sum + t.amount.abs());
-    return {'totalReceived': totalReceived, 'totalWithdrawn': totalWithdrawn};
   }
 
   String _formatCurrency(int amount) {
@@ -130,30 +113,8 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageGradient = isDark
-        ? AppColors.darkScreenGradient
-        : const LinearGradient(
-            colors: [AppColors.lightBackground, AppColors.lightSurface],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          );
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        title: const Text('Carteira'),
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        foregroundColor: isDark ? Colors.white : AppColors.textDark,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded),
-            onPressed: () {},
-            tooltip: 'Histórico',
-          ),
-        ],
-      ),
       backgroundColor:
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
       bottomNavigationBar: widget.showBottomDock
@@ -162,464 +123,339 @@ class _WalletScreenState extends State<WalletScreen> {
               onCenterTap: widget.onOpenWithdrawal,
             )
           : null,
-      body: Container(
-        decoration: BoxDecoration(gradient: pageGradient),
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: _loadData,
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: _accentColor(),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryGold,
+                  ),
+                )
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildHeader(responsive, isDark),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(20),
+                        ),
+                        child: _buildBalanceSection(responsive, isDark),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: responsive.scaledHeight(24)),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(20),
+                        ),
+                        child: _buildQuickActions(responsive, isDark),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: responsive.scaledHeight(28)),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(20),
+                        ),
+                        child: _buildTransactionsSection(responsive, isDark),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: responsive.scaledHeight(110)),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ResponsiveHelper responsive, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(14),
+      ),
+      child: Row(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _searchActive
+                ? GestureDetector(
+                    key: const ValueKey('close'),
+                    onTap: () {
+                      setState(() {
+                        _searchActive = false;
+                        searchQuery = '';
+                        _searchController.clear();
+                      });
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.85)
+                            : AppColors.textDark.withValues(alpha: 0.7),
+                      ),
                     ),
                   )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: responsive.scaledHeight(8),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: responsive.scaledWidth(20),
-                                  ),
-                                  child: _buildBalanceCard(responsive),
-                                ),
-                                SizedBox(height: responsive.scaledHeight(12)),
-                                _buildQuickActions(responsive),
-                                SizedBox(height: responsive.scaledHeight(12)),
-                                Column(
-                                  children: [
-                                    _buildTransactionsSection(responsive),
-                                    SizedBox(
-                                        height: responsive.scaledHeight(8)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                : SizedBox(
+                    key: const ValueKey('empty-left'),
+                    width: responsive.scaledWidth(38),
+                    height: responsive.scaledWidth(38),
                   ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headerBg =
-        isDark ? AppColors.darkBackground : AppColors.adaptiveAccent(context);
-    final headerTextColor = isDark ? Colors.white : AppColors.textDark;
-    return Container(
-      color: Colors.transparent,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: responsive.scaledWidth(20),
-          vertical: responsive.scaledHeight(16),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.maybePop(context),
-                  icon: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: headerTextColor,
-                    size: responsive.scaledWidth(20),
-                  ),
-                  tooltip: 'Voltar',
-                ),
-                Container(
-                  width: responsive.scaledWidth(44),
-                  height: responsive.scaledWidth(44),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: headerTextColor.withOpacity(0.15),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: isDark ? _accentColor() : AppColors.textDark,
-                    size: responsive.scaledWidth(24),
-                  ),
-                ),
-                SizedBox(width: responsive.scaledWidth(12)),
-                Expanded(
-                  child: Text(
-                    'Carteira',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(20),
-                      color: headerTextColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Container(
-                  width: responsive.scaledWidth(44),
-                  height: responsive.scaledWidth(44),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: headerTextColor.withOpacity(0.15),
-                  ),
-                  child: Icon(
-                    Icons.history,
-                    color: headerTextColor,
-                    size: responsive.scaledWidth(24),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: responsive.scaledHeight(24)),
-            _buildBalanceCard(responsive),
-            SizedBox(height: responsive.scaledHeight(24)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBalanceCard(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final shadowBase =
-        isDark ? AppColors.darkBackground : AppColors.lightSurface;
-    final cardText = isDark ? const Color(0xFFE6E8EC) : Colors.white;
-    final cardSubtle = isDark
-        ? const Color(0xFFE6E8EC).withOpacity(0.84)
-        : Colors.white.withOpacity(0.9);
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _accentColor(),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? _accentColor().withOpacity(0.58)
-              : AppColors.primaryBlue.withOpacity(0.42),
-          width: 1.15,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: shadowBase.withOpacity(isDark ? 0.62 : 0.48),
-            blurRadius: 18,
-            offset: const Offset(0, 7),
-          ),
-          BoxShadow(
-            color: shadowBase.withOpacity(isDark ? 0.18 : 0.78),
-            blurRadius: 6,
-            offset: const Offset(-2, -2),
-            spreadRadius: -1,
-          ),
-          BoxShadow(
-            color: shadowBase.withOpacity(isDark ? 0.78 : 0.34),
-            blurRadius: 8,
-            offset: const Offset(3, 3),
-            spreadRadius: -2,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: isDark
-                  ? Image.asset(
-                      'assets/images/card_fundo.jpg',
-                      fit: BoxFit.cover,
-                    )
-                  : Image.asset(
-                      'assets/images/card_fundo.jpg',
-                      fit: BoxFit.cover,
-                    ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: responsive.scaledWidth(18),
-                vertical: responsive.scaledHeight(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'TROCO SEGURO',
+          Expanded(
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: _searchActive
+                    ? TextField(
+                        key: const ValueKey('search-field'),
+                        controller: _searchController,
+                        autofocus: true,
                         style: TextStyle(
-                          color: cardText,
-                          fontSize: responsive.responsiveFontSize(13),
-                          fontWeight: FontWeight.w900,
+                          fontSize: responsive.responsiveFontSize(15),
+                          color: isDark ? Colors.white : AppColors.textDark,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Pesquisar transações...',
+                          hintStyle: TextStyle(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.3),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                        onChanged: (v) => setState(() => searchQuery = v),
+                      )
+                    : Text(
+                        key: const ValueKey('title'),
+                        'Carteira',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(17),
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textDark,
                           letterSpacing: 0.4,
                         ),
                       ),
-                      const Spacer(),
-                      Icon(
-                        Icons.contactless_rounded,
-                        color: cardText,
-                        size: responsive.scaledWidth(22),
-                      ),
-                    ],
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _searchActive = !_searchActive),
+            child: Container(
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+              child: Icon(
+                _searchActive
+                    ? Icons.search_off_rounded
+                    : Icons.search_rounded,
+                size: responsive.scaledWidth(20),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : AppColors.textDark.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceSection(ResponsiveHelper responsive, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Saldo disponível',
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(13),
+            fontWeight: FontWeight.w500,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.45),
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(6)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => showBalance = !showBalance),
+                child: Text(
+                  showBalance ? _formatCurrency(balance) : '••••••••',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(38),
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                    height: 1.1,
                   ),
-                  SizedBox(height: responsive.scaledHeight(14)),
-                  Text(
-                    'Saldo disponível',
-                    style: TextStyle(
-                      color: cardSubtle,
-                      fontSize: responsive.responsiveFontSize(12),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: responsive.scaledHeight(2)),
-                  GestureDetector(
-                    onTap: () => setState(() => showBalance = !showBalance),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            showBalance ? _formatCurrency(balance) : '••••••••',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(30),
-                              color: cardText,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          showBalance ? Icons.visibility : Icons.visibility_off,
-                          color: cardText,
-                          size: responsive.scaledWidth(20),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: responsive.scaledHeight(10)),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => setState(() => showBalance = !showBalance),
+              child: Icon(
+                showBalance
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
+                size: responsive.scaledWidth(22),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.45)
+                    : Colors.black.withValues(alpha: 0.35),
               ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildBalancePill(
-    ResponsiveHelper responsive, {
-    required String title,
-    required String value,
-    required bool isDarkCard,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseText = isDark ? const Color(0xFFE6E8EC) : Colors.white;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: responsive.scaledWidth(10),
-        vertical: responsive.scaledHeight(7),
-      ),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.black.withOpacity(0.22)
-            : Colors.white.withOpacity(0.52),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(
-          color: isDark
-              ? AppColors.adaptiveAccent(context).withOpacity(0.24)
-              : AppColors.primaryBlue.withOpacity(0.26),
-          width: 0.8,
+  Widget _buildQuickActions(ResponsiveHelper responsive, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.currency_exchange_rounded,
+          label: 'Sacar',
+          onTap: widget.onOpenWithdrawal ?? () {},
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: baseText.withOpacity(0.8),
-              fontSize: responsive.responsiveFontSize(10),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: responsive.scaledHeight(2)),
-          Text(
-            value,
-            style: TextStyle(
-              color: baseText,
-              fontSize: responsive.responsiveFontSize(12),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.history_rounded,
+          label: 'Histórico',
+          onTap: () {},
+        ),
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.bar_chart_rounded,
+          label: 'Estatísticas',
+          onTap: () {},
+        ),
+      ],
     );
   }
 
-  Widget _buildQuickActions(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final withdrawBg =
-        isDark ? AppColors.darkCardElevated : AppColors.primaryBlue;
-    final withdrawFg = isDark ? Colors.white : AppColors.textLight;
-    final historyBg = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final historyFg = isDark ? Colors.white : AppColors.textDark;
-    final historySubtle = isDark ? Colors.white70 : AppColors.textSecondary;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: widget.onOpenWithdrawal,
-              child: Container(
-                padding:
-                    EdgeInsets.symmetric(vertical: responsive.scaledHeight(20)),
-                decoration: BoxDecoration(
-                  color: withdrawBg,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: withdrawBg.withOpacity(isDark ? 0.28 : 0.22),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.currency_exchange_rounded,
-                      color: withdrawFg,
-                      size: responsive.scaledWidth(28),
-                    ),
-                    SizedBox(height: responsive.scaledHeight(8)),
-                    Text(
-                      'SACAR',
-                      style: TextStyle(
-                        fontSize: responsive.responsiveFontSize(14),
-                        fontWeight: FontWeight.w800,
-                        color: withdrawFg,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    SizedBox(height: responsive.scaledHeight(4)),
-                    Text(
-                      'Transferir para conta',
-                      style: TextStyle(
-                        fontSize: responsive.responsiveFontSize(10),
-                        color: withdrawFg.withOpacity(0.75),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+  Widget _buildCircularAction(
+    ResponsiveHelper responsive, {
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: responsive.scaledWidth(58),
+            height: responsive.scaledWidth(58),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primaryGold,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.black.withValues(alpha: 0.8),
+              size: responsive.scaledWidth(24),
             ),
           ),
-          SizedBox(width: responsive.scaledWidth(12)),
-          Expanded(
-            child: Container(
-              padding:
-                  EdgeInsets.symmetric(vertical: responsive.scaledHeight(20)),
-              decoration: BoxDecoration(
-                color: historyBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _accentColor(), width: 2),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.history_rounded,
-                    color: historyFg,
-                    size: responsive.scaledWidth(28),
-                  ),
-                  SizedBox(height: responsive.scaledHeight(8)),
-                  Text(
-                    'HISTÓRICO',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(14),
-                      fontWeight: FontWeight.w800,
-                      color: historyFg,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  SizedBox(height: responsive.scaledHeight(4)),
-                  Text(
-                    'Ver transações',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(10),
-                      color: historySubtle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        ),
+        SizedBox(height: responsive.scaledHeight(8)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(11),
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.75)
+                : AppColors.textDark.withValues(alpha: 0.7),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTransactionsSection(ResponsiveHelper responsive) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildTransactionsSection(ResponsiveHelper responsive, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'RECENTES',
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(11),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.35),
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(12)),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
             children: [
-              Text(
-                'Transações Recentes',
-                style: TextStyle(
-                  fontSize: responsive.responsiveFontSize(16),
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : AppColors.textDark,
-                ),
-              ),
+              _buildFilterChip(responsive, isDark, 'all', 'Todas'),
+              SizedBox(width: responsive.scaledWidth(8)),
+              _buildFilterChip(responsive, isDark, 'received', 'Recebido'),
+              SizedBox(width: responsive.scaledWidth(8)),
+              _buildFilterChip(responsive, isDark, 'withdrawal', 'Saque'),
             ],
           ),
-          SizedBox(height: responsive.scaledHeight(12)),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildFilterChip(responsive, 'all', 'Todas'),
-                SizedBox(width: responsive.scaledWidth(8)),
-                _buildFilterChip(responsive, 'received', 'Recebido'),
-                SizedBox(width: responsive.scaledWidth(8)),
-                _buildFilterChip(responsive, 'withdrawal', 'Saque'),
-              ],
-            ),
-          ),
-          SizedBox(height: responsive.scaledHeight(16)),
-          if (filteredTransactions.isEmpty)
-            _buildEmptyTransactions(responsive)
-          else
-            ...filteredTransactions.take(10).map(
-                  (tx) => _buildTransactionItem(responsive, tx),
-                ),
-        ],
-      ),
+        ),
+        SizedBox(height: responsive.scaledHeight(16)),
+        if (filteredTransactions.isEmpty)
+          _buildEmptyState(responsive, isDark)
+        else
+          _buildTransactionList(responsive, isDark),
+      ],
     );
   }
 
   Widget _buildFilterChip(
-      ResponsiveHelper responsive, String value, String label) {
+    ResponsiveHelper responsive,
+    bool isDark,
+    String value,
+    String label,
+  ) {
     final isSelected = activeFilter == value;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => setState(() => activeFilter = value),
       child: AnimatedContainer(
@@ -630,13 +466,18 @@ class _WalletScreenState extends State<WalletScreen> {
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? _accentColor()
-              : (isDark ? AppColors.darkCard : Colors.white),
+              ? AppColors.primaryGold
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.04)),
           borderRadius: BorderRadius.circular(20),
           border: isSelected
               ? null
               : Border.all(
-                  color: isDark ? Colors.white24 : Colors.grey.shade300),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withValues(alpha: 0.08),
+                ),
         ),
         child: Text(
           label,
@@ -644,29 +485,38 @@ class _WalletScreenState extends State<WalletScreen> {
             fontSize: responsive.responsiveFontSize(12),
             fontWeight: FontWeight.w600,
             color: isSelected
-                ? AppColors.textDark
-                : (isDark ? Colors.white70 : Colors.grey.shade600),
+                ? Colors.black.withValues(alpha: 0.85)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : Colors.black.withValues(alpha: 0.55)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyTransactions(ResponsiveHelper responsive) {
+  Widget _buildEmptyState(ResponsiveHelper responsive, bool isDark) {
     return Container(
       padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(40)),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 48, color: Colors.grey.shade300),
+            Icon(
+              Icons.receipt_long_rounded,
+              size: responsive.scaledWidth(44),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : Colors.black.withValues(alpha: 0.15),
+            ),
             SizedBox(height: responsive.scaledHeight(12)),
             Text(
               'Nenhuma transação encontrada',
               style: TextStyle(
-                fontSize: responsive.responsiveFontSize(14),
-                color: Colors.grey.shade500,
+                fontSize: responsive.responsiveFontSize(13),
                 fontWeight: FontWeight.w500,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : Colors.black.withValues(alpha: 0.3),
               ),
             ),
           ],
@@ -675,73 +525,114 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildTransactionItem(ResponsiveHelper responsive, Transaction tx) {
-    final isReceived = tx.type == 'received';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconData =
-        isReceived ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
-    final iconColor = isReceived ? AppColors.success : AppColors.error;
+  Widget _buildTransactionList(ResponsiveHelper responsive, bool isDark) {
+    final items = filteredTransactions.take(30).toList();
 
     return Container(
-      margin: EdgeInsets.only(bottom: responsive.scaledHeight(12)),
-      padding: EdgeInsets.all(responsive.scaledWidth(16)),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: responsive.scaledWidth(44),
-            height: responsive.scaledWidth(44),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(iconData, color: iconColor, size: 20),
-          ),
-          SizedBox(width: responsive.scaledWidth(12)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.description,
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(14),
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final tx = entry.value;
+          final isLast = entry.key == items.length - 1;
+          final isReceived = tx.type == 'received';
+
+          return Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.scaledWidth(16),
+                  vertical: responsive.scaledHeight(14),
                 ),
-                SizedBox(height: responsive.scaledHeight(4)),
-                Text(
-                  '${tx.date} às ${tx.time}',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(11),
-                    color: Colors.grey.shade500,
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: responsive.scaledWidth(40),
+                      height: responsive.scaledWidth(40),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.04),
+                        border: Border.all(
+                          color: isReceived
+                              ? Colors.green.withValues(alpha: 0.4)
+                              : Colors.red.withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        isReceived
+                            ? Icons.arrow_downward_rounded
+                            : Icons.arrow_upward_rounded,
+                        color: isReceived
+                            ? Colors.greenAccent
+                            : Colors.redAccent,
+                        size: responsive.scaledWidth(18),
+                      ),
+                    ),
+                    SizedBox(width: responsive.scaledWidth(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tx.description.isNotEmpty
+                                ? tx.description
+                                : (isReceived ? 'Corrida recebida' : 'Saque'),
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(13),
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isDark ? Colors.white : AppColors.textDark,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: responsive.scaledHeight(2)),
+                          Text(
+                            '${tx.date} às ${tx.time}',
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(11),
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.38)
+                                  : Colors.black.withValues(alpha: 0.35),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${tx.amount > 0 ? "+" : ""}${_formatCurrency(tx.amount)}',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(13),
+                        fontWeight: FontWeight.w700,
+                        color: tx.amount > 0
+                            ? Colors.greenAccent
+                            : Colors.redAccent,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Text(
-            '${tx.amount > 0 ? '+' : ''}${_formatCurrency(tx.amount)}',
-            style: TextStyle(
-              fontSize: responsive.responsiveFontSize(14),
-              fontWeight: FontWeight.w700,
-              color: tx.amount > 0 ? AppColors.success : AppColors.error,
-            ),
-          ),
-        ],
+              ),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: responsive.scaledWidth(68),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }

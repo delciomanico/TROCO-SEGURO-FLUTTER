@@ -107,71 +107,104 @@ class _RoutesScreenState extends State<RoutesScreen> {
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageGradient = isDark
-        ? AppColors.darkScreenGradient
-        : const LinearGradient(
-            colors: [AppColors.lightBackground, AppColors.lightSurface],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          );
-
     return Scaffold(
-        backgroundColor:
-            isDark ? AppColors.darkBackground : AppColors.lightBackground,
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text('Rotas'),
-          backgroundColor:
-              isDark ? AppColors.darkSurface : AppColors.lightBackground,
-          foregroundColor: isDark ? Colors.white : AppColors.textDark,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: _loadRoutes,
-              tooltip: 'Atualizar',
-            ),
-          ],
-        ),
-        bottomNavigationBar: widget.showBottomDock
-            ? const DriverBottomDock(
-                selectedTab: DriverDockTab.menu,
-              )
-            : null,
-        body: Container(
-          decoration: BoxDecoration(gradient: pageGradient),
-          child: isLoading
-              ? Center(
-                  child: CircularProgressIndicator(
-                      color: AppColors.adaptiveAccent(context)),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadRoutes,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.all(responsive.responsivePadding()),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_errorMessage != null)
-                          _buildErrorBanner(responsive),
-                        if (_errorMessage != null)
-                          SizedBox(height: responsive.scaledHeight(16)),
-                        // Dropdown de seleção de rota
-                        _buildRouteSelector(responsive),
-                        SizedBox(height: responsive.scaledHeight(24)),
-
-                        // Detalhes da rota selecionada
-                        if (selectedRoute != null) ...[
-                          _buildRouteDetails(responsive),
-                        ] else ...[
-                          _buildEmptyState(responsive),
-                        ],
-                      ],
-                    ),
-                  ),
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      bottomNavigationBar: widget.showBottomDock
+          ? const DriverBottomDock(
+              selectedTab: DriverDockTab.menu,
+            )
+          : null,
+      body: SafeArea(
+        bottom: false,
+        child: isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primaryGold,
                 ),
-        ));
+              )
+            : RefreshIndicator(
+                onRefresh: _loadRoutes,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildFlatHeader(responsive, isDark),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(responsive.responsivePadding()),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_errorMessage != null) ...[
+                              _buildErrorBanner(responsive),
+                              SizedBox(height: responsive.scaledHeight(16)),
+                            ],
+                            _buildRouteSelector(responsive),
+                            SizedBox(height: responsive.scaledHeight(24)),
+                            if (selectedRoute != null)
+                              _buildRouteDetails(responsive)
+                            else
+                              _buildEmptyState(responsive),
+                            SizedBox(height: responsive.scaledHeight(110)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildFlatHeader(ResponsiveHelper responsive, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(14),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: responsive.scaledWidth(38)),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Rotas',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(17),
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _loadRoutes,
+            child: Container(
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+              child: Icon(
+                Icons.refresh_rounded,
+                size: responsive.scaledWidth(20),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : AppColors.textDark.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildRouteSelector(ResponsiveHelper responsive) {
@@ -184,7 +217,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -214,7 +247,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
           SizedBox(height: responsive.scaledHeight(16)),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.cardBorder.withOpacity(0.3),
+              color: AppColors.cardBorder.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.cardBorder),
             ),
@@ -281,7 +314,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
                               vertical: responsive.scaledHeight(2),
                             ),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.1),
+                              color: statusColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -353,7 +386,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
       padding: EdgeInsets.all(responsive.responsivePadding() * 1.5),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [statusColor, statusColor.withOpacity(0.8)],
+          colors: [statusColor, statusColor.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -361,7 +394,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
             BorderRadius.circular(responsive.responsiveBorderRadius()),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.3),
+            color: statusColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -398,10 +431,11 @@ class _RoutesScreenState extends State<RoutesScreen> {
   }
 
   Widget _buildTaxisCard(ResponsiveHelper responsive, TaxiRoute route) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.all(responsive.responsivePadding()),
       decoration: BoxDecoration(
-        color: AppColors.darkBlue,
+        color: isDark ? AppColors.darkCard : AppColors.textDark,
         borderRadius:
             BorderRadius.circular(responsive.responsiveBorderRadius()),
       ),
@@ -410,7 +444,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
           Container(
             padding: EdgeInsets.all(responsive.scaledWidth(16)),
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.2),
+              color: AppColors.accent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -486,7 +520,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
               Container(
                 padding: EdgeInsets.all(responsive.scaledWidth(8)),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withOpacity(0.1),
+                  color: const Color(0xFF2ECC71).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -557,7 +591,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
               Container(
                 padding: EdgeInsets.all(responsive.scaledWidth(8)),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE74C3C).withOpacity(0.1),
+                  color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -733,17 +767,17 @@ class _RoutesScreenState extends State<RoutesScreen> {
     return Container(
       padding: EdgeInsets.all(responsive.responsivePadding()),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius:
             BorderRadius.circular(responsive.responsiveBorderRadius()),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: EdgeInsets.all(responsive.scaledWidth(12)),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.2),
+              color: statusColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -833,7 +867,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
           Icon(
             Icons.touch_app_rounded,
             size: responsive.scaledWidth(80),
-            color: AppColors.textSecondary.withOpacity(0.3),
+            color: AppColors.textSecondary.withValues(alpha: 0.3),
           ),
           SizedBox(height: responsive.scaledHeight(24)),
           Text(
@@ -850,7 +884,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(14),
-              color: AppColors.textSecondary.withOpacity(0.7),
+              color: AppColors.textSecondary.withValues(alpha: 0.7),
               height: 1.5,
             ),
           ),

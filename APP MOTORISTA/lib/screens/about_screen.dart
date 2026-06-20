@@ -176,7 +176,7 @@ class AboutScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.email_rounded, color: AppColors.primaryOrange),
+                      Icon(Icons.email_rounded, color: AppColors.primaryGold),
                       SizedBox(width: responsive.scaledWidth(12)),
                       Expanded(
                         child: Text(
@@ -193,7 +193,7 @@ class AboutScreen extends StatelessWidget {
                   SizedBox(height: responsive.scaledHeight(12)),
                   Row(
                     children: [
-                      Icon(Icons.phone_rounded, color: AppColors.primaryOrange),
+                      Icon(Icons.phone_rounded, color: AppColors.primaryGold),
                       SizedBox(width: responsive.scaledWidth(12)),
                       Expanded(
                         child: Text(
@@ -211,7 +211,7 @@ class AboutScreen extends StatelessWidget {
                   Row(
                     children: [
                       Icon(Icons.location_on_rounded,
-                          color: AppColors.primaryOrange),
+                          color: AppColors.primaryGold),
                       SizedBox(width: responsive.scaledWidth(12)),
                       Expanded(
                         child: Text(
@@ -257,12 +257,12 @@ class AboutScreen extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(responsive.scaledWidth(10)),
             decoration: BoxDecoration(
-              color: AppColors.primaryOrange.withOpacity(0.1),
+              color: AppColors.primaryGold.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
-              color: AppColors.primaryOrange,
+              color: AppColors.primaryGold,
               size: responsive.scaledWidth(24),
             ),
           ),

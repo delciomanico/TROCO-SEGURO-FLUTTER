@@ -118,8 +118,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
 
     final result = await _api.requestWithdrawal(
       amount: amount,
-      bankAccount: _accountController.text,
-      method: _withdrawalMethod,
+      iban: _accountController.text,
     );
 
     setState(() => _isLoading = false);

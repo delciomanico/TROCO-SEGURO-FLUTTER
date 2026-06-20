@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,8 @@ import 'package:troco_seguro_motorista/models/earnings.dart';
 import 'package:troco_seguro_motorista/models/faq_item.dart';
 import 'package:troco_seguro_motorista/models/vehicle.dart';
 import 'package:troco_seguro_motorista/models/route.dart';
+import 'package:troco_seguro_motorista/models/emergency_contact.dart';
+import 'package:troco_seguro_motorista/models/notification.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
@@ -378,19 +381,7 @@ class ApiService {
   /// Atualizar status online/offline
   Future<ApiResponse<void>> updateDriverStatus({required bool isOnline}) async {
     try {
-      try {
-        await _dio.patch('drivers/status', data: {
-          'isOnline': isOnline,
-        });
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404 || e.response?.statusCode == 405) {
-          await _dio.put('users/me', data: {
-            'isOnline': isOnline,
-          });
-        } else {
-          rethrow;
-        }
-      }
+      await _dio.put('users/me/status', data: {'isOnline': isOnline});
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -472,14 +463,12 @@ class ApiService {
   /// Solicitar saque
   Future<ApiResponse<void>> requestWithdrawal({
     required int amount,
-    required String method, // 'bank' | 'express'
-    String? bankAccount,
+    required String iban,
   }) async {
     try {
-      await _dio.post('transactions/transfer', data: {
+      await _dio.post('transactions/withdraw', data: {
         'amount': amount,
-        'method': method,
-        'bankAccount': bankAccount,
+        'iban': iban,
       });
       return ApiResponse.success(null);
     } on DioException catch (e) {
@@ -490,12 +479,32 @@ class ApiService {
   /// Obter saldo disponível
   Future<ApiResponse<int>> getBalance() async {
     try {
-      // Reutiliza a lógica do getProfile para garantir consistência total
+      try {
+        final response = await _dio.get('wallet/balance');
+        final data = _payload(response.data);
+        final raw = data['balance'] ?? data['amount'] ?? data['available'];
+        if (raw != null) {
+          return ApiResponse.success(
+              double.tryParse(raw.toString())?.toInt() ?? 0);
+        }
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          final profileResult = await getProfile();
+          if (profileResult.isSuccess && profileResult.data != null) {
+            return ApiResponse.success(profileResult.data!.balance);
+          }
+          return ApiResponse.error(
+              profileResult.error ?? 'Falha ao obter saldo');
+        }
+        rethrow;
+      }
       final profileResult = await getProfile();
       if (profileResult.isSuccess && profileResult.data != null) {
         return ApiResponse.success(profileResult.data!.balance);
       }
       return ApiResponse.error(profileResult.error ?? 'Falha ao obter saldo');
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
     } catch (e) {
       return ApiResponse.error('Erro ao processar saldo: $e');
     }
@@ -503,21 +512,40 @@ class ApiService {
 
   // ============ QR CODE ============
 
-  /// Definir/atualizar o valor do QR estático do motorista
+  /// Configurar QR Code para a corrida
   Future<ApiResponse<QrCodePriceResult>> setQrCodePrice({
     required int amount,
     required String description,
+    String? activeVehicleId,
   }) async {
     try {
-      final body = {
-        'amount': amount,
-        'description': description,
+      final body = <String, dynamic>{
+        'tripPrice': amount,
+        if (activeVehicleId != null && activeVehicleId.isNotEmpty)
+          'activeVehicleId': activeVehicleId,
       };
 
       try {
-        final response = await _dio.post('qrcodes/price', data: body);
-        return ApiResponse.success(
-            QrCodePriceResult.fromJson(_payload(response.data)));
+        final response = await _dio.post('qrcodes/setup', data: body);
+        final data = _payload(response.data);
+        return ApiResponse.success(QrCodePriceResult(
+          id: data['id']?.toString() ?? '',
+          amount: int.tryParse(data['tripPrice']?.toString() ??
+                  data['amount']?.toString() ??
+                  '0') ??
+              amount,
+          description: description,
+          qrToken: QrTokenData.fromJson(
+            (data['qrToken'] as Map?)?.cast<String, dynamic>() ??
+                <String, dynamic>{
+                  'publicToken': data['publicToken']?.toString() ??
+                      data['token']?.toString() ??
+                      '',
+                  'isActive': true,
+                },
+          ),
+          validFrom: DateTime.now(),
+        ));
       } on DioException catch (e) {
         if (e.response?.statusCode == 404) {
           final response = await _dio.post('qr-code/payment-request', data: {
@@ -527,7 +555,7 @@ class ApiService {
           return ApiResponse.success(QrCodePriceResult(
             id: data['id']?.toString() ?? '',
             amount: int.tryParse(data['amount'].toString()) ?? amount,
-            description: data['description']?.toString() ?? description,
+            description: description,
             qrToken: QrTokenData.fromJson(
               (data['qrToken'] as Map?)?.cast<String, dynamic>() ??
                   <String, dynamic>{
@@ -597,16 +625,246 @@ class ApiService {
 
   /// Avaliar passageiro
   Future<ApiResponse<void>> ratePassenger({
-    required String tripId,
-    required double rating,
+    required String targetUserId,
+    required int stars,
     String? comment,
   }) async {
     try {
-      await _dio.post('trips/$tripId/rate', data: {
-        'rating': rating,
-        'comment': comment,
+      await _dio.post('ratings', data: {
+        'targetUserId': targetUserId,
+        'stars': stars,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
       });
       return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ AUTH — RECUPERAÇÃO DE PASSWORD ============
+
+  Future<ApiResponse<void>> forgotPassword(String phoneNumber) async {
+    try {
+      await _dio.post('auth/forgot-password', data: {'phoneNumber': phoneNumber});
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<String>> verifyForgotPasswordOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    try {
+      final response = await _dio.post('auth/forgot-password/verify-otp', data: {
+        'phoneNumber': phoneNumber,
+        'otp': otp,
+      });
+      final data = _payload(response.data);
+      final token = (data['resetToken'] ?? data['token'])?.toString();
+      if (token == null || token.isEmpty) {
+        return ApiResponse.error('Token de reset não recebido');
+      }
+      return ApiResponse.success(token);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post('auth/reset-password', data: {
+        'resetToken': resetToken,
+        'newPassword': newPassword,
+        'confirmPassword': newPassword,
+      });
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ SEGURANÇA — PIN ============
+
+  Future<ApiResponse<bool>> verifyPin(String pin) async {
+    try {
+      await _dio.post('auth/verify-pin', data: {'pin': pin});
+      return ApiResponse.success(true);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 400) {
+        return ApiResponse.success(false);
+      }
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    try {
+      await _dio.put('users/me/pin', data: {
+        'currentPin': currentPin,
+        'newPin': newPin,
+      });
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ SEGURANÇA — PÂNICO ============
+
+  Future<ApiResponse<void>> triggerPanic({
+    double latitude = 0,
+    double longitude = 0,
+  }) async {
+    try {
+      await _dio.post('safety/panic', data: {
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ CONTACTOS DE EMERGÊNCIA ============
+
+  Future<ApiResponse<List<EmergencyContact>>> getEmergencyContacts() async {
+    try {
+      final response = await _dio.get('safety/emergency-contacts');
+      final List<dynamic> data = _listPayload(response.data);
+      return ApiResponse.success(
+          data.map((e) => EmergencyContact.fromJson(e)).toList());
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<EmergencyContact>> addEmergencyContact({
+    required String name,
+    required String phoneNumber,
+  }) async {
+    try {
+      final response = await _dio.post('safety/emergency-contacts', data: {
+        'name': name,
+        'phoneNumber': phoneNumber,
+      });
+      return ApiResponse.success(
+          EmergencyContact.fromJson(_payload(response.data)));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> deleteEmergencyContact(String id) async {
+    try {
+      await _dio.delete('safety/emergency-contacts/$id');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ NOTIFICAÇÕES ============
+
+  Future<ApiResponse<NotificationsResult>> getNotifications() async {
+    try {
+      final response = await _dio.get('notifications');
+      final raw = response.data;
+      final Map<String, dynamic> meta =
+          raw is Map ? raw.cast<String, dynamic>() : {};
+      final list = _listPayload(raw);
+      return ApiResponse.success(NotificationsResult.fromJson(meta, list));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> markNotificationRead(String id) async {
+    try {
+      await _dio.put('notifications/$id/read');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<void>> markAllNotificationsRead() async {
+    try {
+      await _dio.put('notifications/read-all');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ FCM TOKEN ============
+
+  Future<ApiResponse<void>> updateFcmToken(String token) async {
+    try {
+      await _dio.put('users/me/fcm-token', data: {'token': token});
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ DOCUMENTOS ============
+
+  Future<ApiResponse<void>> uploadDocuments({
+    required File license,
+    required File bi,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'license': await MultipartFile.fromFile(license.path),
+        'bi': await MultipartFile.fromFile(bi.path),
+      });
+      await _dio.post('users/upload-docs', data: formData);
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ DETALHE DE VIAGEM ============
+
+  Future<ApiResponse<Trip>> getTripDetail(String tripId) async {
+    try {
+      final response = await _dio.get('trips/$tripId');
+      return ApiResponse.success(Trip.fromJson(_payload(response.data)));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ ESTATÍSTICAS DE VIAGENS ============
+
+  Future<ApiResponse<Map<String, dynamic>>> getTripStats() async {
+    try {
+      final response = await _dio.get('trips/stats');
+      return ApiResponse.success(_payload(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ AVALIAÇÃO PRÓPRIA ============
+
+  Future<ApiResponse<double>> getMyRating(String userId) async {
+    try {
+      final response = await _dio.get('ratings/$userId');
+      final data = _payload(response.data);
+      final avg = data['average'] ?? data['averageRating'] ?? data['rating'];
+      return ApiResponse.success(
+          double.tryParse(avg?.toString() ?? '0') ?? 0.0);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
