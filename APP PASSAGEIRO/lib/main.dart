@@ -29,13 +29,14 @@ import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize locale data for date formatting (pt_AO) before runApp
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
-  // Load saved theme preference
   await ThemeController.instance.load();
 
   SystemChrome.setSystemUIOverlayStyle(

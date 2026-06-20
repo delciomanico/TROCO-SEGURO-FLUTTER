@@ -2,10 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:troco_seguro/firebase_options.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 class NotificationService {
@@ -24,9 +25,11 @@ class NotificationService {
     importance: Importance.high,
   );
 
-  // ATENÇÃO: o ficheiro google-services.json deve ser adicionado em android/app/ antes de compilar.
+  bool _initialized = false;
+
   Future<void> initialize() async {
-    await Firebase.initializeApp();
+    if (_initialized) return;
+    _initialized = true;
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
