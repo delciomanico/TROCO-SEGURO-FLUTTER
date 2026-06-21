@@ -822,12 +822,25 @@ class ApiService {
   Future<ApiResponse<List<EmergencyContact>>> getEmergencyContacts() async {
     try {
       final response = await _dio.get('/safety/emergency-contacts');
-      final list = ((response.data['contacts'] ?? response.data) as List)
-          .map((e) => EmergencyContact.fromJson(e as Map<String, dynamic>))
+      final raw = response.data;
+      List<dynamic> items;
+      if (raw is List) {
+        items = raw;
+      } else if (raw is Map) {
+        final v = raw['contacts'] ?? raw['data'] ?? raw['emergencyContacts'] ?? [];
+        items = v is List ? v : [];
+      } else {
+        items = [];
+      }
+      final list = items
+          .whereType<Map<String, dynamic>>()
+          .map((e) => EmergencyContact.fromJson(e))
           .toList();
       return ApiResponse.success(list);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      return ApiResponse.error('Erro ao processar contactos: $e');
     }
   }
 
@@ -838,10 +851,15 @@ class ApiService {
     try {
       final response = await _dio.post('/safety/emergency-contacts',
           data: {'name': name, 'phoneNumber': phoneNumber});
-      return ApiResponse.success(
-          EmergencyContact.fromJson(response.data['contact'] ?? response.data));
+      final raw = response.data;
+      final Map<String, dynamic> json = raw is Map<String, dynamic>
+          ? (raw['contact'] ?? raw['emergencyContact'] ?? raw) as Map<String, dynamic>
+          : <String, dynamic>{};
+      return ApiResponse.success(EmergencyContact.fromJson(json));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
+    } catch (e) {
+      return ApiResponse.error('Erro ao adicionar contacto: $e');
     }
   }
 
@@ -1260,8 +1278,8 @@ class EmergencyContact {
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) =>
       EmergencyContact(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        phoneNumber: json['phoneNumber'] as String,
+        id: (json['id'] ?? json['_id'] ?? '').toString(),
+        name: (json['name'] ?? '').toString(),
+        phoneNumber: (json['phoneNumber'] ?? json['phone_number'] ?? json['phone'] ?? '').toString(),
       );
 }

@@ -1384,7 +1384,11 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
   Future<void> _load() async {
     await _api.loadTokens();
     final res = await _api.getEmergencyContacts();
-    if (mounted) setState(() { _contacts = res.data ?? []; _loading = false; });
+    if (!mounted) return;
+    setState(() { _contacts = res.data ?? []; _loading = false; });
+    if (!res.isSuccess) {
+      FeedbackService.showError(context, message: res.error ?? 'Erro ao carregar contactos');
+    }
   }
 
   Future<void> _delete(EmergencyContact c) async {
