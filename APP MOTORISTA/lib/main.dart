@@ -27,16 +27,20 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
+import 'package:troco_seguro_motorista/services/notification_service.dart';
 import 'package:troco_seguro_motorista/security/pin_guard.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:troco_seguro_motorista/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize locale data for date formatting (pt_AO) before runApp
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService().initialize();
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
-  // Load saved theme preference
   await ThemeController.instance.load();
 
   final initialDark =
@@ -283,8 +287,12 @@ class _AppControllerState extends State<AppController>
     await prefs.setString('ts_driver', json.encode(driver!.toJson()));
     await prefs.setBool('ts_driver_onboarding', true);
 
-    // Buscar dados reais da API imediatamente após o login
     await _refreshFromApi();
+
+    final fcmToken = await NotificationService().getToken();
+    if (fcmToken != null) {
+      await _api.updateFcmToken(fcmToken);
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -2095,8 +2103,31 @@ class _PanicButtonState extends State<_PanicButton> {
 
     if (mounted) setState(() => _sending = true);
     await _api.loadTokens();
-    final result =
-        await _api.triggerPanic(latitude: 0, longitude: 0);
+
+    double lat = 0;
+    double lng = 0;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always) {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
+            ),
+          );
+          lat = pos.latitude;
+          lng = pos.longitude;
+        }
+      }
+    } catch (_) {}
+
+    final result = await _api.triggerPanic(latitude: lat, longitude: lng);
     if (mounted) setState(() => _sending = false);
 
     if (mounted) {
@@ -2738,6 +2769,7 @@ class _SettingsModal extends StatefulWidget {
 class _SettingsModalState extends State<_SettingsModal> {
   bool _darkMode = false;
   bool _notifications = true;
+  final ApiService _api = ApiService();
 
   @override
   void initState() {
@@ -2834,6 +2866,105 @@ class _SettingsModalState extends State<_SettingsModal> {
                       builder: (context) => const TermsAndConditionsScreen()),
                 );
               },
+            ),
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.06),
+            ),
+            _deleteAccountTile(isDark),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        title: Text(
+          'Eliminar Conta',
+          style: TextStyle(
+            color: isDark ? Colors.white : AppColors.textDark,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Esta ação é irreversível. Todos os seus dados serão eliminados permanentemente.',
+          style: TextStyle(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.7)
+                : Colors.black.withValues(alpha: 0.6),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dCtx, true),
+            child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await _api.loadTokens();
+    final result = await _api.deleteAccount();
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result.error ?? 'Erro ao eliminar conta'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  Widget _deleteAccountTile(bool isDark) {
+    return InkWell(
+      onTap: _confirmDeleteAccount,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.delete_forever_outlined,
+                size: 20, color: Colors.red),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Eliminar Conta',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  Text(
+                    'Remover permanentemente todos os dados',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.red.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

@@ -1,4 +1,4 @@
-package com.example.troco_seguro_motorista
+package ao.co.trocoseguro.motorista
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "304435206702",
+    "project_id": "tyhtg-e7aff",
+    "storage_bucket": "tyhtg-e7aff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:304435206702:android:dde1bc9cd6dd550c8f9dbf",
+        "android_client_info": {
+          "package_name": "ao.co.trocoseguro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEZI4qwwCq-2qt4wqVO1z7I2aRZPdoIRw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:304435206702:android:09b407fe80ddcd0d8f9dbf",
+        "android_client_info": {
+          "package_name": "ao.co.trocoseguro.motorista"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEZI4qwwCq-2qt4wqVO1z7I2aRZPdoIRw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
 import 'package:troco_seguro_motorista/models/driver_user.dart';
 import 'package:troco_seguro_motorista/models/transaction.dart';
 import 'package:troco_seguro_motorista/models/trip.dart';
@@ -43,42 +44,28 @@ class ApiService {
         _beginRequest();
         if (_accessToken != null && _accessToken!.trim().isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $_accessToken';
-          final tokenPreview = _accessToken!.length > 16
-              ? '${_accessToken!.substring(0, 8)}...${_accessToken!.substring(_accessToken!.length - 6)}'
-              : _accessToken;
-          debugPrint('🔐 Authorization: Bearer $tokenPreview');
-        } else {
-          debugPrint('🔐 Authorization: (sem token)');
         }
         options.headers['user-agent'] = 'TrocoSeguroMotorista/1.0';
-        debugPrint('🌐 ${options.method} ${options.uri}');
         return handler.next(options);
       },
       onResponse: (response, handler) {
         _endRequest();
-        debugPrint(
-            '✅ ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}');
         return handler.next(response);
       },
       onError: (error, handler) async {
         _endRequest();
-        debugPrint(
-            '❌ ${error.response?.statusCode} ${error.requestOptions.method} ${error.requestOptions.uri}');
 
         // Tentar renovar token se expirado
         if (error.response?.statusCode == 401 && _refreshToken != null) {
           try {
             final refreshed = await _refreshTokens();
             if (refreshed) {
-              // Repetir requisição original
               final opts = error.requestOptions;
               opts.headers['Authorization'] = 'Bearer $_accessToken';
               final response = await _dio.fetch(opts);
               return handler.resolve(response);
             }
-          } catch (e) {
-            debugPrint('Erro ao renovar token: $e');
-          }
+          } catch (_) {}
         }
         return handler.next(error);
       },
@@ -97,17 +84,30 @@ class ApiService {
     _isLoading.value = _activeRequests.value > 0;
   }
 
-  /// Carregar tokens salvos
+  /// Carregar tokens salvos (com migração automática de SharedPreferences)
   Future<void> loadTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('accessToken');
-    _refreshToken = prefs.getString('refreshToken');
+    final secure = SecureStorageService();
+    String? accessToken = await secure.readAccessToken();
+    String? refreshToken = await secure.readRefreshToken();
 
-    if (_accessToken != null && _accessToken!.trim().isNotEmpty) {
-      debugPrint('🔑 Token carregado do storage');
-    } else {
-      debugPrint('🔑 Nenhum token encontrado no storage');
+    if (accessToken == null || accessToken.trim().isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final legacyAccess = prefs.getString('accessToken');
+      final legacyRefresh = prefs.getString('refreshToken');
+      if (legacyAccess != null && legacyAccess.trim().isNotEmpty) {
+        await secure.saveAccessToken(legacyAccess);
+        if (legacyRefresh != null) {
+          await secure.saveRefreshToken(legacyRefresh);
+        }
+        await prefs.remove('accessToken');
+        await prefs.remove('refreshToken');
+        accessToken = legacyAccess;
+        refreshToken = legacyRefresh;
+      }
     }
+
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
   }
 
   /// Salvar tokens
@@ -115,13 +115,11 @@ class ApiService {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('accessToken', accessToken);
+    final secure = SecureStorageService();
+    await secure.saveAccessToken(accessToken);
     if (refreshToken != null) {
-      await prefs.setString('refreshToken', refreshToken);
+      await secure.saveRefreshToken(refreshToken);
     }
-
-    debugPrint('💾 Tokens salvos com sucesso');
   }
 
   /// Definir tokens em memória (uso imediato após autenticação)
@@ -134,6 +132,9 @@ class ApiService {
   Future<void> clearTokens() async {
     _accessToken = null;
     _refreshToken = null;
+    final secure = SecureStorageService();
+    await secure.deleteAccessToken();
+    await secure.deleteRefreshToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('accessToken');
     await prefs.remove('refreshToken');
@@ -153,15 +154,10 @@ class ApiService {
       final accessToken = authData['accessToken']?.toString();
       final refreshToken = authData['refreshToken']?.toString();
       if (accessToken != null && accessToken.isNotEmpty) {
-        await saveTokens(
-          accessToken,
-          refreshToken,
-        );
+        await saveTokens(accessToken, refreshToken);
         return true;
       }
-    } catch (e) {
-      debugPrint('Falha ao renovar token: $e');
-    }
+    } catch (_) {}
     return false;
   }
 
@@ -766,6 +762,18 @@ class ApiService {
   Future<ApiResponse<void>> deleteEmergencyContact(String id) async {
     try {
       await _dio.delete('safety/emergency-contacts/$id');
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ CONTA ============
+
+  Future<ApiResponse<void>> deleteAccount() async {
+    try {
+      await _dio.delete('users/me');
+      await clearTokens();
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
