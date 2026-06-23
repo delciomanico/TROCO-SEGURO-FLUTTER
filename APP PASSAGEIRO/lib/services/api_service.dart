@@ -627,7 +627,7 @@ class ApiService {
       final data = response.data;
       final qrString = data is String
           ? data
-          : (data['qrData'] ?? data['qr'] ?? data['token'] ?? data.toString());
+          : (data['qrCodeImage'] ?? data['qrData'] ?? data['qr'] ?? data['token'] ?? data.toString());
       return ApiResponse.success(qrString as String);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));

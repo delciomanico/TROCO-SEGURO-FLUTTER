@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -483,11 +484,18 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                               8 * scale,
                                             ),
                                           ),
-                                          child: QrImageView(
-                                            data: qrData,
-                                            size: qrSize,
-                                            backgroundColor: Colors.white,
-                                          ),
+                                          child: qrData.startsWith('data:image')
+                                              ? Image.memory(
+                                                  base64Decode(qrData.split(',').last),
+                                                  width: qrSize,
+                                                  height: qrSize,
+                                                  fit: BoxFit.contain,
+                                                )
+                                              : QrImageView(
+                                                  data: qrData,
+                                                  size: qrSize,
+                                                  backgroundColor: Colors.white,
+                                                ),
                                         ),
                                       ],
                                     ),
