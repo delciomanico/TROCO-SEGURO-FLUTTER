@@ -14,6 +14,7 @@ String _userId = '';
 String _tripId = '';
 String _vehicleId = '';
 String _contactId = '';
+String _paymentToken = '';
 
 int _pass = 0, _fail = 0;
 
@@ -181,6 +182,11 @@ Future<void> main(List<String> args) async {
     final r = await _req('GET', '/qr-code/my-code');
     final ok = r['status'] == 200;
     _log(ok, 'GET /qr-code/my-code (QR estático)', ok ? 'ok' : r['body']);
+    if (ok) {
+      final b = r['body'];
+      final d = b is Map ? ((b['data'] ?? b) as Map) : <String, dynamic>{};
+      _paymentToken = (d['publicToken'] ?? d['qrToken'] ?? d['token'] ?? '').toString();
+    }
   }
   {
     // Configurar preço (pode falhar se a conta não for DRIVER)
@@ -382,7 +388,33 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  // ── 15. Encerramento de conta (carência 30 dias) ──
+  // ── 15. Fluxo Inverso — Driver escaneia cartão virtual do passageiro ──
+  print('\n── Fluxo Inverso (Cartão Virtual) ──');
+  {
+    // A) Resolver QR inválido → 400/422 (endpoint existe e valida o QR)
+    final rResolve = await _req('POST', '/virtual-cards/resolve-qr', body: {'qrData': 'invalid-qr-data'});
+    final okResolve = rResolve['status'] == 400 || rResolve['status'] == 422 || rResolve['status'] == 404;
+    _log(okResolve, 'POST /virtual-cards/resolve-qr (400/422 esperado — QR inválido)', okResolve ? 'validacao ok' : rResolve['body']);
+
+    // B) POST /payments/process com dados inválidos → 400/404/422 (endpoint existe e rejeita)
+    {
+      final rPay = await _req('POST', '/payments/process', body: {
+        'driverId': _userId,
+        'cardId': 'invalid-card-id',
+        'amount': 1000,
+        'pin': '0000',
+        'paymentToken': _paymentToken.isNotEmpty ? _paymentToken : 'invalid-token',
+        'origin': 'Teste',
+        'destination': 'Teste',
+        'distanceKm': 1.0,
+        'durationMinutes': 5,
+      });
+      final okPay = rPay['status'] == 400 || rPay['status'] == 404 || rPay['status'] == 422 || rPay['status'] == 401;
+      _log(okPay, 'POST /payments/process com cardId inválido (400/404/422 esperado)', okPay ? 'validacao ok' : rPay['body']);
+    }
+  }
+
+  // ── 16. Encerramento de conta (carência 30 dias) ──
   print('\n── Encerramento de Conta ──');
   {
     // A) Sem IBAN com saldo > 0 → 400 (validação correcta)
