@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
@@ -43,6 +44,11 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
   late final TextEditingController _pinController;
   late final FocusNode _pinFocusNode;
 
+  // null = wallet (main balance); non-null = virtual card id
+  String? _selectedCardId;
+  bool get _isCardPayment => _selectedCardId != null;
+  int get _pinLength => _isCardPayment ? 4 : 6;
+
   @override
   void initState() {
     super.initState();
@@ -67,20 +73,25 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
   }
 
   Future<void> _confirmPayment(BuildContext context) async {
-    if (_enteredPin.length != 6) {
-      setState(() => _pinError = 'PIN deve ter 6 dígitos');
+    if (_enteredPin.length != _pinLength) {
+      setState(() => _pinError = 'PIN deve ter $_pinLength dígitos');
       return;
     }
 
     setState(() => _isProcessing = true);
-    final pinValid = await widget.pinValidator(_enteredPin);
-    if (!mounted) return;
-    if (!pinValid) {
-      setState(() {
-        _isProcessing = false;
-        _pinError = 'PIN inválido';
-      });
-      return;
+
+    // Client-side PIN validation only for wallet payments.
+    // Card PIN is validated server-side (we never store it locally).
+    if (!_isCardPayment) {
+      final pinValid = await widget.pinValidator(_enteredPin);
+      if (!mounted) return;
+      if (!pinValid) {
+        setState(() {
+          _isProcessing = false;
+          _pinError = 'PIN inválido';
+        });
+        return;
+      }
     }
 
     final paymentService = PaymentService();
@@ -94,6 +105,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
       paymentToken: widget.driverInfo.paymentToken ??
           widget.driverInfo.sessionToken ??
           '',
+      cardId: _selectedCardId,
       distanceKm: 0.0,
       durationMinutes: 0,
     );
@@ -132,6 +144,112 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
         });
       }
     }
+  }
+
+  void _selectSource(String? cardId) {
+    _pinController.clear();
+    setState(() {
+      _selectedCardId = cardId;
+      _pinError = null;
+    });
+    FocusScope.of(context).requestFocus(_pinFocusNode);
+  }
+
+  Widget _buildSourceSelector(BuildContext ctx, ResponsiveHelper responsive) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final provider = ctx.read<AppProvider>();
+    final user = provider.user;
+    final cards = provider.virtualCards
+        .where((c) => c.status == CardStatus.active)
+        .toList();
+
+    final accent = AppColors.accentOf(ctx);
+    final bgSelected = accent.withValues(alpha: 0.1);
+    final borderSelected = accent;
+    final bgUnselected = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.black.withValues(alpha: 0.03);
+    final borderUnselected = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.1);
+
+    Widget tile({
+      required String? cardId,
+      required String label,
+      required String sublabel,
+      required IconData icon,
+    }) {
+      final selected = _selectedCardId == cardId;
+      return GestureDetector(
+        onTap: () => _selectSource(cardId),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? bgSelected : bgUnselected,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? borderSelected : borderUnselected,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18,
+                  color: selected ? accent : (isDark ? Colors.white54 : Colors.black45)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? accent
+                                : (isDark ? Colors.white : AppColors.textDark))),
+                    Text(sublabel,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.45)
+                                : Colors.black.withValues(alpha: 0.4))),
+                  ],
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_circle_rounded, size: 18, color: accent),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Pagar com',
+            style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                fontWeight: FontWeight.w600,
+                color: Theme.of(ctx).colorScheme.onSurface)),
+        const SizedBox(height: 10),
+        tile(
+          cardId: null,
+          label: 'Carteira Principal',
+          sublabel: '${user?.balance ?? 0} Kz disponíveis  •  PIN de 6 dígitos',
+          icon: Icons.account_balance_wallet_outlined,
+        ),
+        ...cards.map((c) => tile(
+              cardId: c.id,
+              label: c.name,
+              sublabel: '${c.balance} Kz  •  PIN de 4 dígitos',
+              icon: Icons.credit_card_rounded,
+            )),
+      ],
+    );
   }
 
   @override
@@ -245,8 +363,13 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                   ],
                 ),
 
-                SizedBox(height: responsive.scaledHeight(24)),
-                Text('Confirme com seu PIN',
+                SizedBox(height: responsive.scaledHeight(20)),
+                _buildSourceSelector(context, responsive),
+                SizedBox(height: responsive.scaledHeight(20)),
+                Text(
+                    _isCardPayment
+                        ? 'PIN do Cartão (4 dígitos)'
+                        : 'PIN da Conta (6 dígitos)',
                     style: TextStyle(
                         fontSize: responsive.responsiveFontSize(12),
                         fontWeight: FontWeight.w600,
@@ -267,18 +390,18 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                             fontSize: responsive.responsiveFontSize(12))),
                   ),
 
-                // PIN boxes
+                // PIN boxes — count matches _pinLength (4 for card, 6 for wallet)
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final m = responsive.scaledWidth(4);
-                    final totalSpacing = m * 12;
+                    final totalSpacing = m * (_pinLength * 2);
                     final available = (constraints.maxWidth - totalSpacing)
                         .clamp(0.0, double.infinity);
-                    final boxSize = (available / 6).clamp(36.0, 60.0);
+                    final boxSize = (available / _pinLength).clamp(36.0, 60.0);
 
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(6, (i) {
+                      children: List.generate(_pinLength, (i) {
                         return Container(
                           width: boxSize,
                           height: boxSize,
@@ -317,7 +440,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                     focusNode: _pinFocusNode,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    maxLength: 6,
+                    maxLength: _pinLength,
                     obscureText: true,
                     enableSuggestions: false,
                     autocorrect: false,

@@ -533,11 +533,12 @@ class ApiService {
     required String origin,
     required String destination,
     required String paymentToken,
+    String? cardId,
     double distanceKm = 0.0,
     int durationMinutes = 0,
   }) async {
     try {
-      final response = await _dio.post('/payments/process', data: {
+      final payload = <String, dynamic>{
         'driverId': driverId,
         'amount': amount,
         'pin': pin,
@@ -546,7 +547,9 @@ class ApiService {
         'paymentToken': paymentToken,
         'distanceKm': distanceKm,
         'durationMinutes': durationMinutes,
-      });
+      };
+      if (cardId != null && cardId.isNotEmpty) payload['cardId'] = cardId;
+      final response = await _dio.post('/payments/process', data: payload);
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
