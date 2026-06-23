@@ -1239,34 +1239,67 @@ class _SettingsModalState extends State<_SettingsModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.read<AppProvider>();
     final navigator = Navigator.of(context);
+    final balance = provider.user?.balance ?? 0;
+
+    final ibanCtrl = TextEditingController();
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        title: Text('Excluir Conta',
-            style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
-        content: Text(
-          'Esta ação é irreversível. O seu saldo, histórico de viagens e dados pessoais serão permanentemente eliminados.',
-          style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+          title: Text('Encerrar Conta',
+              style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A sua conta entrará num período de carência de 30 dias. Se voltar a iniciar sessão nesse período, a conta será reactivada automaticamente.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+              ),
+              if (balance > 0) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Tem ${balance} Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
+                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ibanCtrl,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'AO06.0040.0000.XXXX.XXXX.X',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (balance > 0 && ibanCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Encerrar Conta'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Excluir Conta'),
-          ),
-        ],
       ),
     );
 
     if (confirmed != true || !context.mounted) return;
 
-    final success = await provider.deleteAccount();
+    final iban = balance > 0 ? ibanCtrl.text.trim() : null;
+    final success = await provider.deleteAccount(iban: iban);
 
     if (!context.mounted) return;
 
@@ -1276,7 +1309,7 @@ class _SettingsModalState extends State<_SettingsModal> {
         (route) => false,
       );
     } else {
-      FeedbackService.showError(context, message: 'Não foi possível excluir a conta. Contacte suporte@trocoseguro.ao');
+      FeedbackService.showError(context, message: 'Não foi possível encerrar a conta. Contacte suporte@trocoseguro.ao');
     }
   }
 
@@ -1310,8 +1343,8 @@ class _SettingsModalState extends State<_SettingsModal> {
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('Excluir Conta', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red)),
-                        Text('Eliminar permanentemente conta e dados', style: TextStyle(fontSize: 11, color: Colors.red.withValues(alpha: 0.6))),
+                        const Text('Encerrar Conta', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red)),
+                        Text('Período de carência de 30 dias — pode reactivar', style: TextStyle(fontSize: 11, color: Colors.red.withValues(alpha: 0.6))),
                       ]),
                     ),
                     Icon(Icons.chevron_right_rounded, size: 18, color: Colors.red.withValues(alpha: 0.4)),

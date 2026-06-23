@@ -215,9 +215,10 @@ class ApiService {
     }
   }
 
-  Future<ApiResponse<void>> deleteAccount() async {
+  Future<ApiResponse<void>> deleteAccount({String? iban}) async {
     try {
-      await _dio.delete('/users/me');
+      await _dio.delete('/users/me',
+          data: iban != null && iban.isNotEmpty ? {'iban': iban} : null);
       await clearTokens();
       return ApiResponse.success(null);
     } on DioException catch (e) {

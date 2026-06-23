@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -39,6 +40,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool showBalance = false;
   bool _isPanicLoading = false;
+
+  // Panic mode state
+  bool _isPanicActive = false;
+  Timer? _panicTimer;
+  DateTime? _panicStartTime;
+  static const _panicInterval = Duration(seconds: 30);
+  static const _panicMaxDuration = Duration(hours: 5);
+
+  @override
+  void dispose() {
+    _panicTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _confirmTerminateSession() async {
     final responsive = ResponsiveHelper(context);
@@ -362,8 +376,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (shouldTrigger == true) {
-      await _triggerPanic();
+      await _startPanicMode();
     }
+  }
+
+  Future<void> _confirmStopPanic() async {
+    final stop = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Encerrar emergência?'),
+        content: const Text('A sua localização deixará de ser partilhada com as autoridades e contactos de emergência.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Continuar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Encerrar'),
+          ),
+        ],
+      ),
+    );
+    if (stop == true) _stopPanicMode();
   }
 
   Future<(double, double)> _getCurrentLocation() async {
@@ -392,49 +425,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Acionar botão de pânico com localização
-  Future<void> _triggerPanic() async {
+  Future<void> _startPanicMode() async {
     setState(() => _isPanicLoading = true);
+    final (lat, lng) = await _getCurrentLocation();
+    final success = widget.onPanic != null ? await widget.onPanic!(lat, lng) : false;
+    if (!mounted) return;
 
-    try {
-      final (latitude, longitude) = await _getCurrentLocation();
-
-      final success = widget.onPanic != null
-          ? await widget.onPanic!(latitude, longitude)
-          : false;
-
-      if (mounted) {
-        setState(() => _isPanicLoading = false);
-
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🚨 Alerta de pânico registrado com sucesso!'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Erro ao registrar alerta de pânico'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+    setState(() {
+      _isPanicLoading = false;
+      if (success) {
+        _isPanicActive = true;
+        _panicStartTime = DateTime.now();
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isPanicLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    });
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erro ao activar emergência. Tente novamente.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
     }
+
+    // Loop every 30 s — backend updates GPS silently, only 1st call fires alerts
+    _panicTimer = Timer.periodic(_panicInterval, (_) async {
+      if (!mounted) { _panicTimer?.cancel(); return; }
+      final elapsed = DateTime.now().difference(_panicStartTime!);
+      if (elapsed >= _panicMaxDuration) { _stopPanicMode(); return; }
+      final (la, lo) = await _getCurrentLocation();
+      if (widget.onPanic != null) await widget.onPanic!(la, lo);
+    });
+  }
+
+  void _stopPanicMode() {
+    _panicTimer?.cancel();
+    _panicTimer = null;
+    if (mounted) setState(() { _isPanicActive = false; _panicStartTime = null; });
   }
 
   @override
@@ -451,6 +477,27 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             _buildHeader(responsive, user),
+            if (_isPanicActive)
+              GestureDetector(
+                onTap: _confirmStopPanic,
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.red,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.crisis_alert_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'EMERGÊNCIA ACTIVA — A enviar localização  •  Toque para encerrar',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async => provider.refreshUserData(),
@@ -773,7 +820,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       isDark: isDark,
                       title: 'Segurança',
                       items: [
-                        (icon: Icons.warning_amber_rounded, label: 'Pânico', onTap: _isPanicLoading ? () {} : _confirmPanicAction),
+                        (icon: _isPanicActive ? Icons.crisis_alert_rounded : Icons.warning_amber_rounded, label: _isPanicActive ? 'Encerrar' : 'Pânico', onTap: _isPanicLoading ? () {} : (_isPanicActive ? _confirmStopPanic : _confirmPanicAction)),
                       ],
                     ),
                     SizedBox(height: responsive.scaledHeight(24)),

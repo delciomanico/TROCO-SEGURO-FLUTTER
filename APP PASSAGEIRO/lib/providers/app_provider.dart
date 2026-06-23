@@ -689,8 +689,8 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> deleteAccount() async {
-    final result = await _api.deleteAccount();
+  Future<bool> deleteAccount({String? iban}) async {
+    final result = await _api.deleteAccount(iban: iban);
     if (!result.isSuccess) return false;
 
     _user = null;

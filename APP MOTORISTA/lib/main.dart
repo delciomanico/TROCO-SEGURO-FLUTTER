@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -2080,70 +2081,101 @@ class _PanicButton extends StatefulWidget {
 
 class _PanicButtonState extends State<_PanicButton> {
   bool _sending = false;
+  bool _active = false;
+  Timer? _timer;
+  DateTime? _startTime;
   final ApiService _api = ApiService();
 
-  Future<void> _triggerPanic(BuildContext ctx) async {
+  static const _interval = Duration(seconds: 30);
+  static const _maxDuration = Duration(hours: 5);
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<(double, double)> _getLocation() async {
+    try {
+      bool ok = await Geolocator.isLocationServiceEnabled();
+      if (!ok) return (0.0, 0.0);
+      LocationPermission p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
+      if (p == LocationPermission.whileInUse || p == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+        );
+        return (pos.latitude, pos.longitude);
+      }
+    } catch (_) {}
+    return (0.0, 0.0);
+  }
+
+  Future<void> _startPanic() async {
     final confirmed = await showDialog<bool>(
-      context: ctx,
+      context: context,
       builder: (dCtx) => AlertDialog(
         title: const Text('Botão de Pânico'),
-        content: const Text(
-            'Vai enviar um alerta de emergência com a sua localização. Confirmar?'),
+        content: const Text('Vai enviar a sua localização em tempo real para as autoridades e contactos de emergência.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dCtx, false),
-            child: const Text('Cancelar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(dCtx, true),
             child: const Text('CONFIRMAR'),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     if (mounted) setState(() => _sending = true);
     await _api.loadTokens();
-
-    double lat = 0;
-    double lng = 0;
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (serviceEnabled) {
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        if (permission == LocationPermission.whileInUse ||
-            permission == LocationPermission.always) {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              timeLimit: Duration(seconds: 10),
-            ),
-          );
-          lat = pos.latitude;
-          lng = pos.longitude;
-        }
-      }
-    } catch (_) {}
-
+    final (lat, lng) = await _getLocation();
     final result = await _api.triggerPanic(latitude: lat, longitude: lng);
-    if (mounted) setState(() => _sending = false);
+    if (!mounted) return;
 
-    if (mounted) {
+    setState(() { _sending = false; _active = result.isSuccess; });
+    if (!result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.isSuccess
-            ? 'Alerta de emergência enviado!'
-            : result.error ?? 'Erro ao enviar alerta'),
-        backgroundColor: result.isSuccess ? Colors.red : Colors.red.shade700,
+        content: Text(result.error ?? 'Erro ao activar emergência'),
+        backgroundColor: Colors.red.shade700,
       ));
+      return;
     }
+
+    _startTime = DateTime.now();
+    _timer = Timer.periodic(_interval, (_) async {
+      if (!mounted) { _timer?.cancel(); return; }
+      if (DateTime.now().difference(_startTime!) >= _maxDuration) { _stopPanic(); return; }
+      final (la, lo) = await _getLocation();
+      await _api.triggerPanic(latitude: la, longitude: lo);
+    });
+  }
+
+  void _stopPanic() {
+    _timer?.cancel();
+    _timer = null;
+    if (mounted) setState(() { _active = false; _startTime = null; });
+  }
+
+  Future<void> _confirmStop() async {
+    final stop = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Encerrar emergência?'),
+        content: const Text('A sua localização deixará de ser partilhada.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Continuar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Encerrar'),
+          ),
+        ],
+      ),
+    );
+    if (stop == true) _stopPanic();
   }
 
   @override
@@ -2151,34 +2183,25 @@ class _PanicButtonState extends State<_PanicButton> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
-        onTap: _sending ? null : () => _triggerPanic(context),
-        child: Container(
+        onTap: _sending ? null : (_active ? _confirmStop : _startPanic),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.red,
+            color: _active ? Colors.red.shade700 : Colors.red,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_sending)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               else
-                const Icon(Icons.crisis_alert_rounded,
-                    color: Colors.white, size: 20),
+                Icon(_active ? Icons.location_on_rounded : Icons.crisis_alert_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Text(
-                _sending ? 'Enviando...' : 'Botão de Pânico',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
+                _sending ? 'A activar...' : (_active ? 'EMERGÊNCIA ACTIVA — Encerrar' : 'Botão de Pânico'),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -2891,52 +2914,86 @@ class _SettingsModalState extends State<_SettingsModal> {
 
   Future<void> _confirmDeleteAccount() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Ler saldo em cache para decidir se é necessário pedir IBAN
+    int balance = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('ts_driver');
+      if (raw != null) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        balance = map['balance'] as int? ?? 0;
+      }
+    } catch (_) {}
+
+    final ibanCtrl = TextEditingController();
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dCtx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-        title: Text(
-          'Eliminar Conta',
-          style: TextStyle(
-            color: isDark ? Colors.white : AppColors.textDark,
-            fontWeight: FontWeight.w700,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (dCtx, setDialog) => AlertDialog(
+          backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+          title: Text(
+            'Encerrar Conta',
+            style: TextStyle(color: isDark ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w700),
           ),
-        ),
-        content: Text(
-          'Esta ação é irreversível. Todos os seus dados serão eliminados permanentemente.',
-          style: TextStyle(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.7)
-                : Colors.black.withValues(alpha: 0.6),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A sua conta entrará num período de carência de 30 dias. Se voltar a iniciar sessão nesse período, a conta será reactivada automaticamente.',
+                style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black.withValues(alpha: 0.6)),
+              ),
+              if (balance > 0) ...[
+                const SizedBox(height: 14),
+                Text(
+                  'Tem $balance Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
+                  style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black.withValues(alpha: 0.6), fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ibanCtrl,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'AO06.0040.0000.XXXX.XXXX.X',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dCtx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: const Text('Cancelar'),
             ),
-            onPressed: () => Navigator.pop(dCtx, true),
-            child: const Text('ELIMINAR'),
-          ),
-        ],
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () {
+                if (balance > 0 && ibanCtrl.text.trim().isEmpty) return;
+                Navigator.pop(dCtx, true);
+              },
+              child: const Text('ENCERRAR'),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed != true || !mounted) return;
 
+    final iban = balance > 0 ? ibanCtrl.text.trim() : null;
     await _api.loadTokens();
-    final result = await _api.deleteAccount();
+    final result = await _api.deleteAccount(iban: iban);
     if (!mounted) return;
 
     if (result.isSuccess) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'Erro ao eliminar conta'),
+        content: Text(result.error ?? 'Erro ao encerrar conta'),
         backgroundColor: Colors.red,
       ));
     }
@@ -2965,7 +3022,7 @@ class _SettingsModalState extends State<_SettingsModal> {
                     ),
                   ),
                   Text(
-                    'Remover permanentemente todos os dados',
+                    'Período de carência de 30 dias — pode reactivar',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.red.withValues(alpha: 0.65),
