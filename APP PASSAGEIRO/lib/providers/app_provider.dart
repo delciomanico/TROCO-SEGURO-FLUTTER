@@ -419,72 +419,57 @@ class AppProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Transferir saldo entre cartões virtuais locais
+  /// Transferir saldo entre cartões virtuais
   Future<String?> transferBetweenVirtualCards({
     required String fromCardId,
     required String toCardId,
     required int amount,
+    required String pin,
   }) async {
-    _isLoadingCards = true;
-    notifyListeners();
+    if (fromCardId == toCardId) return 'Selecione cartões diferentes.';
+    if (amount <= 0) return 'O montante deve ser maior que zero.';
+
+    final fromIndex = _virtualCards.indexWhere((c) => c.id == fromCardId);
+    final toIndex = _virtualCards.indexWhere((c) => c.id == toCardId);
+    if (fromIndex == -1 || toIndex == -1) return 'Cartão não encontrado.';
+
+    final source = _virtualCards[fromIndex];
+    final destination = _virtualCards[toIndex];
+
+    if (source.isFrozen || source.isBlocked) return 'Cartão de origem indisponível.';
+    if (destination.isFrozen || destination.isBlocked) return 'Cartão de destino indisponível.';
+    if (source.balance < amount) return 'Saldo insuficiente no cartão de origem.';
 
     try {
-      if (fromCardId == toCardId) {
-        return 'Selecione cartões diferentes.';
-      }
+      final result = await _api.transferBetweenCards(
+        fromCardId: fromCardId,
+        toCardId: toCardId,
+        amount: amount,
+        pin: pin,
+      );
 
-      final fromIndex =
-          _virtualCards.indexWhere((card) => card.id == fromCardId);
-      final toIndex = _virtualCards.indexWhere((card) => card.id == toCardId);
+      if (!result.isSuccess) return result.error ?? 'Erro ao transferir entre cartões.';
 
-      if (fromIndex == -1 || toIndex == -1) {
-        return 'Cartão não encontrado.';
-      }
-
-      final sourceCard = _virtualCards[fromIndex];
-      final destinationCard = _virtualCards[toIndex];
-
-      if (sourceCard.isFrozen || sourceCard.isBlocked) {
-        return 'Cartão de origem indisponível.';
-      }
-
-      if (destinationCard.isFrozen || destinationCard.isBlocked) {
-        return 'Cartão de destino indisponível.';
-      }
-
-      if (amount <= 0) {
-        return 'O montante deve ser maior que zero.';
-      }
-
-      if (sourceCard.balance < amount) {
-        return 'Saldo insuficiente no cartão de origem.';
-      }
-
+      // Actualizar estado local optimistamente
       final timestamp = DateTime.now().toIso8601String();
-
-      _virtualCards[fromIndex] = sourceCard.copyWith(
-        balance: sourceCard.balance - amount,
+      _virtualCards[fromIndex] = source.copyWith(
+        balance: source.balance - amount,
         lastModified: timestamp,
       );
-
-      _virtualCards[toIndex] = destinationCard.copyWith(
-        balance: destinationCard.balance + amount,
+      _virtualCards[toIndex] = destination.copyWith(
+        balance: destination.balance + amount,
         lastModified: timestamp,
       );
-
       await _prefs?.setString(
         'ts_cards',
-        json.encode(_virtualCards.map((card) => card.toJson()).toList()),
+        json.encode(_virtualCards.map((c) => c.toJson()).toList()),
       );
-
       notifyListeners();
+      invalidate(AppDomain.cards);
       return null;
     } catch (e) {
       debugPrint('Erro ao transferir entre cartões: $e');
       return 'Erro ao transferir entre cartões.';
-    } finally {
-      _isLoadingCards = false;
-      notifyListeners();
     }
   }
 

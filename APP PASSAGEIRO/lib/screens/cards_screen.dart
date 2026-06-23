@@ -15,6 +15,7 @@ import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
+import 'package:troco_seguro/widgets/card_transfer_modal.dart';
 
 class CardsScreen extends StatefulWidget {
   const CardsScreen({super.key});
@@ -584,6 +585,145 @@ class _CardsScreenState extends State<CardsScreen> {
     } else {
       FeedbackService.showError(context, message: 'Erro ao apagar cartão');
     }
+  }
+
+  // ── Transfer between cards modal ───────────────────────────────────────────
+  void _showTransferBetweenCardsModal(VirtualCard fromCard) {
+    final provider = context.read<AppProvider>();
+    final cards = provider.virtualCards;
+
+    if (cards.length < 2) {
+      FeedbackService.showError(
+        context,
+        message: 'É necessário ter pelo menos dois cartões para transferir',
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => CardTransferModal(
+        cards: cards,
+        onTransfer: (fromCardId, toCardId, amount, pin) =>
+            provider.transferBetweenVirtualCards(
+          fromCardId: fromCardId,
+          toCardId: toCardId,
+          amount: amount,
+          pin: pin,
+        ),
+        onClose: () => Navigator.pop(ctx),
+      ),
+    );
+  }
+
+  // ── More actions modal ─────────────────────────────────────────────────────
+  void _showMoreCardActionsModal(VirtualCard card, bool isDark) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, animation, _) {
+        final dark = Theme.of(ctx).brightness == Brightness.dark;
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: Scaffold(
+            backgroundColor: dark ? AppColors.darkBackground : Colors.white,
+            body: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Mais opções',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: dark ? Colors.white : AppColors.textDark,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: dark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.05),
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: dark ? Colors.white : AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        _ActionChip(
+                          icon: Icons.swap_horiz_rounded,
+                          label: 'Transferir',
+                          color: Colors.purple,
+                          onTap: (card.isBlocked || card.isFrozen)
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  _showTransferBetweenCardsModal(card);
+                                },
+                        ),
+                        const SizedBox(width: 8),
+                        _ActionChip(
+                          icon: Icons.speed_rounded,
+                          label: 'Limite',
+                          onTap: card.isBlocked
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  _showLimitModal(card);
+                                },
+                        ),
+                        const SizedBox(width: 8),
+                        _ActionChip(
+                          icon: Icons.delete_outline_rounded,
+                          label: 'Apagar',
+                          color: Colors.red,
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _confirmDelete(card);
+                          },
+                        ),
+                        const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // ── Card share/download ────────────────────────────────────────────────────
@@ -1165,7 +1305,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                     ? Colors.white.withValues(alpha: 0.06)
                                     : Colors.black.withValues(alpha: 0.04),
                                 border: Border.all(
-                                  color: AppColors.primaryGold
+                                  color: AppColors.accentOf(context)
                                       .withValues(alpha: 0.4),
                                   width: 1.2,
                                 ),
@@ -1211,7 +1351,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                       : Colors.black.withValues(alpha: 0.04),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: AppColors.primaryGold
+                                    color: AppColors.accentOf(context)
                                         .withValues(alpha: 0.6),
                                     width: 1.2,
                                   ),
@@ -1300,8 +1440,8 @@ class _CardsScreenState extends State<CardsScreen> {
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             decoration: BoxDecoration(
                               color: active
-                                  ? AppColors.primaryGold
-                                  : AppColors.primaryGold
+                                  ? AppColors.accentOf(context)
+                                  : AppColors.accentOf(context)
                                       .withAlpha((0.25 * 255).round()),
                               borderRadius: BorderRadius.circular(4),
                             ),
@@ -1371,18 +1511,10 @@ class _CardsScreenState extends State<CardsScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 _ActionChip(
-                                  icon: Icons.speed_rounded,
-                                  label: 'Limite',
-                                  onTap: card.isBlocked
-                                      ? null
-                                      : () => _showLimitModal(card),
-                                ),
-                                const SizedBox(width: 8),
-                                _ActionChip(
-                                  icon: Icons.delete_outline_rounded,
-                                  label: 'Apagar',
-                                  color: Colors.red,
-                                  onTap: () => _confirmDelete(card),
+                                  icon: Icons.grid_view_rounded,
+                                  label: 'Mais',
+                                  onTap: () =>
+                                      _showMoreCardActionsModal(card, isDark),
                                 ),
                               ],
                             ),
@@ -1424,7 +1556,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                 icon: Icons.account_balance_wallet_rounded,
                                 label: 'Saldo',
                                 value: '${_fmt(card.balance)} Kz',
-                                valueColor: AppColors.primaryGold,
+                                valueColor: AppColors.accentOf(context),
                               ),
                               _Divider(),
                               _InfoRow(
@@ -1530,7 +1662,7 @@ class _CardCarouselItem extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppColors.primaryGold.withAlpha((0.9 * 255).round()),
+            color: AppColors.accentOf(context).withAlpha((0.9 * 255).round()),
             width: 1.2,
           ),
           boxShadow: [
@@ -1721,7 +1853,7 @@ class _CardVisual extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: AppColors.primaryGold.withAlpha((0.9 * 255).round()),
+            color: AppColors.accentOf(context).withAlpha((0.9 * 255).round()),
             width: 1.2,
           ),
           boxShadow: [
@@ -1885,14 +2017,14 @@ class _ActionChip extends StatelessWidget {
               Container(
                 width: 54,
                 height: 54,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primaryGold,
+                  color: AppColors.accentOf(context),
                 ),
                 child: Icon(
                   icon,
                   size: 22,
-                  color: Colors.black.withValues(alpha: 0.8),
+                  color: isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white,
                 ),
               ),
               const SizedBox(height: 7),

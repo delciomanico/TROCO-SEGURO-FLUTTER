@@ -7,6 +7,7 @@ import 'package:troco_seguro/utils/constants.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/api_service.dart' show ApiService, TripStats;
+import 'package:troco_seguro/widgets/ratings_history_modal.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -102,15 +103,15 @@ class _TripsScreenState extends State<TripsScreen> {
             _buildHeader(isDark, responsive),
             Expanded(
               child: isLoading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                          color: AppColors.primaryGold))
+                          color: AppColors.accentOf(context)))
                   : RefreshIndicator(
                       onRefresh: () async {
                         await context.read<AppProvider>().refreshTrips();
                         await _loadStats();
                       },
-                      color: AppColors.primaryGold,
+                      color: AppColors.accentOf(context),
                       child: ListView(
                         padding: EdgeInsets.fromLTRB(
                           responsive.scaledWidth(20),
@@ -183,7 +184,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         ),
                         prefixIcon: Icon(
                           Icons.search_rounded,
-                          color: AppColors.primaryGold,
+                          color: AppColors.accentOf(context),
                           size: responsive.scaledWidth(20),
                         ),
                         filled: true,
@@ -205,7 +206,7 @@ class _TripsScreenState extends State<TripsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
                             color:
-                                AppColors.primaryGold.withValues(alpha: 0.7),
+                                AppColors.accentOf(context).withValues(alpha: 0.7),
                             width: 1.2,
                           ),
                         ),
@@ -258,6 +259,34 @@ class _TripsScreenState extends State<TripsScreen> {
                     ),
                   ),
                   const Spacer(),
+                  // Botão: histórico de avaliações
+                  GestureDetector(
+                    onTap: () {
+                      final userId =
+                          context.read<AppProvider>().user?.id;
+                      if (userId != null) {
+                        RatingsHistoryModal.show(context, userId: userId);
+                      }
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.star_outline_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : AppColors.textDark.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(8)),
                   GestureDetector(
                     onTap: () => setState(() => _showSearch = true),
                     child: Container(
@@ -328,7 +357,7 @@ class _TripsScreenState extends State<TripsScreen> {
               Icons.payments_outlined,
               _apiStats != null ? 'Kz este mês' : 'Total gasto',
               _fmt(totalSpent),
-              AppColors.primaryGold,
+              AppColors.accentOf(context),
             ),
           ),
         ],
@@ -404,7 +433,7 @@ class _TripsScreenState extends State<TripsScreen> {
                     ? Colors.white.withValues(alpha: 0.06)
                     : Colors.black.withValues(alpha: 0.04),
                 border: Border.all(
-                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                  color: AppColors.accentOf(context).withValues(alpha: 0.4),
                   width: 1.2,
                 ),
               ),
@@ -528,7 +557,7 @@ class _TripsScreenState extends State<TripsScreen> {
                       style: TextStyle(
                         fontSize: responsive.responsiveFontSize(13),
                         fontWeight: FontWeight.w800,
-                        color: AppColors.primaryGold,
+                        color: AppColors.accentOf(context),
                       ),
                     ),
                   ],
@@ -575,15 +604,36 @@ class _TripsScreenState extends State<TripsScreen> {
                   ],
                 ),
                 SizedBox(height: responsive.scaledHeight(5)),
-                Text(
-                  '${trip.date} • ${trip.time}',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(10),
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.35)
-                        : Colors.black.withValues(alpha: 0.35),
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      '${trip.date} • ${trip.time}',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(10),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.35),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (trip.rating != null) ...[
+                      SizedBox(width: responsive.scaledWidth(10)),
+                      Icon(
+                        Icons.star_rounded,
+                        size: responsive.scaledWidth(12),
+                        color: AppColors.accentOf(context),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(2)),
+                      Text(
+                        trip.rating!.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(10),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accentOf(context),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

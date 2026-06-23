@@ -207,9 +207,9 @@ class _AppControllerState extends State<AppController>
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.darkBlue,
-        body: Center(
+      return Scaffold(
+        backgroundColor: AppColors.accentOf(context),
+        body: const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
       );
@@ -467,19 +467,19 @@ class _MainScreenState extends State<MainScreen> {
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primaryGold
-                          : Colors.transparent,
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           item.icon,
-                          color: isSelected 
-                              ? Colors.black
-                              : isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.55),
+                          color: isSelected
+                              ? AppColors.accentOf(context)
+                              : isDark
+                                  ? Colors.white.withValues(alpha: 0.55)
+                                  : AppColors.textDark.withValues(alpha: 0.6),
                           size: 22,
                         ),
                         const SizedBox(height: 4),
@@ -487,12 +487,12 @@ class _MainScreenState extends State<MainScreen> {
                           item.label,
                           style: TextStyle(
                             color: isSelected
-                                ? Colors.black
-                                : isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.55),
+                                ? AppColors.accentOf(context)
+                                : isDark
+                                    ? Colors.white.withValues(alpha: 0.55)
+                                    : AppColors.textDark.withValues(alpha: 0.6),
                             fontSize: 11,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w400,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                           ),
                         ),
                       ],
@@ -606,7 +606,7 @@ class _MenuModalState extends State<_MenuModal> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-                      border: Border.all(color: AppColors.primaryGold, width: 1.5),
+                      border: Border.all(color: AppColors.accentOf(context), width: 1.5),
                     ),
                     child: user?.photo != null && user!.photo!.isNotEmpty
                         ? ClipOval(child: Image.network(user.photo!, fit: BoxFit.cover,
@@ -751,8 +751,8 @@ class _ProfileModalState extends State<_ProfileModal> {
                 controller: nameCtrl,
                 decoration: InputDecoration(
                   labelText: 'Nome completo',
-                  prefixIcon: const Icon(Icons.person_outline,
-                      color: AppColors.primaryGold),
+                  prefixIcon: Icon(Icons.person_outline,
+                      color: AppColors.accentOf(context)),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   enabledBorder: OutlineInputBorder(
@@ -764,8 +764,8 @@ class _ProfileModalState extends State<_ProfileModal> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primaryGold, width: 1.5),
+                    borderSide: BorderSide(
+                        color: AppColors.accentOf(context), width: 1.5),
                   ),
                   filled: true,
                   fillColor: isDark
@@ -787,8 +787,8 @@ class _ProfileModalState extends State<_ProfileModal> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    foregroundColor: Colors.black,
+                    backgroundColor: AppColors.accentOf(context),
+                    foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -827,7 +827,7 @@ class _ProfileModalState extends State<_ProfileModal> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.06)
                     : Colors.black.withValues(alpha: 0.04),
-                border: Border.all(color: AppColors.primaryGold, width: 1.5),
+                border: Border.all(color: AppColors.accentOf(context), width: 1.5),
               ),
               child: user?.photo != null && user!.photo!.isNotEmpty
                   ? ClipOval(
@@ -1054,8 +1054,8 @@ class _SecurityModalState extends State<_SecurityModal> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppColors.accentOf(context),
+                      foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -1090,7 +1090,7 @@ class _SecurityModalState extends State<_SecurityModal> {
       decoration: InputDecoration(
         labelText: label,
         counterText: '',
-        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryGold),
+        prefixIcon: Icon(Icons.lock_outline, color: AppColors.accentOf(context)),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1102,7 +1102,7 @@ class _SecurityModalState extends State<_SecurityModal> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide:
-              const BorderSide(color: AppColors.primaryGold, width: 1.5),
+              BorderSide(color: AppColors.accentOf(context), width: 1.5),
         ),
         filled: true,
         fillColor: isDark
@@ -1166,7 +1166,7 @@ class _SecurityModalState extends State<_SecurityModal> {
               Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
             ]),
           ),
-          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.accentOf(context), activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ],
       ),
     );
@@ -1336,7 +1336,7 @@ class _SettingsModalState extends State<_SettingsModal> {
             Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
             Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
           ])),
-          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryGold, activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.accentOf(context), activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ],
       ),
     );
@@ -1456,13 +1456,13 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold, foregroundColor: Colors.black,
+                      backgroundColor: AppColors.accentOf(context), foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: busy
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? Colors.black : Colors.white))
                         : const Text('Adicionar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
                 ),
@@ -1480,12 +1480,12 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
       controller: ctrl, keyboardType: type,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primaryGold),
+        prefixIcon: Icon(icon, color: AppColors.accentOf(context)),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5)),
+            borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5)),
         filled: true,
         fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
       ),
@@ -1516,13 +1516,13 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGold,
+                          color: AppColors.accentOf(context),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.add_rounded, size: 15, color: Colors.black),
-                          SizedBox(width: 4),
-                          Text('Adicionar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.add_rounded, size: 15, color: isDark ? Colors.black : Colors.white),
+                          const SizedBox(width: 4),
+                          Text('Adicionar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.black : Colors.white)),
                         ]),
                       ),
                     )
@@ -1543,7 +1543,7 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
                 color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentOf(context)))
                   : _contacts.isEmpty
                       ? _buildEmpty(isDark)
                       : ListView.separated(
@@ -1570,10 +1570,10 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-              border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4), width: 1.2),
+              border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4), width: 1.2),
             ),
             child: Center(child: Text(c.name[0].toUpperCase(),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primaryGold))),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.accentOf(context)))),
           ),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1600,7 +1600,7 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
         Container(width: 72, height: 72,
             decoration: BoxDecoration(shape: BoxShape.circle,
                 color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-                border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4), width: 1.5)),
+                border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4), width: 1.5)),
             child: Icon(Icons.people_outline_rounded, size: 32,
                 color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.3))),
         const SizedBox(height: 16),
@@ -1641,7 +1641,7 @@ class _AboutPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-                          border: Border.all(color: AppColors.primaryGold, width: 1.5),
+                          border: Border.all(color: AppColors.accentOf(context), width: 1.5),
                         ),
                         child: Icon(Icons.security_rounded, size: 34,
                             color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
@@ -1666,11 +1666,11 @@ class _AboutPage extends StatelessWidget {
                     const SizedBox(height: 24),
                     _section('Como funciona?', isDark),
                     const SizedBox(height: 8),
-                    _step('1', 'Carregue a sua carteira com o saldo desejado.', isDark),
+                    _step('1', 'Carregue a sua carteira com o saldo desejado.', isDark, context),
                     const SizedBox(height: 10),
-                    _step('2', 'No final da viagem, escaneie o QR code do motorista.', isDark),
+                    _step('2', 'No final da viagem, escaneie o QR code do motorista.', isDark, context),
                     const SizedBox(height: 10),
-                    _step('3', 'Confirme o pagamento com o seu PIN de 6 dígitos.', isDark),
+                    _step('3', 'Confirme o pagamento com o seu PIN de 6 dígitos.', isDark, context),
                     const SizedBox(height: 24),
                     _section('Segurança', isDark),
                     const SizedBox(height: 8),
@@ -1697,11 +1697,11 @@ class _AboutPage extends StatelessWidget {
       style: TextStyle(fontSize: 13, height: 1.65,
           color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55)));
 
-  Widget _step(String num, String text, bool isDark) {
+  Widget _step(String num, String text, bool isDark, BuildContext context) {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(
         width: 22, height: 22,
-        decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryGold),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accentOf(context)),
         child: Center(child: Text(num, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.black))),
       ),
       const SizedBox(width: 10),
@@ -1731,14 +1731,14 @@ class _TermsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _clause('1. Aceitação dos Termos', 'Ao registar-se e utilizar o Troco Seguro, concorda expressamente com estes Termos e Condições. Caso não concorde, deverá cessar imediatamente a utilização da aplicação.', isDark),
-                    _clause('2. Descrição do Serviço', 'O Troco Seguro é uma plataforma de pagamentos digitais destinada a facilitar transações entre passageiros e motoristas de táxi em Angola. O serviço inclui carteira digital, pagamentos via QR code e histórico de transações.', isDark),
-                    _clause('3. Conta e Segurança', 'É da sua exclusiva responsabilidade manter a confidencialidade do PIN e das credenciais de acesso à conta. Qualquer atividade realizada com as suas credenciais é da sua responsabilidade. Em caso de suspeita de acesso não autorizado, contacte-nos imediatamente.', isDark),
-                    _clause('4. Pagamentos e Saldo', 'O saldo da carteira é expresso em Kwanzas (Kz) e não é convertível em dinheiro físico exceto mediante solicitação formal. Todos os pagamentos são definitivos e não reversíveis, salvo em casos de erro técnico comprovado.', isDark),
-                    _clause('5. Privacidade dos Dados', 'Os seus dados pessoais são tratados de acordo com a legislação angolana de proteção de dados. Não partilhamos informações pessoais com terceiros sem o seu consentimento, exceto quando exigido por lei.', isDark),
-                    _clause('6. Limitação de Responsabilidade', 'O Troco Seguro não se responsabiliza por falhas causadas por problemas de conectividade, interrupções de serviço de terceiros ou utilização indevida da aplicação pelo utilizador.', isDark),
-                    _clause('7. Alterações aos Termos', 'Reservamo-nos o direito de atualizar estes termos a qualquer momento. Será notificado de alterações significativas através da aplicação. O uso continuado após as alterações implica aceitação dos novos termos.', isDark),
-                    _clause('8. Contacto', 'Para questões relacionadas com estes termos, contacte: termos@trocoseguro.ao', isDark),
+                    _clause('1. Aceitação dos Termos', 'Ao registar-se e utilizar o Troco Seguro, concorda expressamente com estes Termos e Condições. Caso não concorde, deverá cessar imediatamente a utilização da aplicação.', isDark, context),
+                    _clause('2. Descrição do Serviço', 'O Troco Seguro é uma plataforma de pagamentos digitais destinada a facilitar transações entre passageiros e motoristas de táxi em Angola. O serviço inclui carteira digital, pagamentos via QR code e histórico de transações.', isDark, context),
+                    _clause('3. Conta e Segurança', 'É da sua exclusiva responsabilidade manter a confidencialidade do PIN e das credenciais de acesso à conta. Qualquer atividade realizada com as suas credenciais é da sua responsabilidade. Em caso de suspeita de acesso não autorizado, contacte-nos imediatamente.', isDark, context),
+                    _clause('4. Pagamentos e Saldo', 'O saldo da carteira é expresso em Kwanzas (Kz) e não é convertível em dinheiro físico exceto mediante solicitação formal. Todos os pagamentos são definitivos e não reversíveis, salvo em casos de erro técnico comprovado.', isDark, context),
+                    _clause('5. Privacidade dos Dados', 'Os seus dados pessoais são tratados de acordo com a legislação angolana de proteção de dados. Não partilhamos informações pessoais com terceiros sem o seu consentimento, exceto quando exigido por lei.', isDark, context),
+                    _clause('6. Limitação de Responsabilidade', 'O Troco Seguro não se responsabiliza por falhas causadas por problemas de conectividade, interrupções de serviço de terceiros ou utilização indevida da aplicação pelo utilizador.', isDark, context),
+                    _clause('7. Alterações aos Termos', 'Reservamo-nos o direito de atualizar estes termos a qualquer momento. Será notificado de alterações significativas através da aplicação. O uso continuado após as alterações implica aceitação dos novos termos.', isDark, context),
+                    _clause('8. Contacto', 'Para questões relacionadas com estes termos, contacte: termos@trocoseguro.ao', isDark, context),
                     const SizedBox(height: 8),
                     Text('Última atualização: Junho 2026',
                         style: TextStyle(fontSize: 11,
@@ -1753,12 +1753,12 @@ class _TermsPage extends StatelessWidget {
     );
   }
 
-  Widget _clause(String title, String body, bool isDark) {
+  Widget _clause(String title, String body, bool isDark, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryGold)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accentOf(context))),
         const SizedBox(height: 6),
         Text(body,
             style: TextStyle(fontSize: 13, height: 1.65,
@@ -1931,11 +1931,11 @@ class _ReauthScreenState extends State<ReauthScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
+                            Text(
                               'Bem-vindo',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: AppColors.primaryGold,
+                                color: AppColors.accentOf(context),
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 1.2,
@@ -1994,8 +1994,8 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                         focusedBorder: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          borderSide: const BorderSide(
-                                            color: AppColors.primaryGold,
+                                          borderSide: BorderSide(
+                                            color: AppColors.accentOf(context),
                                             width: 2,
                                           ),
                                         ),
@@ -2046,7 +2046,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accent,
+                                    backgroundColor: AppColors.accentOf(context),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
@@ -2062,7 +2062,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _verifyPin,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.accent,
+                                  backgroundColor: AppColors.accentOf(context),
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -2097,9 +2097,9 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                         await widget.onSwitchAccount();
                                       },
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.accent,
+                                  foregroundColor: AppColors.accentOf(context),
                                   side:
-                                      const BorderSide(color: AppColors.accent),
+                                      BorderSide(color: AppColors.accentOf(context)),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),

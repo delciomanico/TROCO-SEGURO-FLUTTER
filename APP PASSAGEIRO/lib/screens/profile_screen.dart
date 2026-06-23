@@ -130,7 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.primary,
+                      color: AppColors.accentOf(context),
                       width: 3,
                     ),
                   ),
@@ -153,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: responsive.scaledWidth(32),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.primary,
+                      color: AppColors.accentOf(context),
                       border: Border.all(
                         color: AppColors.lightBackground,
                         width: 2,
@@ -194,11 +194,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDefaultAvatar() {
     return Container(
-      color: AppColors.primary.withValues(alpha: 0.1),
-      child: const Icon(
+      color: AppColors.accentOf(context).withValues(alpha: 0.1),
+      child: Icon(
         Icons.person_outline,
         size: 50,
-        color: AppColors.primary,
+        color: AppColors.accentOf(context),
       ),
     );
   }
@@ -354,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(
             icon,
             size: responsive.scaledWidth(22),
-            color: AppColors.primary,
+            color: AppColors.accentOf(context),
           ),
           SizedBox(width: responsive.scaledWidth(12)),
           Expanded(
@@ -384,8 +384,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: AppColors.primary,
-            activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
+            activeThumbColor: AppColors.accentOf(context),
+            activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -420,7 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(
               icon,
               size: responsive.scaledWidth(22),
-              color: AppColors.primary,
+              color: AppColors.accentOf(context),
             ),
             SizedBox(width: responsive.scaledWidth(12)),
             Expanded(
@@ -528,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(
               icon,
               size: responsive.scaledWidth(22),
-              color: AppColors.primary,
+              color: AppColors.accentOf(context),
             ),
             SizedBox(width: responsive.scaledWidth(12)),
             Expanded(
@@ -1215,7 +1215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Row(
                   children: [
                     Icon(icon,
-                        color: AppColors.primary,
+                        color: AppColors.accentOf(context),
                         size: responsive.scaledWidth(24)),
                     SizedBox(width: responsive.scaledWidth(10)),
                     Expanded(
@@ -1239,7 +1239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppColors.accentOf(context),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -1302,7 +1302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       Icon(
                         icon,
-                        color: AppColors.primary,
+                        color: AppColors.accentOf(context),
                         size: responsive.scaledWidth(24),
                       ),
                       SizedBox(width: responsive.scaledWidth(10)),
@@ -1346,7 +1346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: ElevatedButton(
                             onPressed: () => Navigator.pop(dialogContext),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
+                              backgroundColor: AppColors.accentOf(context),
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(

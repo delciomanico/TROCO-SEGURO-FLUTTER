@@ -164,8 +164,8 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = const Color(0xFFD4AF37);
-    secondaryGold = const Color(0xFFC5A028);
+    primaryGold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
+    secondaryGold = isDark ? const Color(0xFFC5A028) : const Color(0xFFE55A00);
     darkBg = const Color(0xFF121212);
     darkCard = const Color(0xFF1E1E1E);
     lightBg = const Color(0xFFFFFFFF);
@@ -402,7 +402,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   }),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGold,
-                    foregroundColor: isDark ? Colors.black : darkBg,
+                    foregroundColor: isDark ? Colors.black : Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
@@ -771,7 +771,7 @@ class _AuthScreenState extends State<AuthScreen> {
         onPressed: isLoading ? null : _handleContinue,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGold,
-          foregroundColor: isDark ? Colors.black : darkBg,
+          foregroundColor: isDark ? Colors.black : Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
@@ -886,9 +886,9 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     if (res.isSuccess) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Senha redefinida com sucesso. Faça login.'),
-          backgroundColor: Color(0xFFD4AF37),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Senha redefinida com sucesso. Faça login.'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
         ));
       }
     } else {
@@ -908,7 +908,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD4AF37);
+    final gold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
     final bg = isDark ? const Color(0xFF121212) : Colors.white;
     final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2F2);
     final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
@@ -1080,13 +1080,13 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
         onPressed: _busy ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: gold,
-          foregroundColor: Colors.black,
+          foregroundColor: isDark ? Colors.black : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
         child: _busy
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+            ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? Colors.black : Colors.white))
             : Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
       ),
     );

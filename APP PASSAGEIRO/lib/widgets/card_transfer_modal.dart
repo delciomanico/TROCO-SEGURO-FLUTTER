@@ -6,7 +6,7 @@ import 'package:troco_seguro/utils/responsive_helper.dart';
 
 class CardTransferModal extends StatefulWidget {
   final List<VirtualCard> cards;
-  final Future<String?> Function(String fromCardId, String toCardId, int amount)
+  final Future<String?> Function(String fromCardId, String toCardId, int amount, String pin)
       onTransfer;
   final VoidCallback onClose;
 
@@ -25,17 +25,20 @@ class _CardTransferModalState extends State<CardTransferModal> {
   String? selectedFromCardId;
   String? selectedToCardId;
   final amountController = TextEditingController();
+  final pinController = TextEditingController();
   String? error;
   bool isLoading = false;
 
   @override
   void dispose() {
     amountController.dispose();
+    pinController.dispose();
     super.dispose();
   }
 
   Future<void> _submitTransfer() async {
     final amount = int.tryParse(amountController.text.trim());
+    final pin = pinController.text.trim();
 
     if (selectedFromCardId == null ||
         selectedToCardId == null ||
@@ -64,6 +67,11 @@ class _CardTransferModalState extends State<CardTransferModal> {
       return;
     }
 
+    if (pin.length != 4) {
+      setState(() => error = 'PIN do cartão deve ter 4 dígitos');
+      return;
+    }
+
     setState(() {
       error = null;
       isLoading = true;
@@ -73,6 +81,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
       selectedFromCardId!,
       selectedToCardId!,
       amount,
+      pin,
     );
 
     if (!mounted) return;
@@ -245,6 +254,8 @@ class _CardTransferModalState extends State<CardTransferModal> {
               ),
               SizedBox(height: responsive.scaledHeight(16)),
               _buildAmountField(context, responsive),
+              SizedBox(height: responsive.scaledHeight(16)),
+              _buildPinField(context, responsive),
               SizedBox(height: responsive.scaledHeight(24)),
               Row(
                 children: [
@@ -408,6 +419,70 @@ class _CardTransferModalState extends State<CardTransferModal> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             hintText: 'Ex: 2500',
+            filled: true,
+            fillColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(
+                responsive.responsiveBorderRadius(),
+              ),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(
+                responsive.responsiveBorderRadius(),
+              ),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(
+                responsive.responsiveBorderRadius(),
+              ),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPinField(BuildContext context, ResponsiveHelper responsive) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 8),
+          child: Text(
+            'PIN DO CARTAO DE ORIGEM',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(10),
+              fontWeight: FontWeight.w900,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withAlpha((0.6 * 255).round()),
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        TextField(
+          controller: pinController,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          maxLength: 4,
+          decoration: InputDecoration(
+            hintText: '****',
+            counterText: '',
+            prefixIcon: const Icon(Icons.lock_outline),
             filled: true,
             fillColor: Theme.of(context)
                 .colorScheme

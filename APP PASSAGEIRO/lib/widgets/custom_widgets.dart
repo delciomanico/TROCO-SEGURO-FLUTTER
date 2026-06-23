@@ -65,14 +65,14 @@ class AppBrandingHeader extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(compact ? 10 : 14),
             border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.6),
+              color: AppColors.accentOf(context).withValues(alpha: 0.6),
               width: 2,
             ),
           ),
           child: Icon(
             Icons.currency_exchange_rounded,
             size: responsive.scaledWidth(compact ? 20 : 28),
-            color: AppColors.accent,
+            color: AppColors.accentOf(context),
           ),
         ),
         SizedBox(width: responsive.scaledWidth(12)),
@@ -128,11 +128,11 @@ class GradientBalanceCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [
-            AppColors.darkBlue,
+            AppColors.accentOf(context),
             AppColors.darkBlueSurface,
-            Color(0xFF2A4A6C),
+            const Color(0xFF2A4A6C),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -141,7 +141,7 @@ class GradientBalanceCard extends StatelessWidget {
             BorderRadius.circular(responsive.responsiveBorderRadius() * 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.darkBlue.withValues(alpha: 0.3),
+            color: AppColors.accentOf(context).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -192,7 +192,7 @@ class GradientBalanceCard extends StatelessWidget {
                             Icon(
                               Icons.account_balance_wallet_rounded,
                               size: responsive.scaledWidth(16),
-                              color: AppColors.accent,
+                              color: AppColors.accentOf(context),
                             ),
                             SizedBox(width: responsive.scaledWidth(6)),
                             Text(
@@ -293,7 +293,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
     final responsive = ResponsiveHelper(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // No tema dark, botões outline usam branco; no light, usam azul escuro
-    final outlineColor = isDark ? Colors.white : AppColors.darkBlue;
+    final outlineColor = isDark ? Colors.white : AppColors.accentOf(context);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -309,11 +309,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
           height: responsive.responsiveButtonHeight(),
           decoration: BoxDecoration(
             gradient: widget.isPrimary
-                ? const LinearGradient(
-                    colors: [AppColors.accent, Color(0xFFE5A00D)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
+                ? AppColors.accentGradientOf(context)
                 : null,
             color: widget.isPrimary ? null : Colors.transparent,
             borderRadius:
@@ -324,7 +320,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
             boxShadow: widget.isPrimary
                 ? [
                     BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.3),
+                      color: AppColors.accentOf(context).withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -381,7 +377,7 @@ class CustomButton extends StatelessWidget {
     final fontSize = responsive.responsiveFontSize(12);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // No tema dark, botões outline usam branco; no light, usam azul escuro
-    final outlineColor = isDark ? Colors.white : AppColors.darkBlue;
+    final outlineColor = isDark ? Colors.white : AppColors.accentOf(context);
     final isDisabled = onPressed == null || isLoading;
 
     return SizedBox(
@@ -389,19 +385,19 @@ class CustomButton extends StatelessWidget {
       height: responsive.responsiveButtonHeight(),
       child: Container(
         decoration: BoxDecoration(
-          gradient: isOutline ? null : (isDisabled ? null : AppColors.primaryGradient),
+          gradient: isOutline ? null : (isDisabled ? null : AppColors.accentGradientOf(context)),
           color: isDisabled && !isOutline ? Colors.grey : null,
           borderRadius:
               BorderRadius.circular(responsive.responsiveBorderRadius()),
           border: isOutline ? Border.all(
-            color: isDisabled ? Colors.grey : outlineColor, 
+            color: isDisabled ? Colors.grey : outlineColor,
             width: 2
           ) : null,
           boxShadow: isOutline || isDisabled
               ? null
               : [
                   BoxShadow(
-                    color: AppColors.darkBlue.withValues(alpha: 0.2),
+                    color: AppColors.accentOf(context).withValues(alpha: 0.2),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -687,7 +683,7 @@ class SectionHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(10),
                   fontWeight: FontWeight.w900,
-                  color: AppColors.darkBlue,
+                  color: AppColors.accentOf(context),
                   letterSpacing: 1.0,
                 ),
               ),

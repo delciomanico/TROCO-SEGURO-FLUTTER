@@ -22,7 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           'Pague suas corridas de táxi em Luanda de forma digital e esqueça a confusão com as notas.',
       icon: Icons.payments_outlined,
-      color: AppColors.accent,
+      color: AppColors.primaryOrange,
     ),
     OnboardingData(
       title: 'Rápido e seguro',
@@ -84,7 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(16),
                       fontWeight: FontWeight.w900,
-                      color: AppColors.darkBlue,
+                      color: AppColors.accentOf(context),
                     ),
                   ),
                   if (_currentPage < _pages.length - 1)
@@ -199,7 +199,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       height: responsive.scaledWidth(8),
       decoration: BoxDecoration(
         color:
-            isActive ? AppColors.accent : Theme.of(context).colorScheme.outline,
+            isActive ? AppColors.accentOf(context) : Theme.of(context).colorScheme.outline,
         borderRadius: BorderRadius.circular(responsive.scaledWidth(4)),
       ),
     );

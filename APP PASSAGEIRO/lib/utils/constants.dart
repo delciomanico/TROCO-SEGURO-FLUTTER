@@ -4,8 +4,12 @@ import 'package:troco_seguro/models/faq_item.dart';
 class AppColors {
   // App-wide palette changed to dark/gold identity
   // Primary gold accents and neutral dark backgrounds
-  static const Color primaryGold = Color(0xFFD4AF37); // main accent (gold)
+  static const Color primaryGold = Color(0xFFD4AF37); // dark theme accent (gold)
   static const Color secondaryGold = Color(0xFFC5A028);
+
+  // Light theme accent — orange from the app logo icon
+  static const Color primaryOrange = Color(0xFFFF6600);
+  static const Color secondaryOrange = Color(0xFFE55A00);
 
   // Backgrounds / surfaces
   static const Color lightBackground = Color(0xFFFFFFFF);
@@ -53,6 +57,30 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // Retorna a cor de acento correta para o tema atual (laranja no claro, dourado no escuro)
+  static Color accentOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? primaryGold : primaryOrange;
+  }
+
+  // Retorna a cor de acento secundária correta para o tema atual
+  static Color secondaryAccentOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? secondaryGold : secondaryOrange;
+  }
+
+  // Retorna gradiente de acento correto para o tema atual
+  static LinearGradient accentGradientOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark
+        ? primaryGradient
+        : const LinearGradient(
+            colors: [primaryOrange, secondaryOrange],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          );
+  }
 }
 
 class Constants {

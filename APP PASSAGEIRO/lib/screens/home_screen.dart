@@ -1169,13 +1169,13 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             width: responsive.scaledWidth(58),
             height: responsive.scaledWidth(58),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryGold,
+              color: AppColors.accentOf(context),
             ),
             child: Icon(
               icon,
-              color: Colors.black.withValues(alpha: 0.8),
+              color: isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white,
               size: responsive.scaledWidth(24),
             ),
           ),
@@ -1260,7 +1260,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(12),
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primaryGold,
+                  color: AppColors.accentOf(context),
                 ),
               ),
             ],
@@ -1503,7 +1503,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                           '$_unreadCount não lida${_unreadCount > 1 ? 's' : ''}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.primaryGold,
+                            color: AppColors.accentOf(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1518,12 +1518,12 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryGold
+                              color: AppColors.accentOf(context)
                                   .withValues(alpha: isDark ? 0.15 : 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color:
-                                    AppColors.primaryGold.withValues(alpha: 0.4),
+                                    AppColors.accentOf(context).withValues(alpha: 0.4),
                               ),
                             ),
                             child: Text(
@@ -1531,7 +1531,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.primaryGold,
+                                color: AppColors.accentOf(context),
                               ),
                             ),
                           ),
@@ -1564,9 +1564,9 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
             // Body
             Expanded(
               child: _loading
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                          color: AppColors.primaryGold))
+                          color: AppColors.accentOf(context)))
                   : _error != null
                       ? Center(
                           child: Column(
@@ -1584,7 +1584,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                 child: Text(
                                   'Tentar novamente',
                                   style: TextStyle(
-                                    color: AppColors.primaryGold,
+                                    color: AppColors.accentOf(context),
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
                                   ),
@@ -1610,7 +1610,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                             )
                           : RefreshIndicator(
                               onRefresh: _loadNotifications,
-                              color: AppColors.primaryGold,
+                              color: AppColors.accentOf(context),
                               child: ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                                 itemCount: _notifications.length,
@@ -1626,9 +1626,9 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                         color: n.read
                                             ? cardBg
                                             : isDark
-                                                ? AppColors.primaryGold
+                                                ? AppColors.accentOf(context)
                                                     .withValues(alpha: 0.08)
-                                                : AppColors.primaryGold
+                                                : AppColors.accentOf(context)
                                                     .withValues(alpha: 0.05),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
@@ -1638,7 +1638,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                                       .withValues(alpha: 0.06)
                                                   : Colors.black
                                                       .withValues(alpha: 0.05))
-                                              : AppColors.primaryGold
+                                              : AppColors.accentOf(context)
                                                   .withValues(alpha: 0.3),
                                         ),
                                       ),
@@ -1657,7 +1657,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                                   : Colors.black
                                                       .withValues(alpha: 0.04),
                                               border: Border.all(
-                                                color: AppColors.primaryGold
+                                                color: AppColors.accentOf(context)
                                                     .withValues(alpha: 0.4),
                                                 width: 1.0,
                                               ),
@@ -1665,7 +1665,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                             child: Icon(
                                               _iconForType(n.type),
                                               size: 18,
-                                              color: AppColors.primaryGold,
+                                              color: AppColors.accentOf(context),
                                             ),
                                           ),
                                           const SizedBox(width: 12),

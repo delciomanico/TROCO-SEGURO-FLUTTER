@@ -7,6 +7,8 @@ import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/models/trip.dart';
 import 'package:troco_seguro/models/faq_item.dart';
+import 'package:troco_seguro/models/complaint.dart';
+import 'package:troco_seguro/models/rating.dart';
 import 'dart:convert';
 
 /// Serviço para comunicação com a API do Troco Seguro
@@ -616,6 +618,22 @@ class ApiService {
     }
   }
 
+  /// Retorna o QR payload oficial do servidor para um cartão virtual.
+  /// O valor retornado é o JSON string que deve ser codificado no QR code.
+  Future<ApiResponse<String>> getVirtualCardQr(String cardId) async {
+    try {
+      final response = await _dio.get('/virtual-cards/$cardId/qr');
+      // O servidor pode retornar { qrData: "..." } ou a string directamente
+      final data = response.data;
+      final qrString = data is String
+          ? data
+          : (data['qrData'] ?? data['qr'] ?? data['token'] ?? data.toString());
+      return ApiResponse.success(qrString as String);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Excluir cartão
   Future<ApiResponse<DeleteCardResult>> deleteVirtualCard(String cardId) async {
     try {
@@ -746,6 +764,30 @@ class ApiService {
   }
 
   // ============ AVALIAÇÕES ============
+
+  /// Obter histórico de avaliações feitas por um utilizador
+  Future<ApiResponse<List<Rating>>> getRatings(String userId) async {
+    try {
+      final response = await _dio.get('/ratings/$userId');
+      final raw = response.data;
+      List<dynamic> list;
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map) {
+        final v = raw['ratings'] ?? raw['data'] ?? raw['items'] ?? [];
+        list = v is List ? v : [];
+      } else {
+        list = [];
+      }
+      final ratings = list
+          .whereType<Map<String, dynamic>>()
+          .map((e) => Rating.fromJson(e))
+          .toList();
+      return ApiResponse.success(ratings);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
 
   /// Criar avaliação
   Future<ApiResponse<void>> createRating({
@@ -964,6 +1006,28 @@ class ApiService {
       if (tripId != null) data['tripId'] = tripId;
       await _dio.post('/complaints', data: data);
       return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<List<Complaint>>> getComplaints() async {
+    try {
+      final response = await _dio.get('/complaints');
+      final list = (response.data as List)
+          .map((e) => Complaint.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(list);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<Complaint>> getComplaint(String id) async {
+    try {
+      final response = await _dio.get('/complaints/$id');
+      return ApiResponse.success(
+          Complaint.fromJson(response.data as Map<String, dynamic>));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }

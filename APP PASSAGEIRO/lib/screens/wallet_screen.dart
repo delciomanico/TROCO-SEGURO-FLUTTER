@@ -144,9 +144,9 @@ class _WalletScreenState extends State<WalletScreen> {
             _buildWalletHeader(isDark, responsive),
             Expanded(
               child: provider.isLoadingTransactions
-                  ? const Center(
+                  ? Center(
                       child: CircularProgressIndicator(
-                          color: AppColors.primaryGold))
+                          color: AppColors.accentOf(context)))
                   : RefreshIndicator(
                       onRefresh: () async {
                         await Future.wait([
@@ -154,7 +154,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           provider.refreshTransactions(),
                         ]);
                       },
-                      color: AppColors.primaryGold,
+                      color: AppColors.accentOf(context),
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: [
@@ -244,7 +244,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         prefixIcon: Icon(
                           Icons.search_rounded,
-                          color: AppColors.primaryGold,
+                          color: AppColors.accentOf(context),
                           size: responsive.scaledWidth(20),
                         ),
                         filled: true,
@@ -265,7 +265,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: AppColors.primaryGold.withValues(alpha: 0.7),
+                            color: AppColors.accentOf(context).withValues(alpha: 0.7),
                             width: 1.2,
                           ),
                         ),
@@ -425,19 +425,15 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildQuickActions(bool isDark, ResponsiveHelper responsive) {
-    final actions = [
+    final mainActions = [
       (icon: Icons.add_circle_outline_rounded, label: 'Recarregar',
           onTap: () => widget.onOpenTopup?.call()),
       (icon: Icons.send_rounded, label: 'Transferir',
           onTap: _showTransferModal),
       (icon: Icons.credit_card_rounded, label: 'P/ Cartão',
           onTap: _showDepositToCardModal),
-      (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
-          onTap: _showExternalCardModal),
-      (icon: Icons.account_balance_rounded, label: 'Levantar',
-          onTap: _showWithdrawalModal),
-      (icon: Icons.qr_code_scanner_rounded, label: 'Saldo QR',
-          onTap: _showQrBalanceModal),
+      (icon: Icons.grid_view_rounded, label: 'Mais',
+          onTap: () => _showMoreWalletActionsModal(isDark, responsive)),
     ];
 
     return Padding(
@@ -445,7 +441,7 @@ class _WalletScreenState extends State<WalletScreen> {
           EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: actions
+        children: mainActions
             .map((a) => Expanded(
                   child: _buildCircularActionButton(
                     responsive,
@@ -457,6 +453,116 @@ class _WalletScreenState extends State<WalletScreen> {
                 ))
             .toList(),
       ),
+    );
+  }
+
+  void _showMoreWalletActionsModal(bool isDark, ResponsiveHelper responsive) {
+    final moreActions = [
+      (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
+          onTap: _showExternalCardModal),
+      (icon: Icons.account_balance_rounded, label: 'Levantar',
+          onTap: _showWithdrawalModal),
+      (icon: Icons.qr_code_scanner_rounded, label: 'Saldo QR',
+          onTap: _showQrBalanceModal),
+    ];
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, animation, _) {
+        final r = ResponsiveHelper(ctx);
+        final dark = Theme.of(ctx).brightness == Brightness.dark;
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: Scaffold(
+            backgroundColor: dark ? AppColors.darkBackground : Colors.white,
+            body: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      r.scaledWidth(20),
+                      r.scaledHeight(16),
+                      r.scaledWidth(20),
+                      0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Mais opções',
+                          style: TextStyle(
+                            fontSize: r.responsiveFontSize(18),
+                            fontWeight: FontWeight.w800,
+                            color: dark ? Colors.white : AppColors.textDark,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx),
+                          child: Container(
+                            width: r.scaledWidth(36),
+                            height: r.scaledWidth(36),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: dark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.05),
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: r.scaledWidth(18),
+                              color: dark ? Colors.white : AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: r.scaledHeight(20)),
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: r.scaledWidth(20)),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: moreActions.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: r.scaledHeight(12),
+                        crossAxisSpacing: r.scaledWidth(8),
+                        childAspectRatio: 0.85,
+                      ),
+                      itemBuilder: (_, index) {
+                        final item = moreActions[index];
+                        return _buildCircularActionButton(
+                          r,
+                          isDark: dark,
+                          icon: item.icon,
+                          label: item.label,
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            item.onTap();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(height: r.scaledHeight(32)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -475,13 +581,13 @@ class _WalletScreenState extends State<WalletScreen> {
           Container(
             width: responsive.scaledWidth(58),
             height: responsive.scaledWidth(58),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryGold,
+              color: AppColors.accentOf(context),
             ),
             child: Icon(
               icon,
-              color: Colors.black.withValues(alpha: 0.8),
+              color: isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white,
               size: responsive.scaledWidth(24),
             ),
           ),
@@ -534,14 +640,14 @@ class _WalletScreenState extends State<WalletScreen> {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.primaryGold
+              ? AppColors.accentOf(context)
               : (isDark
                   ? Colors.white.withValues(alpha: 0.07)
                   : Colors.black.withValues(alpha: 0.04)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? AppColors.primaryGold
+                ? AppColors.accentOf(context)
                 : (isDark
                     ? Colors.white.withValues(alpha: 0.1)
                     : Colors.black.withValues(alpha: 0.07)),
@@ -622,7 +728,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ? Colors.white.withValues(alpha: 0.07)
                   : Colors.black.withValues(alpha: 0.04),
               border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.3),
+                color: AppColors.accentOf(context).withValues(alpha: 0.3),
                 width: 1.0,
               ),
             ),
@@ -1273,10 +1379,10 @@ class _QrBalanceSheetState extends State<_QrBalanceSheet> {
                     const SizedBox(height: 20),
                     Text(
                       '${_result!.balance} Kz',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.primaryGold,
+                        color: AppColors.accentOf(context),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1560,7 +1666,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
                 fillColor: fillColor,
@@ -1579,7 +1685,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
                 fillColor: fillColor,
@@ -1612,8 +1718,8 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
               child: ElevatedButton(
                 onPressed: _busy ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppColors.accentOf(context),
+                  foregroundColor: isDark ? Colors.black : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,

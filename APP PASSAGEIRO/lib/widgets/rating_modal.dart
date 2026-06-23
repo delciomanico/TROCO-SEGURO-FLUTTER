@@ -137,7 +137,7 @@ class _RatingModalState extends State<RatingModal> {
               Icon(
                 Icons.star_rounded,
                 size: responsive.scaledWidth(64),
-                color: AppColors.primaryGold,
+                color: AppColors.accentOf(context),
               ),
               SizedBox(height: responsive.scaledHeight(16)),
               Text(
@@ -173,7 +173,7 @@ class _RatingModalState extends State<RatingModal> {
                       child: Icon(
                         index < _selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
                         size: responsive.scaledWidth(48),
-                        color: index < _selectedRating ? AppColors.primaryGold : Colors.grey,
+                        color: index < _selectedRating ? AppColors.accentOf(context) : Colors.grey,
                       ),
                     ),
                   );

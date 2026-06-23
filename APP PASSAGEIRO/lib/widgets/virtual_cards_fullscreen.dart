@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
+import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 
 class VirtualCardsFullscreen extends StatefulWidget {
@@ -256,9 +258,21 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     return '$mm/$yy';
   }
 
-  void _showCardDetails(VirtualCard card) {
+  Future<void> _showCardDetails(VirtualCard card) async {
+    // Busca o QR oficial do servidor — não usar geração local (inválida em produção)
+    final qrResult = await ApiService().getVirtualCardQr(card.id);
+    if (!mounted) return;
+
+    if (!qrResult.isSuccess) {
+      FeedbackService.showError(
+        context,
+        message: qrResult.error ?? 'Não foi possível gerar o QR code. Tente novamente.',
+      );
+      return;
+    }
+
+    final qrData = qrResult.data!;
     final service = VirtualCardService();
-    final payload = service.getQRPayload(card);
     final remainingLimit =
         card.dailyLimit > 0 ? service.getRemainingDailyLimit(card) : null;
     final previewKey = GlobalKey();
@@ -470,7 +484,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                             ),
                                           ),
                                           child: QrImageView(
-                                            data: payload.toString(),
+                                            data: qrData,
                                             size: qrSize,
                                             backgroundColor: Colors.white,
                                           ),

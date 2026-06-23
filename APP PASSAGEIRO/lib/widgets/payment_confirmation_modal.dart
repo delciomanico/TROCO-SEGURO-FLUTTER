@@ -203,19 +203,19 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.12),
+                          color: AppColors.accentOf(context).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4)),
+                          border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4)),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.airline_seat_recline_normal_rounded,
-                              size: 14, color: AppColors.primaryGold),
+                          Icon(Icons.airline_seat_recline_normal_rounded,
+                              size: 14, color: AppColors.accentOf(context)),
                           const SizedBox(width: 5),
                           Text(widget.driverInfo.seatLabel!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryGold)),
+                                  color: AppColors.accentOf(context))),
                         ]),
                       ),
                     ],
@@ -241,7 +241,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                         style: TextStyle(
                             fontSize: responsive.responsiveFontSize(28),
                             fontWeight: FontWeight.w900,
-                            color: AppColors.accent)),
+                            color: AppColors.accentOf(context))),
                   ],
                 ),
 
@@ -299,7 +299,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                                   style: TextStyle(
                                       fontSize: boxSize * 0.5,
                                       fontWeight: FontWeight.bold,
-                                      color: AppColors.accent))
+                                      color: AppColors.accentOf(context)))
                               : null,
                         );
                       }),
