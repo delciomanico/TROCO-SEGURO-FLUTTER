@@ -853,6 +853,23 @@ class ApiService {
     }
   }
 
+  /// Avaliar uma viagem (POST /trips/{id}/rate)
+  Future<ApiResponse<void>> rateTrip({
+    required String tripId,
+    required int stars,
+    String? comment,
+  }) async {
+    try {
+      await _dio.post('trips/$tripId/rate', data: {
+        'stars': stars,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      });
+      return ApiResponse.success(null);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ ESTATÍSTICAS DE VIAGENS ============
 
   Future<ApiResponse<Map<String, dynamic>>> getTripStats() async {
@@ -873,6 +890,76 @@ class ApiService {
       final avg = data['average'] ?? data['averageRating'] ?? data['rating'];
       return ApiResponse.success(
           double.tryParse(avg?.toString() ?? '0') ?? 0.0);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Ver histórico de avaliações de um utilizador
+  Future<ApiResponse<List<Map<String, dynamic>>>> getRatings(
+      String userId) async {
+    try {
+      final response = await _dio.get('ratings/$userId');
+      final data = _payload(response.data);
+      final list = data['ratings'] as List? ?? data['items'] as List? ?? [];
+      return ApiResponse.success(
+          list.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList());
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ PERFIL DE MOTORISTA/PASSAGEIRO ============
+
+  /// Ver perfil público de um utilizador (GET /users/drivers/{id})
+  Future<ApiResponse<Map<String, dynamic>>> getDriverProfile(
+      String userId) async {
+    try {
+      final response = await _dio.get('users/drivers/$userId');
+      return ApiResponse.success(_payload(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ CARTEIRA — VERIFICAR DESTINATÁRIO ============
+
+  /// Verificar destinatário de transferência por telefone
+  Future<ApiResponse<Map<String, dynamic>>> verifyTransferRecipient(
+      String phone) async {
+    try {
+      final response = await _dio.get('wallet/transfer/verify/$phone');
+      return ApiResponse.success(_payload(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  // ============ DEPÓSITO (SIMULAÇÃO) ============
+
+  /// Iniciar referência de depósito pendente
+  Future<ApiResponse<Map<String, dynamic>>> initiateDeposit({
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.post('payments/deposit/initiate', data: {
+        'amount': amount,
+      });
+      return ApiResponse.success(_payload(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Simular webhook de confirmação de pagamento (ambiente de testes)
+  Future<ApiResponse<void>> simulateDepositWebhook({
+    required String reference,
+  }) async {
+    try {
+      await _dio.post('payments/webhook/simulate', data: {
+        'reference': reference,
+      });
+      return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }

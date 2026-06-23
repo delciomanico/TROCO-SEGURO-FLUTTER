@@ -5,21 +5,25 @@ import 'package:troco_seguro_motorista/models/trip.dart';
 import 'package:troco_seguro_motorista/models/faq_item.dart';
 
 class AppColors {
-  // Core brand palette aligned with passageiro app
+  // Core brand palette — dark theme accent (gold)
   static const Color primaryGold = Color(0xFFD4AF37);
   static const Color secondaryGold = Color(0xFFC5A028);
+
+  // Light theme accent — laranja do logo (idêntico ao passageiro)
+  static const Color primaryOrange = Color(0xFFFF6600);
+  static const Color secondaryOrange = Color(0xFFE55A00);
+
+  // Backwards-compat aliases
   static const Color primaryBlue = primaryGold;
   static const Color secondaryBlue = secondaryGold;
-  static const Color primaryOrange = primaryGold;
-  static const Color secondaryOrange = secondaryGold;
 
-  // Light mode (white + blue)
+  // Light mode
   static const Color lightBackground = Color(0xFFFFFFFF);
   static const Color lightSurface = Color(0xFFF2F2F2);
   static const Color lightCard = Color(0xFFF2F2F2);
   static const Color lightBorder = Color(0xFFE6E6E6);
 
-  // Dark mode (classic neutral + gold)
+  // Dark mode
   static const Color darkBackground = Color(0xFF121212);
   static const Color darkSurface = Color(0xFF121212);
   static const Color darkCard = Color(0xFF1E1E1E);
@@ -32,7 +36,7 @@ class AppColors {
 
   static const Color cardBorder = Color(0xFFE6E6E6);
 
-  // Backwards-compatible aliases used by existing motorista screens.
+  // Backwards-compatible aliases
   static const Color accent = primaryGold;
   static const Color accentLight = secondaryGold;
   static const Color primary = primaryGold;
@@ -48,18 +52,17 @@ class AppColors {
 
   // Status colors
   static const Color online = Color(0xFF3ECF8E);
-  static const Color offline = Color(0xFFE74C3C); // Vermelho - Offline
+  static const Color offline = Color(0xFFE74C3C);
   static const Color pending = Color(0xFFE4B445);
   static const Color success = Color(0xFF3ECF8E);
   static const Color warning = Color(0xFFF39C12);
   static const Color error = Color(0xFFE74C3C);
 
-  // Alias for widgets compatibility
   static const Color statusOnline = online;
   static const Color statusOffline = offline;
   static const Color statusPending = pending;
 
-  // Gradients adapted to blue/gold identity.
+  // Gradients — dark theme usa gold, ambos usados de forma estática
   static const List<Color> gradientColors = [primaryGold, secondaryGold];
 
   static const LinearGradient primaryGradient = LinearGradient(
@@ -68,7 +71,6 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 
-  // Gradiente laranja para cards de ganhos
   static const LinearGradient earningsGradient = LinearGradient(
     colors: [primaryGold, secondaryGold],
     begin: Alignment.topLeft,
@@ -81,15 +83,41 @@ class AppColors {
     end: Alignment.bottomCenter,
   );
 
-  // Dark blue gradient for app bars and dock surfaces.
   static const LinearGradient darkBlueGradient = LinearGradient(
     colors: [primaryGold, darkCard],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
+  // ── Helpers de acento adaptativos (laranja no claro, dourado no escuro) ──────
+
+  /// Acento principal: laranja no tema claro, dourado no tema escuro.
+  static Color accentOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? primaryGold : primaryOrange;
+  }
+
+  /// Acento secundário: versão mais escura do acento principal.
+  static Color secondaryAccentOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark ? secondaryGold : secondaryOrange;
+  }
+
+  /// Gradiente adaptativo ao tema atual.
+  static LinearGradient accentGradientOf(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark
+        ? primaryGradient
+        : const LinearGradient(
+            colors: [primaryOrange, secondaryOrange],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          );
+  }
+
+  /// Compatibilidade com código existente (sempre retorna gold — preferir accentOf).
   static Color adaptiveAccent(BuildContext context) {
-    return primaryGold;
+    return accentOf(context);
   }
 }
 

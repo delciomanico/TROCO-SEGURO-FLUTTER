@@ -1169,6 +1169,10 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isLoading = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = AppColors.accentOf(context);
+    final iconColor = isDark
+        ? Colors.black.withValues(alpha: 0.8)
+        : Colors.white;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1177,21 +1181,21 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             width: responsive.scaledWidth(58),
             height: responsive.scaledWidth(58),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryGold,
+              color: accentColor,
             ),
             child: isLoading
                 ? Padding(
                     padding: EdgeInsets.all(responsive.scaledWidth(14)),
-                    child: const CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Colors.black,
+                      color: iconColor,
                     ),
                   )
                 : Icon(
                     icon,
-                    color: Colors.black.withValues(alpha: 0.8),
+                    color: iconColor,
                     size: responsive.scaledWidth(24),
                   ),
           ),
@@ -1276,7 +1280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(12),
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primaryGold,
+                  color: AppColors.accentOf(context),
                 ),
               ),
             ],

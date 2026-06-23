@@ -73,11 +73,18 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         elevation: 0,
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryGold,
-        onPressed: _showAddVehicleModal,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Adicionar', style: TextStyle(color: Colors.white)),
+      floatingActionButton: Builder(
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final accentColor = AppColors.accentOf(ctx);
+          final iconColor = isDark ? Colors.black : Colors.white;
+          return FloatingActionButton.extended(
+            backgroundColor: accentColor,
+            onPressed: _showAddVehicleModal,
+            icon: Icon(Icons.add, color: iconColor),
+            label: Text('Adicionar', style: TextStyle(color: iconColor)),
+          );
+        },
       ),
     );
   }
@@ -303,8 +310,10 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.accentOf(context),
+                  foregroundColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),

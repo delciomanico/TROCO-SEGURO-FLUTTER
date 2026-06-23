@@ -940,9 +940,14 @@ class _MainNavigationState extends State<_MainNavigation> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: theme.colorScheme.surface,
-        selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+        selectedItemColor:
+            isDark ? AppColors.primaryGold : AppColors.primaryOrange,
+        unselectedItemColor: isDark
+            ? Colors.white.withValues(alpha: 0.55)
+            : AppColors.textDark.withValues(alpha: 0.60),
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
         selectedLabelStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
@@ -1480,8 +1485,8 @@ class _ProfileModal extends StatelessWidget {
                     Navigator.pop(ctx);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    foregroundColor: Colors.black,
+                    backgroundColor: AppColors.accentOf(ctx),
+                    foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -1847,19 +1852,20 @@ class _SecurityModalState extends State<_SecurityModal> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppColors.accentOf(context),
+                      foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: busy
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.black))
+                                strokeWidth: 2,
+                                color: isDark ? Colors.black : Colors.white))
                         : const Text(
                             'Alterar PIN',
                             style: TextStyle(
@@ -2295,8 +2301,8 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    foregroundColor: Colors.black,
+                    backgroundColor: AppColors.accentOf(context),
+                    foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -2500,8 +2506,10 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                             label: Text(
                                 'Adicionar contacto (${_contacts.length}/3)'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryGold,
-                              foregroundColor: Colors.black,
+                              backgroundColor: AppColors.accentOf(context),
+                              foregroundColor: isDark
+                                  ? Colors.black
+                                  : Colors.white,
                               padding:
                                   const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
