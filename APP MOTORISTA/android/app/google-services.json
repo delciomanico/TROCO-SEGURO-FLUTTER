@@ -7,25 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:304435206702:android:dde1bc9cd6dd550c8f9dbf",
-        "android_client_info": {
-          "package_name": "ao.co.trocoseguro.app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAEZI4qwwCq-2qt4wqVO1z7I2aRZPdoIRw"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:304435206702:android:09b407fe80ddcd0d8f9dbf",
         "android_client_info": {
           "package_name": "ao.co.trocoseguro.motorista"
