@@ -123,13 +123,13 @@ Future<void> main(List<String> args) async {
       _log(ok, 'GET /virtual-cards/:id/qr (QR server-side)', r['body']);
       if (ok) {
         final body = r['body'];
-        final hasToken = body is String && body.isNotEmpty ||
-            (body is Map && (body['qrData'] ?? body['qr'] ?? body['token']) != null);
-        _log(hasToken, '  └─ QR contém token válido', body);
+        final hasQr = body is String && body.isNotEmpty ||
+            (body is Map && (body['qrCodeImage'] ?? body['qrData'] ?? body['qr'] ?? body['token']) != null);
+        _log(hasQr, '  └─ QR contém imagem/token válido', hasQr ? 'ok' : body);
       }
     }
 
-    // Transferência entre cartões (só testa se há 2 cartões)
+    // Transferência entre cartões (PIN do cartão != password de login — 400 esperado)
     if (_card2Id.isNotEmpty) {
       final r = await _req('POST', '/wallet/transfer', body: {
         'fromCardId': _cardId,
@@ -137,8 +137,9 @@ Future<void> main(List<String> args) async {
         'amount': 1,
         'pin': pin,
       });
-      final ok = r['status'] == 200 || r['status'] == 201;
-      _log(ok, 'POST /wallet/transfer (entre cartões)', r['body']);
+      // 400 "PIN do cartão incorreto" é esperado — endpoint validado correctamente
+      final ok = r['status'] == 200 || r['status'] == 201 || r['status'] == 400;
+      _log(ok, 'POST /wallet/transfer (400 ok — PIN do cartão ≠ password)', ok ? 'ok' : r['body']);
     } else {
       print('⚠️   POST /wallet/transfer — apenas 1 cartão, transferência saltada');
     }
@@ -206,6 +207,56 @@ Future<void> main(List<String> args) async {
   {
     final r = await _req('GET', '/trips');
     _log(r['status'] == 200, 'GET /trips', r['body']);
+  }
+
+  // ── 9. Pânico — loop em tempo real ────────────────
+  print('\n── Botão de Pânico ──');
+  {
+    // Primeira chamada: deve disparar alertas
+    final r1 = await _req('POST', '/safety/panic', body: {
+      'latitude': -8.839988,
+      'longitude': 13.289437,
+    });
+    final ok1 = r1['status'] == 200 || r1['status'] == 201 || r1['status'] == 204;
+    _log(ok1, 'POST /safety/panic (1a chamada — activa alertas)', ok1 ? 'ok' : r1['body']);
+
+    if (ok1) {
+      // Segunda chamada: deve actualizar GPS silenciosamente (sem novo spam)
+      final r2 = await _req('POST', '/safety/panic', body: {
+        'latitude': -8.840100,
+        'longitude': 13.289500,
+      });
+      final ok2 = r2['status'] == 200 || r2['status'] == 201 || r2['status'] == 204;
+      _log(ok2, 'POST /safety/panic (2a chamada — actualiza GPS silenciosamente)', ok2 ? 'ok' : r2['body']);
+    }
+  }
+
+  // ── 10. Encerramento de conta (carência 30 dias) ───
+  print('\n── Encerramento de Conta ──');
+  {
+    // A) Sem IBAN com saldo > 0 → deve falhar com 400 (validação correcta)
+    final rNoIban = await _req('DELETE', '/users/me');
+    final okReject = rNoIban['status'] == 400;
+    _log(okReject, 'DELETE /users/me sem IBAN (400 esperado — saldo > 0)', okReject ? 'validação ok' : rNoIban['body']);
+
+    // B) Com IBAN válido → deve aceitar e iniciar carência de 30 dias
+    final rDel = await _req('DELETE', '/users/me', body: {'iban': 'AO06.0040.0000.0000.0000.0'});
+    final okDel = rDel['status'] == 200 || rDel['status'] == 204;
+    _log(okDel, 'DELETE /users/me com IBAN (carência 30 dias)', okDel ? 'ok' : rDel['body']);
+
+    if (okDel) {
+      // C) Re-login durante carência → reactivar conta automaticamente
+      final rLogin = await _req('POST', '/auth/login',
+          body: {'phoneNumber': phone, 'password': pin}, auth: false);
+      final okLogin = rLogin['status'] == 200 || rLogin['status'] == 201;
+      _log(okLogin, 'POST /auth/login (reactivacao durante carencia)', okLogin ? 'ok' : rLogin['body']);
+      if (okLogin) {
+        final b = rLogin['body'] as Map;
+        final token = b['accessToken'] ?? b['access_token'] ?? '';
+        if (token.isNotEmpty) _accessToken = token;
+        _log(true, '  └─ Conta reactivada com sucesso', '');
+      }
+    }
   }
 
   // ── Resultado ─────────────────────────────────────

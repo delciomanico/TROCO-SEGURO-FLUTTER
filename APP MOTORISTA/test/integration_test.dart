@@ -362,6 +362,55 @@ Future<void> main(List<String> args) async {
     );
   }
 
+  // ── 14. Pânico — loop em tempo real ──────────────
+  print('\n── Botão de Pânico ──');
+  {
+    final r1 = await _req('POST', '/safety/panic', body: {
+      'latitude': -8.839988,
+      'longitude': 13.289437,
+    });
+    final ok1 = r1['status'] == 200 || r1['status'] == 201 || r1['status'] == 204;
+    _log(ok1, 'POST /safety/panic (1a chamada — activa alertas)', ok1 ? 'ok' : r1['body']);
+
+    if (ok1) {
+      final r2 = await _req('POST', '/safety/panic', body: {
+        'latitude': -8.840100,
+        'longitude': 13.289500,
+      });
+      final ok2 = r2['status'] == 200 || r2['status'] == 201 || r2['status'] == 204;
+      _log(ok2, 'POST /safety/panic (2a chamada — actualiza GPS silenciosamente)', ok2 ? 'ok' : r2['body']);
+    }
+  }
+
+  // ── 15. Encerramento de conta (carência 30 dias) ──
+  print('\n── Encerramento de Conta ──');
+  {
+    // A) Sem IBAN com saldo > 0 → 400 (validação correcta)
+    final rNoIban = await _req('DELETE', '/users/me');
+    final okReject = rNoIban['status'] == 400;
+    _log(okReject, 'DELETE /users/me sem IBAN (400 esperado — saldo > 0)', okReject ? 'validacao ok' : rNoIban['body']);
+
+    // B) Com IBAN → inicia carência de 30 dias
+    final rDel = await _req('DELETE', '/users/me', body: {'iban': 'AO06.0040.0000.0000.0000.0'});
+    final okDel = rDel['status'] == 200 || rDel['status'] == 204;
+    _log(okDel, 'DELETE /users/me com IBAN (carencia 30 dias)', okDel ? 'ok' : rDel['body']);
+
+    if (okDel) {
+      // C) Re-login durante carência → reactivar conta
+      final rLogin = await _req('POST', '/auth/login',
+          body: {'phoneNumber': phone, 'password': pin}, auth: false);
+      final okLogin = rLogin['status'] == 200 || rLogin['status'] == 201;
+      _log(okLogin, 'POST /auth/login (reactivacao durante carencia)', okLogin ? 'ok' : rLogin['body']);
+      if (okLogin) {
+        final b = rLogin['body'] as Map;
+        final data = b['data'] ?? b;
+        final token = (data as Map?)?['accessToken'] ?? (data)?['access_token'] ?? '';
+        if (token.isNotEmpty) _accessToken = token.toString();
+        _log(true, '  └─ Conta reactivada com sucesso', '');
+      }
+    }
+  }
+
   // ── Logout ────────────────────────────────────────
   print('\n── Cleanup ──');
   {
