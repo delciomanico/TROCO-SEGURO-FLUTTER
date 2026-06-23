@@ -47,6 +47,12 @@ Future<void> main() async {
     return true;
   };
   await NotificationService().initialize();
+  // Manter token FCM actualizado no backend quando o Firebase o renovar
+  NotificationService().subscribeTokenRefresh((newToken) async {
+    final api = ApiService();
+    await api.loadTokens();
+    if (api.isAuthenticated) await api.updateFcmToken(newToken);
+  });
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
   await ThemeController.instance.load();
@@ -251,13 +257,19 @@ class _AppControllerState extends State<AppController>
       await prefs.setString('ts_driver', json.encode(driver!.toJson()));
     }
 
-    // Buscar transaÃ§Ãµes
+    // Buscar transações
     final txResult = await _api.getTransactionHistory();
     if (txResult.isSuccess && txResult.data != null) {
       setState(() => transactions = txResult.data!);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ts_driver_transactions',
           json.encode(transactions.map((t) => t.toJson()).toList()));
+    }
+
+    // Registar/actualizar token FCM (cobre sessões restauradas do cache)
+    final fcmToken = await NotificationService().getToken();
+    if (fcmToken != null) {
+      await _api.updateFcmToken(fcmToken);
     }
   }
 

@@ -234,7 +234,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
         MobileScanner(
           controller: scannerController,
           onDetect: _handleBarcodeDetect,
-          errorBuilder: (context, error, child) {
+          errorBuilder: (context, error) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
