@@ -768,6 +768,46 @@ class ApiService {
     }
   }
 
+  // ============ CARTÃO VIRTUAL ============
+
+  Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(String qrData) async {
+    try {
+      final response = await _dio.post('virtual-cards/resolve-qr', data: {'qrData': qrData});
+      return ApiResponse.success(VirtualCardQrResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  Future<ApiResponse<PaymentResult>> processPayment({
+    required String driverId,
+    required String cardId,
+    required int amount,
+    required String pin,
+    required String paymentToken,
+    String origin = '',
+    String destination = '',
+    double distanceKm = 0.0,
+    int durationMinutes = 0,
+  }) async {
+    try {
+      final response = await _dio.post('payments/process', data: {
+        'driverId': driverId,
+        'cardId': cardId,
+        'amount': amount,
+        'pin': pin,
+        'paymentToken': paymentToken,
+        'origin': origin,
+        'destination': destination,
+        'distanceKm': distanceKm,
+        'durationMinutes': durationMinutes,
+      });
+      return ApiResponse.success(PaymentResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ CONTA ============
 
   Future<ApiResponse<void>> deleteAccount({String? iban}) async {
@@ -1144,6 +1184,49 @@ class ApiService {
       default:
         return 'Erro de comunicação com o servidor.';
     }
+  }
+}
+
+class VirtualCardQrResult {
+  final String? cardId;
+  final String? cardNumber;
+  final String? ownerName;
+
+  VirtualCardQrResult({this.cardId, this.cardNumber, this.ownerName});
+
+  factory VirtualCardQrResult.fromJson(Map<String, dynamic> json) {
+    final card = json['card'] as Map<String, dynamic>?;
+    return VirtualCardQrResult(
+      cardId: card?['id']?.toString() ?? json['id']?.toString() ?? json['cardId']?.toString(),
+      cardNumber: card?['cardNumber']?.toString() ?? json['cardNumber']?.toString() ?? json['number']?.toString(),
+      ownerName: card?['ownerName']?.toString() ?? json['ownerName']?.toString() ?? json['name']?.toString(),
+    );
+  }
+}
+
+class PaymentResult {
+  final String transactionId;
+  final int amount;
+  final int newBalance;
+  final String status;
+  final String message;
+
+  PaymentResult({
+    required this.transactionId,
+    required this.amount,
+    required this.newBalance,
+    required this.status,
+    required this.message,
+  });
+
+  factory PaymentResult.fromJson(Map<String, dynamic> json) {
+    return PaymentResult(
+      transactionId: json['transactionId']?.toString() ?? json['id']?.toString() ?? '',
+      amount: int.tryParse(json['amount'].toString()) ?? 0,
+      newBalance: int.tryParse((json['newBalance'] ?? json['balance'] ?? 0).toString()) ?? 0,
+      status: json['status']?.toString() ?? 'completed',
+      message: json['message']?.toString() ?? 'Pagamento recebido com sucesso',
+    );
   }
 }
 

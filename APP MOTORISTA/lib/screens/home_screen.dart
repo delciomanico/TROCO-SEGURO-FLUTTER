@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro_motorista/models/driver_user.dart';
 import 'package:troco_seguro_motorista/models/qr_config.dart';
 import 'package:troco_seguro_motorista/models/transaction.dart';
@@ -237,30 +238,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _processScannedQR(String scannedData) {
-    final parts = scannedData.split(':');
+  Future<void> _processScannedQR(String scannedData) async {
+    await _api.loadTokens();
+    final result = await _api.resolveVirtualCardQr(scannedData);
+    if (!mounted) return;
 
-    String passengerName = 'Passageiro';
-    int amount = 0;
-    String passengerId = '';
-
-    if (scannedData.startsWith('troco_seguro:')) {
-      if (parts.length >= 3) passengerId = parts[2];
-      if (parts.length >= 4) amount = int.tryParse(parts[3]) ?? 0;
-      if (parts.length >= 5) passengerName = parts[4];
+    if (!result.isSuccess || result.data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result.error ?? 'QR inválido ou não reconhecido'),
+        backgroundColor: Colors.red,
+      ));
+      return;
     }
 
+    final card = result.data!;
     _showPaymentConfirmation(
-      passengerName: passengerName,
-      passengerId: passengerId,
-      amount: amount,
+      passengerName: card.ownerName ?? 'Passageiro',
+      cardId: card.cardId ?? '',
+      amount: 0,
       rawData: scannedData,
     );
   }
 
   void _showPaymentConfirmation({
     required String passengerName,
-    required String passengerId,
+    required String cardId,
     required int amount,
     required String rawData,
   }) {
@@ -428,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             return;
                           }
                           Navigator.pop(ctx);
-                          _confirmPayment(passengerId, passengerName, tripAmount);
+                          _confirmPayment(cardId, passengerName, tripAmount);
                         },
                         child: Container(
                           padding: EdgeInsets.symmetric(
@@ -461,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _confirmPayment(String passengerId, String passengerName, int amount) {
+  void _confirmPayment(String cardId, String passengerName, int amount) {
     final responsive = ResponsiveHelper(context);
 
     showModalBottomSheet(
@@ -470,115 +472,18 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final cardColor = isDark ? AppColors.darkCard : Colors.white;
-        final primaryText = isDark ? Colors.white : AppColors.textDark;
-        final subtleText = isDark
-            ? Colors.white.withValues(alpha: 0.45)
-            : Colors.black.withValues(alpha: 0.4);
-
-        return Container(
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              responsive.scaledWidth(24),
-              responsive.scaledHeight(16),
-              responsive.scaledWidth(24),
-              responsive.scaledHeight(32),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.15)
-                        : Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(32)),
-                Container(
-                  width: responsive.scaledWidth(96),
-                  height: responsive.scaledWidth(96),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: isDark ? 0.15 : 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    size: responsive.scaledWidth(60),
-                    color: Colors.green,
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(20)),
-                Text(
-                  'PAGAMENTO RECEBIDO!',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(16),
-                    fontWeight: FontWeight.w900,
-                    color: Colors.green,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(12)),
-                Text(
-                  _formatCurrency(amount),
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(40),
-                    fontWeight: FontWeight.w900,
-                    color: primaryText,
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(4)),
-                Text(
-                  'de $passengerName',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(14),
-                    color: subtleText,
-                  ),
-                ),
-                SizedBox(height: responsive.scaledHeight(32)),
-                SizedBox(
-                  width: double.infinity,
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _loadTodayStats();
-                      _loadBalance();
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        vertical: responsive.scaledHeight(16),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'CONTINUAR',
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(14),
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (ctx) => _PosTerminalModal(
+        cardId: cardId,
+        passengerName: passengerName,
+        amount: amount,
+        driverId: widget.driver.id ?? '',
+        api: _api,
+        responsive: responsive,
+        onSuccess: (result) {
+          _loadTodayStats();
+          _loadBalance();
+        },
+      ),
     );
   }
 
@@ -1391,5 +1296,448 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+}
+
+// ─── POS Terminal Modal ────────────────────────────────────────────────────────
+
+enum _PosStep { pin, processing, success, error }
+
+class _PosTerminalModal extends StatefulWidget {
+  final String cardId;
+  final String passengerName;
+  final int amount;
+  final String driverId;
+  final ApiService api;
+  final ResponsiveHelper responsive;
+  final void Function(PaymentResult result) onSuccess;
+
+  const _PosTerminalModal({
+    required this.cardId,
+    required this.passengerName,
+    required this.amount,
+    required this.driverId,
+    required this.api,
+    required this.responsive,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_PosTerminalModal> createState() => _PosTerminalModalState();
+}
+
+class _PosTerminalModalState extends State<_PosTerminalModal> {
+  _PosStep _step = _PosStep.pin;
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+  String _enteredPin = '';
+  String? _pinError;
+  String? _errorMessage;
+
+  static const int _pinLength = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinController.addListener(() {
+      setState(() {
+        _enteredPin = _pinController.text;
+        _pinError = null;
+      });
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FocusScope.of(context).requestFocus(_pinFocusNode);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_enteredPin.length != _pinLength) {
+      setState(() => _pinError = 'PIN deve ter $_pinLength dígitos');
+      return;
+    }
+
+    setState(() => _step = _PosStep.processing);
+
+    await widget.api.loadTokens();
+
+    // Get driver's own paymentToken from static QR
+    final qrResult = await widget.api.getMyStaticQrCode();
+    if (!mounted) return;
+
+    if (!qrResult.isSuccess || qrResult.data == null) {
+      setState(() {
+        _step = _PosStep.error;
+        _errorMessage = qrResult.error ?? 'Erro ao obter token de pagamento';
+      });
+      return;
+    }
+
+    final driverId = widget.driverId;
+    final paymentToken = qrResult.data!.publicToken;
+
+    final result = await widget.api.processPayment(
+      driverId: driverId,
+      cardId: widget.cardId,
+      amount: widget.amount,
+      pin: _enteredPin,
+      paymentToken: paymentToken,
+    );
+    if (!mounted) return;
+
+    if (result.isSuccess && result.data != null) {
+      setState(() => _step = _PosStep.success);
+      widget.onSuccess(result.data!);
+    } else {
+      setState(() {
+        _step = _PosStep.error;
+        _errorMessage = result.error ?? 'Pagamento recusado';
+      });
+    }
+  }
+
+  void _retry() {
+    _pinController.clear();
+    setState(() {
+      _step = _PosStep.pin;
+      _errorMessage = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FocusScope.of(context).requestFocus(_pinFocusNode);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.responsive;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.darkCard : Colors.white;
+    final primaryText = isDark ? Colors.white : AppColors.textDark;
+    final subtleText = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : Colors.black.withValues(alpha: 0.4);
+
+    return Container(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          r.scaledWidth(24), r.scaledHeight(16),
+          r.scaledWidth(24), r.scaledHeight(32),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42, height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: r.scaledHeight(24)),
+            if (_step == _PosStep.pin) ..._buildPinStep(r, isDark, primaryText, subtleText),
+            if (_step == _PosStep.processing) ..._buildProcessingStep(r, primaryText, subtleText),
+            if (_step == _PosStep.success) ..._buildSuccessStep(r, primaryText, subtleText),
+            if (_step == _PosStep.error) ..._buildErrorStep(r, primaryText),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildPinStep(ResponsiveHelper r, bool isDark, Color primaryText, Color subtleText) {
+    const accent = AppColors.primaryGold;
+    return [
+      Icon(Icons.credit_card_rounded, size: r.scaledWidth(48), color: accent),
+      SizedBox(height: r.scaledHeight(12)),
+      Text(
+        'TERMINAL DE PAGAMENTO',
+        style: TextStyle(
+          fontSize: r.responsiveFontSize(12),
+          fontWeight: FontWeight.w800,
+          color: accent,
+          letterSpacing: 0.8,
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(4)),
+      Text(
+        widget.passengerName,
+        style: TextStyle(fontSize: r.responsiveFontSize(18), fontWeight: FontWeight.w700, color: primaryText),
+      ),
+      SizedBox(height: r.scaledHeight(4)),
+      Text(
+        _formatCurrencyStatic(widget.amount),
+        style: TextStyle(fontSize: r.responsiveFontSize(32), fontWeight: FontWeight.w900, color: primaryText),
+      ),
+      SizedBox(height: r.scaledHeight(24)),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          'Peça ao passageiro que digite o PIN do cartão (4 dígitos)',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: r.responsiveFontSize(13), color: primaryText),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(20)),
+      if (_pinError != null) ...[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(_pinError!, style: TextStyle(color: Colors.red.shade700, fontSize: r.responsiveFontSize(12))),
+        ),
+        SizedBox(height: r.scaledHeight(12)),
+      ],
+      LayoutBuilder(builder: (context, constraints) {
+        final m = r.scaledWidth(6);
+        final boxSize = ((constraints.maxWidth - m * _pinLength * 2) / _pinLength).clamp(44.0, 64.0);
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_pinLength, (i) => Container(
+            width: boxSize, height: boxSize,
+            margin: EdgeInsets.symmetric(horizontal: r.scaledWidth(6)),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.04),
+              border: Border.all(
+                color: _enteredPin.length > i ? accent : (isDark ? Colors.white30 : Colors.black26),
+                width: _enteredPin.length > i ? 2 : 1.5,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: _enteredPin.length > i
+                ? Text('•', style: TextStyle(fontSize: boxSize * 0.5, fontWeight: FontWeight.bold, color: accent))
+                : null,
+          )),
+        );
+      }),
+      SizedBox(height: r.scaledHeight(8)),
+      SizedBox(
+        height: 1,
+        child: TextField(
+          controller: _pinController,
+          focusNode: _pinFocusNode,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: _pinLength,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            counterText: '',
+          ),
+          style: const TextStyle(color: Colors.transparent, height: 0.1),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(20)),
+      Row(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text('CANCELAR', style: TextStyle(
+                  fontSize: r.responsiveFontSize(14),
+                  fontWeight: FontWeight.w700,
+                  color: primaryText,
+                )),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: r.scaledWidth(12)),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _submit,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text('CONFIRMAR', style: TextStyle(
+                  fontSize: r.responsiveFontSize(16),
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black.withValues(alpha: 0.85),
+                )),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    ];
+  }
+
+  List<Widget> _buildProcessingStep(ResponsiveHelper r, Color primaryText, Color subtleText) {
+    return [
+      SizedBox(height: r.scaledHeight(32)),
+      const CircularProgressIndicator(color: AppColors.primaryGold),
+      SizedBox(height: r.scaledHeight(24)),
+      Text('Processando pagamento…', style: TextStyle(
+        fontSize: r.responsiveFontSize(16),
+        fontWeight: FontWeight.w600,
+        color: primaryText,
+      )),
+      SizedBox(height: r.scaledHeight(8)),
+      Text('Aguarde um momento', style: TextStyle(fontSize: r.responsiveFontSize(13), color: subtleText)),
+      SizedBox(height: r.scaledHeight(48)),
+    ];
+  }
+
+  List<Widget> _buildSuccessStep(ResponsiveHelper r, Color primaryText, Color subtleText) {
+    return [
+      Container(
+        width: r.scaledWidth(88), height: r.scaledWidth(88),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.check_circle_rounded, size: r.scaledWidth(56), color: Colors.green),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      Text('PAGAMENTO RECEBIDO!', style: TextStyle(
+        fontSize: r.responsiveFontSize(16),
+        fontWeight: FontWeight.w900,
+        color: Colors.green,
+        letterSpacing: 0.5,
+      )),
+      SizedBox(height: r.scaledHeight(8)),
+      Text(_formatCurrencyStatic(widget.amount), style: TextStyle(
+        fontSize: r.responsiveFontSize(36),
+        fontWeight: FontWeight.w900,
+        color: primaryText,
+      )),
+      SizedBox(height: r.scaledHeight(4)),
+      Text('de ${widget.passengerName}', style: TextStyle(fontSize: r.responsiveFontSize(14), color: subtleText)),
+      SizedBox(height: r.scaledHeight(32)),
+      SizedBox(
+        width: double.infinity,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text('CONTINUAR', style: TextStyle(
+                fontSize: r.responsiveFontSize(14),
+                fontWeight: FontWeight.w700,
+                color: Colors.black.withValues(alpha: 0.85),
+              )),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildErrorStep(ResponsiveHelper r, Color primaryText) {
+    return [
+      Container(
+        width: r.scaledWidth(88), height: r.scaledWidth(88),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.cancel_rounded, size: r.scaledWidth(56), color: Colors.red),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      Text('PAGAMENTO RECUSADO', style: TextStyle(
+        fontSize: r.responsiveFontSize(15),
+        fontWeight: FontWeight.w900,
+        color: Colors.red,
+        letterSpacing: 0.5,
+      )),
+      SizedBox(height: r.scaledHeight(10)),
+      Text(
+        _errorMessage ?? 'Tente novamente',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: r.responsiveFontSize(13), color: primaryText),
+      ),
+      SizedBox(height: r.scaledHeight(28)),
+      Row(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text('FECHAR', style: TextStyle(
+                  fontSize: r.responsiveFontSize(14),
+                  fontWeight: FontWeight.w700,
+                  color: primaryText,
+                )),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: r.scaledWidth(12)),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _retry,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text('TENTAR NOVAMENTE', style: TextStyle(
+                  fontSize: r.responsiveFontSize(13),
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black.withValues(alpha: 0.85),
+                )),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    ];
+  }
+
+  String _formatCurrencyStatic(int amount) {
+    final formatted = amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formatted Kz';
   }
 }
