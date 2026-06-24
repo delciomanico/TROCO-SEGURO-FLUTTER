@@ -26,6 +26,13 @@ class NotificationService {
   );
 
   bool _initialized = false;
+  void Function(String token)? _onTokenRefresh;
+
+  /// Chama [callback] sempre que o Firebase renovar o token FCM.
+  /// Usar para manter o backend actualizado automaticamente.
+  void subscribeTokenRefresh(void Function(String token) callback) {
+    _onTokenRefresh = callback;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -38,6 +45,10 @@ class NotificationService {
       badge: true,
       sound: true,
     );
+
+    _fcm.onTokenRefresh.listen((newToken) {
+      _onTokenRefresh?.call(newToken);
+    });
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings();
@@ -70,7 +81,7 @@ class NotificationService {
     if (notification == null) return;
 
     _localNotifications.show(
-      notification.hashCode,
+      message.messageId.hashCode,
       notification.title,
       notification.body,
       NotificationDetails(

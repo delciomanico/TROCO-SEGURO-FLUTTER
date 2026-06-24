@@ -74,6 +74,11 @@ class AppProvider extends ChangeNotifier {
     await _api.loadTokens();
     await _loadFromCache();
 
+    // Manter token FCM actualizado no backend quando o Firebase o renovar
+    NotificationService().subscribeTokenRefresh((newToken) async {
+      if (_isAuthenticated) await _api.updateFcmToken(newToken);
+    });
+
     // Se temos dados no cache, carregar do servidor em background
     if (_user != null) {
       _isAuthenticated = _user!.isLoggedIn;
