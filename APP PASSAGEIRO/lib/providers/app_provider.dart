@@ -144,7 +144,7 @@ class AppProvider extends ChangeNotifier {
         await _api.updateFcmToken(token);
       }
     } catch (e) {
-      debugPrint('Erro ao registar FCM token: $e');
+      debugPrint('🔔 FCM TOKEN ERROR (PASSAGEIRO): $e');
     }
   }
 
