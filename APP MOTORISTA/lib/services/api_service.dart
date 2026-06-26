@@ -1,21 +1,22 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/models/transaction.dart';
-import 'package:troco_seguro_motorista/models/trip.dart';
-import 'package:troco_seguro_motorista/models/earnings.dart';
-import 'package:troco_seguro_motorista/models/faq_item.dart';
-import 'package:troco_seguro_motorista/models/vehicle.dart';
-import 'package:troco_seguro_motorista/models/route.dart';
-import 'package:troco_seguro_motorista/models/emergency_contact.dart';
-import 'package:troco_seguro_motorista/models/notification.dart';
+import 'package:troco_seguro_pro/services/secure_storage_service.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/models/transaction.dart';
+import 'package:troco_seguro_pro/models/trip.dart';
+import 'package:troco_seguro_pro/models/earnings.dart';
+import 'package:troco_seguro_pro/models/faq_item.dart';
+import 'package:troco_seguro_pro/models/vehicle.dart';
+import 'package:troco_seguro_pro/models/route.dart';
+import 'package:troco_seguro_pro/models/emergency_contact.dart';
+import 'package:troco_seguro_pro/models/notification.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
-  static const String baseUrl = 'https://troco-seguro.onrender.com/api/v1/';
+  static final  String baseUrl = dotenv.get('BASE_URL') ?? 'http://localhost:3000';
   static final ApiService _instance = ApiService._internal();
   static final ValueNotifier<int> _activeRequests = ValueNotifier<int>(0);
   static final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
@@ -1168,6 +1169,7 @@ class ApiService {
   }
 
   String _parseError(DioException e) {
+    debugPrint('❌ DioException type=${e.type} status=${e.response?.statusCode} msg=${e.message} cause=${e.error}');
     if (e.response?.data != null) {
       final data = e.response!.data;
       if (data is Map) {
@@ -1180,9 +1182,9 @@ class ApiService {
       case DioExceptionType.receiveTimeout:
         return 'Tempo limite excedido. Verifique sua conexão.';
       case DioExceptionType.connectionError:
-        return 'Sem conexão com a internet.';
+        return 'Sem conexão com o servidor. (${e.error ?? e.message})';
       default:
-        return 'Erro de comunicação com o servidor.';
+        return 'Erro de comunicação com o servidor. (${e.type})';
     }
   }
 }
