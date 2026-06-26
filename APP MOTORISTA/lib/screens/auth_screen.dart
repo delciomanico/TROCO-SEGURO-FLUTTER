@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
 
 enum AuthMode { choice, login, register, otp }
 
@@ -189,7 +189,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = const Color(0xFFD4AF37);
+    primaryGold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
     secondaryGold = const Color(0xFFC5A028);
     darkBg = const Color(0xFF121212);
     darkCard = const Color(0xFF1E1E1E);

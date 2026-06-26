@@ -2,6 +2,7 @@ class AppNotification {
   final String id;
   final String title;
   final String body;
+  final String type;
   final bool isRead;
   final DateTime? createdAt;
 
@@ -9,6 +10,7 @@ class AppNotification {
     required this.id,
     required this.title,
     required this.body,
+    this.type = '',
     required this.isRead,
     this.createdAt,
   });
@@ -19,6 +21,7 @@ class AppNotification {
       title: (json['title'] ?? json['subject'] ?? '').toString(),
       body: (json['body'] ?? json['message'] ?? json['content'] ?? '')
           .toString(),
+      type: (json['type'] ?? '').toString(),
       isRead: json['isRead'] == true || json['read'] == true,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())

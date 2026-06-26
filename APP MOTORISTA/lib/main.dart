@@ -2,41 +2,42 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:troco_seguro_motorista/utils/theme.dart';
-import 'package:troco_seguro_motorista/services/theme_controller.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/models/transaction.dart';
-import 'package:troco_seguro_motorista/models/vehicle.dart';
-import 'package:troco_seguro_motorista/models/emergency_contact.dart';
-import 'package:troco_seguro_motorista/models/notification.dart';
-import 'package:troco_seguro_motorista/screens/onboarding_screen.dart';
-import 'package:troco_seguro_motorista/screens/splash_screen.dart';
-import 'package:troco_seguro_motorista/screens/auth_screen.dart';
-import 'package:troco_seguro_motorista/screens/home_screen.dart';
-import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
-import 'package:troco_seguro_motorista/screens/trips_screen.dart';
-import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
-import 'package:troco_seguro_motorista/screens/vehicles_screen.dart';
-import 'package:troco_seguro_motorista/screens/about_screen.dart';
-import 'package:troco_seguro_motorista/screens/terms_and_conditions_screen.dart';
-import 'package:troco_seguro_motorista/widgets/withdrawal_modal.dart';
-import 'package:troco_seguro_motorista/widgets/success_modal.dart';
+import 'package:troco_seguro_pro/utils/theme.dart';
+import 'package:troco_seguro_pro/services/theme_controller.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/models/transaction.dart';
+import 'package:troco_seguro_pro/models/vehicle.dart';
+import 'package:troco_seguro_pro/models/emergency_contact.dart';
+import 'package:troco_seguro_pro/models/notification.dart';
+import 'package:troco_seguro_pro/screens/onboarding_screen.dart';
+import 'package:troco_seguro_pro/screens/splash_screen.dart';
+import 'package:troco_seguro_pro/screens/auth_screen.dart';
+import 'package:troco_seguro_pro/screens/home_screen.dart';
+import 'package:troco_seguro_pro/screens/earnings_screen.dart';
+import 'package:troco_seguro_pro/screens/trips_screen.dart';
+import 'package:troco_seguro_pro/screens/wallet_screen.dart';
+import 'package:troco_seguro_pro/screens/vehicles_screen.dart';
+import 'package:troco_seguro_pro/screens/about_screen.dart';
+import 'package:troco_seguro_pro/screens/terms_and_conditions_screen.dart';
+import 'package:troco_seguro_pro/widgets/withdrawal_modal.dart';
+import 'package:troco_seguro_pro/widgets/success_modal.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
-import 'package:troco_seguro_motorista/services/notification_service.dart';
-import 'package:troco_seguro_motorista/security/pin_guard.dart';
+import 'package:troco_seguro_pro/services/secure_storage_service.dart';
+import 'package:troco_seguro_pro/services/notification_service.dart';
+import 'package:troco_seguro_pro/security/pin_guard.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:troco_seguro_motorista/firebase_options.dart';
+import 'package:troco_seguro_pro/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +65,8 @@ Future<void> main() async {
     statusBarIconBrightness: initialDark ? Brightness.light : Brightness.dark,
     statusBarBrightness: initialDark ? Brightness.dark : Brightness.light,
   ));
+  
+  await dotenv.load();
   runApp(const TrocoSeguroMotoristaApp());
 }
 
@@ -2029,7 +2032,7 @@ class _SecurityModalState extends State<_SecurityModal> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primaryGold,
+            activeThumbColor: AppColors.primaryGold,
             activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
@@ -2584,6 +2587,23 @@ class _NotificationsModalState extends State<_NotificationsModal> {
   List<AppNotification> _notifications = [];
   int _unread = 0;
   bool _loading = true;
+  String? _error;
+
+  IconData _iconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'payment':
+        return Icons.payments_outlined;
+      case 'topup':
+      case 'deposit':
+        return Icons.account_balance_wallet_outlined;
+      case 'security':
+        return Icons.security_outlined;
+      case 'alert':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
 
   @override
   void initState() {
@@ -2592,12 +2612,17 @@ class _NotificationsModalState extends State<_NotificationsModal> {
   }
 
   Future<void> _load() async {
+    if (mounted) setState(() { _loading = true; _error = null; });
     await _api.loadTokens();
     final result = await _api.getNotifications();
     if (mounted) {
       setState(() {
-        _notifications = result.data?.notifications ?? [];
-        _unread = result.data?.unreadCount ?? 0;
+        if (result.isSuccess) {
+          _notifications = result.data?.notifications ?? [];
+          _unread = result.data?.unreadCount ?? 0;
+        } else {
+          _error = result.error ?? 'Erro ao carregar notificações';
+        }
         _loading = false;
       });
     }
@@ -2612,6 +2637,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                   id: n.id,
                   title: n.title,
                   body: n.body,
+                  type: n.type,
                   isRead: true,
                   createdAt: n.createdAt,
                 ))
@@ -2632,6 +2658,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
             id: n.id,
             title: n.title,
             body: n.body,
+            type: n.type,
             isRead: true,
             createdAt: n.createdAt,
           );
@@ -2671,6 +2698,44 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                   child: Center(
                       child: CircularProgressIndicator(
                           color: AppColors.primaryGold)))
+            else if (_error != null)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 40,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.35)
+                              : Colors.black.withValues(alpha: 0.3)),
+                      const SizedBox(height: 12),
+                      Text(_error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.45)
+                                : Colors.black.withValues(alpha: 0.4),
+                          )),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: _load,
+                        child: Text(
+                          'Tentar novamente',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.primaryGold
+                                : AppColors.primaryOrange,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
             else if (_notifications.isEmpty)
               Expanded(
                 child: Center(
@@ -2702,48 +2767,54 @@ class _NotificationsModalState extends State<_NotificationsModal> {
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  color: isDark ? AppColors.primaryGold : AppColors.primaryOrange,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                     itemCount: _notifications.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final n = _notifications[i];
+                      final accent = isDark
+                          ? AppColors.primaryGold
+                          : AppColors.primaryOrange;
                       return GestureDetector(
-                        onTap: () => _markOne(n),
+                        onTap: n.isRead ? null : () => _markOne(n),
                         child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: n.isRead
                                 ? (isDark
                                     ? Colors.white.withValues(alpha: 0.03)
                                     : Colors.black.withValues(alpha: 0.02))
-                                : AppColors.primaryGold.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
+                                : accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: n.isRead
                                   ? (isDark
                                       ? Colors.white.withValues(alpha: 0.06)
                                       : Colors.black.withValues(alpha: 0.05))
-                                  : AppColors.primaryGold
-                                      .withValues(alpha: 0.3),
+                                  : accent.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                width: 36,
-                                height: 36,
+                                width: 40,
+                                height: 40,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.primaryGold
-                                      .withValues(alpha: 0.12),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.07)
+                                      : Colors.black.withValues(alpha: 0.04),
+                                  border: Border.all(
+                                    color: accent.withValues(alpha: 0.4),
+                                    width: 1.0,
+                                  ),
                                 ),
                                 child: Icon(
-                                  n.isRead
-                                      ? Icons.notifications_none_rounded
-                                      : Icons.notifications_active_rounded,
-                                  color: AppColors.primaryGold,
+                                  _iconForType(n.type),
+                                  color: accent,
                                   size: 18,
                                 ),
                               ),
@@ -2752,20 +2823,37 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      n.title,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: n.isRead
-                                            ? FontWeight.w500
-                                            : FontWeight.w700,
-                                        color: isDark
-                                            ? Colors.white
-                                            : AppColors.textDark,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            n.title,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: n.isRead
+                                                  ? FontWeight.w500
+                                                  : FontWeight.w700,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : AppColors.textDark,
+                                            ),
+                                          ),
+                                        ),
+                                        if (!n.isRead)
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            margin:
+                                                const EdgeInsets.only(top: 2),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: accent,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                     if (n.body.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       Text(
                                         n.body,
                                         style: TextStyle(
@@ -2775,24 +2863,30 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                                                   .withValues(alpha: 0.5)
                                               : Colors.black
                                                   .withValues(alpha: 0.45),
+                                          height: 1.4,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
+                                    if (n.createdAt != null) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        DateFormat('dd/MM/yyyy HH:mm', 'pt_AO')
+                                            .format(n.createdAt!),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark
+                                              ? Colors.white
+                                                  .withValues(alpha: 0.35)
+                                              : Colors.black
+                                                  .withValues(alpha: 0.35),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
-                              if (!n.isRead)
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  margin: const EdgeInsets.only(top: 4),
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.primaryGold,
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -3097,7 +3191,7 @@ class _SettingsModalState extends State<_SettingsModal> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primaryGold,
+            activeThumbColor: AppColors.primaryGold,
             activeTrackColor: AppColors.primaryGold.withValues(alpha: 0.3),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),

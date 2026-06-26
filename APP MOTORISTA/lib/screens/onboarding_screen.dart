@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -79,23 +79,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: EdgeInsets.all(responsive.responsivePadding()),
-                child: TextButton(
-                  onPressed: widget.onComplete,
-                  child: Text(
-                    'Pular',
-                    style: TextStyle(
-                      color: isDark ? Colors.white70 : AppColors.textSecondary,
-                      fontSize: responsive.responsiveFontSize(14),
+            // Skip button — only shown when not on the last page
+            if (_currentPage < _pages.length - 1)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.all(responsive.responsivePadding()),
+                  child: TextButton(
+                    onPressed: widget.onComplete,
+                    child: Text(
+                      'Pular',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        fontSize: responsive.responsiveFontSize(14),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
             // Page content
             Expanded(
               child: PageView.builder(
@@ -115,7 +116,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           width: responsive.scaledWidth(120),
                           height: responsive.scaledWidth(120),
                           decoration: BoxDecoration(
-                            color: AppColors.adaptiveAccent(context).withOpacity(0.2),
+                            color: AppColors.adaptiveAccent(context).withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(

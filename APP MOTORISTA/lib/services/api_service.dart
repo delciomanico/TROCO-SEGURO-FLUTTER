@@ -1173,6 +1173,9 @@ class ApiService {
     if (e.response?.data != null) {
       final data = e.response!.data;
       if (data is Map) {
+        if (data['message'] is List) {
+          return (data['message'] as List).join('. ');
+        }
         return data['message'] ?? data['error'] ?? 'Erro desconhecido';
       }
     }

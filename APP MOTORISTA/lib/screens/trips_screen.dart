@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/models/trip.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_pro/models/trip.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
-import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
+import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 
 class TripsScreen extends StatefulWidget {
   final bool showBottomDock;
@@ -31,6 +31,7 @@ class _TripsScreenState extends State<TripsScreen> {
   void initState() {
     super.initState();
     _loadTrips();
+    _loadStats();
   }
 
   Future<void> _loadTrips() async {
@@ -131,10 +132,20 @@ class _TripsScreenState extends State<TripsScreen> {
 
   bool _searchActive = false;
   final _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  Map<String, dynamic>? _stats;
+
+  Future<void> _loadStats() async {
+    final result = await _api.getTripStats();
+    if (result.isSuccess && result.data != null && mounted) {
+      setState(() => _stats = result.data);
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -154,7 +165,10 @@ class _TripsScreenState extends State<TripsScreen> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: _loadTrips,
+          onRefresh: () async {
+            await _loadTrips();
+            await _loadStats();
+          },
           child: isLoading
               ? const Center(
                   child: CircularProgressIndicator(
@@ -167,6 +181,10 @@ class _TripsScreenState extends State<TripsScreen> {
                     SliverToBoxAdapter(
                       child: _buildFlatHeader(responsive, isDark),
                     ),
+                    if (_stats != null)
+                      SliverToBoxAdapter(
+                        child: _buildStatsRow(responsive, isDark),
+                      ),
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -196,10 +214,21 @@ class _TripsScreenState extends State<TripsScreen> {
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(-0.04, 0),
+                  end: Offset.zero,
+                ).animate(anim),
+                child: child,
+              ),
+            ),
             child: _searchActive
                 ? GestureDetector(
                     key: const ValueKey('close'),
                     onTap: () {
+                      _searchFocus.unfocus();
                       setState(() {
                         _searchActive = false;
                         searchQuery = '';
@@ -234,10 +263,21 @@ class _TripsScreenState extends State<TripsScreen> {
             child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.04, 0),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
+                ),
                 child: _searchActive
                     ? TextField(
                         key: const ValueKey('search'),
                         controller: _searchController,
+                        focusNode: _searchFocus,
                         autofocus: true,
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(15),
@@ -291,6 +331,90 @@ class _TripsScreenState extends State<TripsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(ResponsiveHelper responsive, bool isDark) {
+    final total = _stats?['total'] ?? _stats?['totalTrips'] ?? 0;
+    final earned = _stats?['totalEarned'] ?? _stats?['earned'] ?? _stats?['revenue'] ?? 0;
+    final fmt = NumberFormat('#,##0', 'pt_AO');
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(4),
+        responsive.scaledWidth(20),
+        responsive.scaledHeight(4),
+      ),
+      child: Row(
+        children: [
+          _statChip(
+            isDark,
+            Icons.route_rounded,
+            '$total',
+            'viagens',
+            responsive,
+          ),
+          SizedBox(width: responsive.scaledWidth(10)),
+          _statChip(
+            isDark,
+            Icons.account_balance_wallet_outlined,
+            '${fmt.format(earned)} Kz',
+            'recebido',
+            responsive,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statChip(bool isDark, IconData icon, String value, String label, ResponsiveHelper responsive) {
+    final accent = isDark ? AppColors.primaryGold : AppColors.primaryOrange;
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: responsive.scaledWidth(14),
+          vertical: responsive.scaledHeight(12),
+        ),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.black.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: accent),
+            SizedBox(width: responsive.scaledWidth(10)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(11),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.45)
+                        : Colors.black.withValues(alpha: 0.4),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
