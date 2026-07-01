@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/widgets/custom_widgets.dart'
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/widgets/custom_widgets.dart'
     show CustomButton;
+import 'package:troco_seguro_pro/widgets/seat_qrs_modal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,7 +20,7 @@ class QrDisplayModal extends StatefulWidget {
   final String currency;
   final String driverName;
   final String? tripId;
-  final String? routeName;
+  final List<Map<String, dynamic>> childQrs;
   final VoidCallback? onClose;
   final Future<bool> Function(int amount)? onUpdateAmount;
 
@@ -31,7 +32,7 @@ class QrDisplayModal extends StatefulWidget {
     this.currency = 'AOA',
     required this.driverName,
     this.tripId,
-    this.routeName,
+    this.childQrs = const [],
     this.onClose,
     this.onUpdateAmount,
   });
@@ -44,7 +45,7 @@ class QrDisplayModal extends StatefulWidget {
     String currency = 'AOA',
     required String driverName,
     String? tripId,
-    String? routeName,
+    List<Map<String, dynamic>> childQrs = const [],
     VoidCallback? onClose,
     Future<bool> Function(int amount)? onUpdateAmount,
   }) {
@@ -59,7 +60,7 @@ class QrDisplayModal extends StatefulWidget {
         currency: currency,
         driverName: driverName,
         tripId: tripId,
-        routeName: routeName,
+        childQrs: childQrs,
         onClose: onClose,
         onUpdateAmount: onUpdateAmount,
       ),
@@ -208,7 +209,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                     Container(
                       padding: EdgeInsets.all(responsive.scaledWidth(8)),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.1),
+                        color: AppColors.accent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -251,64 +252,6 @@ class _QrDisplayModalState extends State<QrDisplayModal>
             ),
           ),
 
-          // Route display (if specified)
-          if (widget.routeName != null)
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: responsive.responsivePadding(),
-              ),
-              padding: EdgeInsets.all(responsive.responsivePadding()),
-              decoration: BoxDecoration(
-                color: AppColors.darkBlue,
-                borderRadius:
-                    BorderRadius.circular(responsive.responsiveBorderRadius()),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(responsive.scaledWidth(10)),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.route_rounded,
-                      color: AppColors.accent,
-                      size: responsive.scaledWidth(22),
-                    ),
-                  ),
-                  SizedBox(width: responsive.scaledWidth(12)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Rota',
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(10),
-                            color: Colors.white60,
-                          ),
-                        ),
-                        Text(
-                          widget.routeName!,
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(14),
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          if (widget.routeName != null)
-            SizedBox(height: responsive.scaledHeight(12)),
-
           // Amount display
           if (true) // Always show to allow editing
             Container(
@@ -319,7 +262,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: _isEditingAmount
-                      ? [AppColors.darkBlue, AppColors.darkBlue.withOpacity(0.8)]
+                      ? [AppColors.darkBlue, AppColors.darkBlue.withValues(alpha: 0.8)]
                       : [const Color(0xFFF6B415), const Color(0xFFF9C846)],
                 ),
                 borderRadius:
@@ -429,7 +372,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                     BorderRadius.circular(responsive.responsiveBorderRadius()),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accent.withOpacity(0.2),
+                    color: AppColors.accent.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -448,7 +391,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.accent.withOpacity(0.3),
+                              color: AppColors.accent.withValues(alpha: 0.3),
                               width: 3,
                             ),
                           ),
@@ -501,10 +444,63 @@ class _QrDisplayModalState extends State<QrDisplayModal>
 
           SizedBox(height: responsive.scaledHeight(24)),
 
-          // Status indicator
-          // Indicador de status removido
-
-          SizedBox(height: responsive.scaledHeight(16)),
+          // Seat QRs button
+          if (widget.childQrs.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                responsive.responsivePadding(),
+                0,
+                responsive.responsivePadding(),
+                responsive.scaledHeight(12),
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  SeatQrsModal.show(
+                    context,
+                    childQrs: widget.childQrs,
+                    currentFare: widget.amount ?? 0,
+                    driverName: widget.driverName,
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    vertical: responsive.scaledHeight(14),
+                    horizontal: responsive.scaledWidth(16),
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkBlue,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.event_seat_rounded,
+                        color: AppColors.accent,
+                        size: responsive.scaledWidth(20),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(10)),
+                      Text(
+                        'GERIR QR DOS ASSENTOS (${widget.childQrs.length})',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(13),
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(8)),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        size: responsive.scaledWidth(14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // Action buttons
           Padding(

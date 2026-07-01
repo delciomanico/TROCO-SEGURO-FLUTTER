@@ -5,7 +5,7 @@ import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/models/user.dart';
 
-enum AuthMode { choice, login, register }
+enum AuthMode { choice, login, register, otp }
 
 class AuthScreen extends StatefulWidget {
   final Function(User user, String pin,
@@ -29,6 +29,9 @@ class _AuthScreenState extends State<AuthScreen> {
   final nameController = TextEditingController();
   final pinController = TextEditingController();
   final otpController = TextEditingController();
+
+  // phone stored after register to use in verifyOtp / resendOtp
+  String? _pendingPhone;
 
   late Color primaryGold;
   late Color secondaryGold;
@@ -100,22 +103,52 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => isLoading = false);
 
       if (result.isSuccess) {
-        // após registro, tentar logar automaticamente
-        setState(() => isLoading = true);
-        final login =
-            await _api.login(phoneNumber: phone, password: pinController.text);
-        setState(() => isLoading = false);
-        if (login.isSuccess) {
-          final user = login.data?.user ?? _createUserFromInput(phone);
-          widget.onAuth(user, pinController.text,
-              accessToken: login.data?.accessToken,
-              refreshToken: login.data?.refreshToken);
-        } else {
-          setState(() =>
-              errorMessage = 'Registro efetuado. Por favor verifique seu SMS.');
-        }
+        _pendingPhone = phone;
+        otpController.clear();
+        setState(() => _mode = AuthMode.otp);
       } else {
         setState(() => errorMessage = result.error ?? 'Falha no registro');
+      }
+    }
+  }
+
+  Future<void> _handleVerifyOtp() async {
+    if (otpController.text.length != 6) {
+      setState(() => errorMessage = 'Código deve ter 6 dígitos');
+      return;
+    }
+    setState(() { isLoading = true; errorMessage = null; });
+    final result = await _api.verifyOtp(
+      phoneNumber: _pendingPhone!,
+      otpCode: otpController.text,
+    );
+    setState(() => isLoading = false);
+
+    if (result.isSuccess) {
+      final user = result.data?.user ?? _createUserFromInput(_pendingPhone!);
+      widget.onAuth(
+        user,
+        pinController.text,
+        accessToken: result.data?.accessToken,
+        refreshToken: result.data?.refreshToken,
+      );
+    } else {
+      setState(() => errorMessage = result.error ?? 'Código inválido ou expirado');
+    }
+  }
+
+  Future<void> _handleResendOtp() async {
+    setState(() { isLoading = true; errorMessage = null; });
+    final result = await _api.resendOtp(_pendingPhone!);
+    setState(() => isLoading = false);
+    if (!result.isSuccess) {
+      setState(() => errorMessage = result.error ?? 'Erro ao reenviar código');
+    } else {
+      setState(() => errorMessage = null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Código reenviado via SMS')),
+        );
       }
     }
   }
@@ -195,79 +228,211 @@ class _AuthScreenState extends State<AuthScreen> {
           SafeArea(
             child: _mode == AuthMode.choice
                 ? _buildChoiceScreen(r)
-                : Column(
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: r.scaledWidth(8),
-                            vertical: r.scaledHeight(6)),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : () => setState(() {
-                                        _mode = AuthMode.choice;
-                                        isLogin = true;
-                                        errorMessage = null;
-                                      }),
-                              icon: Icon(Icons.arrow_back, color: primaryGold),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: r.scaledWidth(24)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              SizedBox(height: r.scaledHeight(12)),
-                              _buildSteps(r),
-                              SizedBox(height: r.scaledHeight(12)),
-                              _buildTitle(r),
-                              SizedBox(height: r.scaledHeight(20)),
-                              _buildStep1(r),
-                              _buildField(
-                                r,
-                                controller: pinController,
-                                hint: '••••••',
-                                icon: Icons.lock_outline,
-                                keyboardType: TextInputType.number,
-                                obscure: _obscurePin,
-                                maxLength: 6,
-                                suffix: IconButton(
-                                  icon: Icon(
-                                    _obscurePin
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: primaryGold.withValues(alpha: 0.7),
-                                    size: r.scaledWidth(20),
-                                  ),
-                                  onPressed: () => setState(() {
-                                    _obscurePin = !_obscurePin;
-                                  }),
+                : _mode == AuthMode.otp
+                    ? _buildOtpScreen(r)
+                    : Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: r.scaledWidth(8),
+                                vertical: r.scaledHeight(6)),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => setState(() {
+                                            _mode = AuthMode.choice;
+                                            isLogin = true;
+                                            errorMessage = null;
+                                          }),
+                                  icon: Icon(Icons.arrow_back, color: primaryGold),
                                 ),
-                              ),
-                              if (errorMessage != null) ...[
-                                SizedBox(height: r.scaledHeight(16)),
-                                _buildError(r),
                               ],
-                              SizedBox(height: r.scaledHeight(18)),
-                              _buildButton(r),
-                              SizedBox(height: r.scaledHeight(18)),
-                              _buildToggle(r),
-                              SizedBox(height: r.scaledHeight(40)),
-                            ],
+                            ),
                           ),
-                        ),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: r.scaledWidth(24)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SizedBox(height: r.scaledHeight(12)),
+                                  _buildSteps(r),
+                                  SizedBox(height: r.scaledHeight(12)),
+                                  _buildTitle(r),
+                                  SizedBox(height: r.scaledHeight(20)),
+                                  _buildStep1(r),
+                                  _buildField(
+                                    r,
+                                    controller: pinController,
+                                    hint: '••••••',
+                                    icon: Icons.lock_outline,
+                                    keyboardType: TextInputType.number,
+                                    obscure: _obscurePin,
+                                    maxLength: 6,
+                                    suffix: IconButton(
+                                      icon: Icon(
+                                        _obscurePin
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: primaryGold.withValues(alpha: 0.7),
+                                        size: r.scaledWidth(20),
+                                      ),
+                                      onPressed: () => setState(() {
+                                        _obscurePin = !_obscurePin;
+                                      }),
+                                    ),
+                                  ),
+                                  if (errorMessage != null) ...[
+                                    SizedBox(height: r.scaledHeight(16)),
+                                    _buildError(r),
+                                  ],
+                                  SizedBox(height: r.scaledHeight(18)),
+                                  _buildButton(r),
+                                  SizedBox(height: r.scaledHeight(18)),
+                                  _buildToggle(r),
+                                  SizedBox(height: r.scaledHeight(40)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOtpScreen(ResponsiveHelper r) {
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: r.scaledWidth(8), vertical: r.scaledHeight(6)),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: isLoading
+                    ? null
+                    : () => setState(() {
+                          _mode = AuthMode.register;
+                          isLogin = false;
+                          errorMessage = null;
+                        }),
+                icon: Icon(Icons.arrow_back, color: primaryGold),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: r.scaledWidth(24)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(height: r.scaledHeight(24)),
+                Container(
+                  width: r.scaledWidth(64),
+                  height: r.scaledWidth(64),
+                  decoration: BoxDecoration(
+                    color: primaryGold.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.sms_outlined,
+                      size: r.scaledWidth(32), color: primaryGold),
+                ),
+                SizedBox(height: r.scaledHeight(20)),
+                Text(
+                  'VERIFICAR NÚMERO',
+                  style: TextStyle(
+                    fontSize: r.responsiveFontSize(20),
+                    fontWeight: FontWeight.w800,
+                    color: primaryGold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                SizedBox(height: r.scaledHeight(8)),
+                Text(
+                  'Enviámos um código de 6 dígitos para',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: r.responsiveFontSize(13),
+                    color: isDark ? Colors.white70 : Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: r.scaledHeight(4)),
+                Text(
+                  _pendingPhone ?? '',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: r.responsiveFontSize(14),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                SizedBox(height: r.scaledHeight(28)),
+                _buildField(
+                  r,
+                  controller: otpController,
+                  hint: 'Código de 6 dígitos',
+                  icon: Icons.lock_outline,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+                if (errorMessage != null) ...[
+                  SizedBox(height: r.scaledHeight(16)),
+                  _buildError(r),
+                ],
+                SizedBox(height: r.scaledHeight(20)),
+                // Confirm button
+                SizedBox(
+                  width: double.infinity,
+                  height: r.scaledHeight(52),
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _handleVerifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGold,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: isLoading
+                        ? SizedBox(
+                            width: r.scaledWidth(22),
+                            height: r.scaledWidth(22),
+                            child: const CircularProgressIndicator(
+                                color: Colors.black, strokeWidth: 2.5),
+                          )
+                        : Text(
+                            'Confirmar código',
+                            style: TextStyle(
+                              fontSize: r.responsiveFontSize(15),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+                SizedBox(height: r.scaledHeight(16)),
+                // Resend button
+                TextButton(
+                  onPressed: isLoading ? null : _handleResendOtp,
+                  child: Text(
+                    'Reenviar código',
+                    style: TextStyle(
+                        color: primaryGold,
+                        fontSize: r.responsiveFontSize(13)),
+                  ),
+                ),
+                SizedBox(height: r.scaledHeight(40)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +12,6 @@ import 'package:troco_seguro_pro/models/trip.dart';
 import 'package:troco_seguro_pro/models/earnings.dart';
 import 'package:troco_seguro_pro/models/faq_item.dart';
 import 'package:troco_seguro_pro/models/vehicle.dart';
-import 'package:troco_seguro_pro/models/route.dart';
 import 'package:troco_seguro_pro/models/emergency_contact.dart';
 import 'package:troco_seguro_pro/models/notification.dart';
 
@@ -509,110 +510,160 @@ class ApiService {
 
   // ============ QR CODE ============
 
-  /// Configurar QR Code para a corrida
-  Future<ApiResponse<QrCodePriceResult>> setQrCodePrice({
+  /// Iniciar sessão de viagem e gerar QR Codes (pai + filhos por assento)
+  Future<ApiResponse<QrSetupResult>> setupQrSession({
     required int amount,
-    required String description,
     String? activeVehicleId,
   }) async {
     try {
       final body = <String, dynamic>{
-        'tripPrice': amount,
+        'pricePerSeat': amount,
         if (activeVehicleId != null && activeVehicleId.isNotEmpty)
-          'activeVehicleId': activeVehicleId,
+          'vehicleId': activeVehicleId,
       };
-
-      try {
-        final response = await _dio.post('qrcodes/setup', data: body);
-        final data = _payload(response.data);
-        return ApiResponse.success(QrCodePriceResult(
-          id: data['id']?.toString() ?? '',
-          amount: int.tryParse(data['tripPrice']?.toString() ??
-                  data['amount']?.toString() ??
-                  '0') ??
-              amount,
-          description: description,
-          qrToken: QrTokenData.fromJson(
-            (data['qrToken'] as Map?)?.cast<String, dynamic>() ??
-                <String, dynamic>{
-                  'publicToken': data['publicToken']?.toString() ??
-                      data['token']?.toString() ??
-                      '',
-                  'isActive': true,
-                },
-          ),
-          validFrom: DateTime.now(),
-        ));
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404) {
-          final response = await _dio.post('qr-code/payment-request', data: {
-            'amount': amount,
-          });
-          final data = _payload(response.data);
-          return ApiResponse.success(QrCodePriceResult(
-            id: data['id']?.toString() ?? '',
-            amount: int.tryParse(data['amount'].toString()) ?? amount,
-            description: description,
-            qrToken: QrTokenData.fromJson(
-              (data['qrToken'] as Map?)?.cast<String, dynamic>() ??
-                  <String, dynamic>{
-                    'publicToken': data['qrToken']?.toString() ??
-                        data['token']?.toString() ??
-                        '',
-                    'isActive': true,
-                  },
-            ),
-            validFrom: DateTime.now(),
-          ));
-        }
-        rethrow;
-      }
+      final response = await _dio.post('qrcodes/session/start', data: body);
+      final raw = response.data;
+      final map = raw is Map ? raw.cast<String, dynamic>() : <String, dynamic>{};
+      final root = map['data'] is Map
+          ? (map['data'] as Map).cast<String, dynamic>()
+          : map;
+      return ApiResponse.success(QrSetupResult.fromJson(root));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
   }
 
-  /// Obter o QR estático atual do motorista
-  Future<ApiResponse<DriverStaticQrCode>> getMyStaticQrCode() async {
+  /// Encerrar sessão de viagem activa
+  Future<ApiResponse<void>> endSession() async {
     try {
-      try {
-        final response = await _dio.get('qrcodes/my-static');
-        return ApiResponse.success(
-            DriverStaticQrCode.fromJson(_payload(response.data)));
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404) {
-          final response = await _dio.get('qr-code/my-code');
-          final data = _payload(response.data);
-          return ApiResponse.success(DriverStaticQrCode(
-            publicToken: data['publicToken']?.toString() ??
-                data['qrToken']?.toString() ??
-                data['token']?.toString() ??
-                '',
-            qrCodeImage: data['qrCodeImage']?.toString() ?? '',
-            driverName: data['driverName']?.toString() ?? '',
-            currentAmount: int.tryParse(data['currentAmount'].toString()) ?? 0,
-            currency: data['currency']?.toString() ?? 'AOA',
-          ));
-        }
-        rethrow;
-      }
+      await _dio.post('qrcodes/session/end');
+      return ApiResponse._(data: null, isSuccess: true);
     } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      // 404 = não havia sessão activa
+      // 500 = bug no servidor — tratar como sucesso para não bloquear o motorista
+      if (status == 404 || status == 500) {
+        debugPrint('endSession: status $status — a limpar estado local');
+        return ApiResponse._(data: null, isSuccess: true);
+      }
+      return ApiResponse._(error: _parseError(e), isSuccess: false);
+    }
+  }
+
+  /// Obter estado actual da sessão: assentos pagos, publicToken, receita
+  Future<ApiResponse<SessionSeatsResult>> getSessionSeats() async {
+    try {
+      final response = await _dio.get('qrcodes/session/seats');
+      final data = _payload(response.data);
+      return ApiResponse.success(SessionSeatsResult.fromJson(data));
+    } on DioException catch (e) {
+      // 404 = sem sessão activa — não é erro, é estado normal
+      // 500 = bug no servidor — tratar como sem dados para não bloquear o motorista
+      if (e.response?.statusCode == 404 || e.response?.statusCode == 500) {
+        return ApiResponse.success(SessionSeatsResult(active: false));
+      }
       return ApiResponse.error(_parseError(e));
     }
   }
 
-  /// Gerar token QR para receber pagamento
-  Future<ApiResponse<String>> generatePaymentQR({required int amount}) async {
-    try {
-      final result = await setQrCodePrice(
-        amount: amount,
-        description: 'Corrida',
-      );
-      if (result.isSuccess && result.data != null) {
-        return ApiResponse.success(result.data!.qrToken.publicToken);
+  /// Stream SSE em tempo real dos assentos pagos (GET qrcodes/session/seats-live)
+  Stream<SessionSeatsResult> streamSessionSeats() {
+    late StreamController<SessionSeatsResult> controller;
+    HttpClient? httpClient;
+    bool cancelled = false;
+
+    Future<void> connect() async {
+      while (!cancelled) {
+        httpClient = HttpClient();
+        try {
+          final uri = Uri.parse('${baseUrl}qrcodes/session/seats-live');
+          final request = await httpClient!.getUrl(uri);
+          request.headers.set('Accept', 'text/event-stream');
+          request.headers.set('Cache-Control', 'no-cache');
+          if (_accessToken != null) {
+            request.headers.set('Authorization', 'Bearer $_accessToken');
+          }
+          final response = await request.close();
+          // Parar em erros de autenticação — não reconectar
+          if (response.statusCode == 401 || response.statusCode == 403) {
+            debugPrint('SSE: auth error ${response.statusCode}, a aguardar token');
+            break;
+          }
+          // Em caso de erro do servidor, deixar cair para reconectar
+          if (response.statusCode >= 400) {
+            debugPrint('SSE: erro ${response.statusCode}');
+          } else {
+            String buffer = '';
+            await for (final chunk in response.transform(utf8.decoder)) {
+              if (cancelled) break;
+              buffer += chunk;
+              while (buffer.contains('\n\n')) {
+                final idx = buffer.indexOf('\n\n');
+                final block = buffer.substring(0, idx);
+                buffer = buffer.substring(idx + 2);
+                for (final line in block.split('\n')) {
+                  if (line.startsWith('data:')) {
+                    try {
+                      final raw = jsonDecode(line.substring(5).trim());
+                      if (raw is Map && !cancelled && !controller.isClosed) {
+                        controller.add(
+                          SessionSeatsResult.fromJson(raw.cast<String, dynamic>()),
+                        );
+                      }
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('SSE seats-live: $e');
+        } finally {
+          httpClient?.close(force: true);
+          httpClient = null;
+        }
+        if (!cancelled) await Future<void>.delayed(const Duration(seconds: 5));
       }
-      return ApiResponse.error(
-          result.error ?? 'Falha ao gerar QR de cobrança.');
+    }
+
+    controller = StreamController<SessionSeatsResult>(
+      onListen: () => connect(),
+      onCancel: () {
+        cancelled = true;
+        httpClient?.close(force: true);
+      },
+    );
+
+    return controller.stream;
+  }
+
+  /// Fluxo 2 — Motorista escaneia QR do Passageiro e cobra
+  Future<ApiResponse<PassengerQrPaymentResult>> authorizePassengerQr({
+    required String qrData,
+    required String passengerPin,
+    required String origin,
+    required String destination,
+    double distanceKm = 0.0,
+    int durationMinutes = 0,
+    int seatsCount = 1,
+    String? parentQrToken,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'qrData': qrData,
+        'passengerPin': passengerPin,
+        'origin': origin,
+        'destination': destination,
+        if (distanceKm > 0) 'distanceKm': distanceKm,
+        if (durationMinutes > 0) 'durationMinutes': durationMinutes,
+        if (seatsCount > 1) 'seatsCount': seatsCount,
+        if (parentQrToken != null && parentQrToken.isNotEmpty)
+          'parentQrToken': parentQrToken,
+      };
+      final response =
+          await _dio.post('payments/authorize-passenger-qr', data: body);
+      return ApiResponse.success(
+          PassengerQrPaymentResult.fromJson(_payload(response.data)));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
@@ -780,6 +831,7 @@ class ApiService {
     }
   }
 
+  // API extrai amount do paymentToken JWT — não enviar amount no body
   Future<ApiResponse<PaymentResult>> processPayment({
     required String driverId,
     required String cardId,
@@ -792,16 +844,34 @@ class ApiService {
     int durationMinutes = 0,
   }) async {
     try {
-      final response = await _dio.post('payments/process', data: {
+      final body = <String, dynamic>{
         'driverId': driverId,
-        'cardId': cardId,
-        'amount': amount,
         'pin': pin,
         'paymentToken': paymentToken,
         'origin': origin,
         'destination': destination,
         'distanceKm': distanceKm,
         'durationMinutes': durationMinutes,
+      };
+      if (cardId.isNotEmpty) body['cardId'] = cardId;
+      final response = await _dio.post('payments/process', data: body);
+      return ApiResponse.success(PaymentResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Cobrar cartão virtual do passageiro (POS terminal flow)
+  Future<ApiResponse<PaymentResult>> chargeVirtualCard({
+    required String cardId,
+    required int amount,
+    required String cardPin,
+  }) async {
+    try {
+      final response = await _dio.post('wallet/card/withdraw', data: {
+        'cardId': cardId,
+        'amount': amount,
+        'pin': cardPin,
       });
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
@@ -813,8 +883,7 @@ class ApiService {
 
   Future<ApiResponse<void>> deleteAccount({String? iban}) async {
     try {
-      await _dio.delete('users/me',
-          data: iban != null && iban.isNotEmpty ? {'iban': iban} : null);
+      await _dio.delete('users/me', data: iban != null && iban.isNotEmpty ? {'iban': iban} : null);
       await clearTokens();
       return ApiResponse.success(null);
     } on DioException catch (e) {
@@ -1080,12 +1149,13 @@ class ApiService {
   // ============== VEÍCULOS ==============
 
   Future<ApiResponse<Vehicle>> registerVehicle(
-      String licensePlate, String model, String color) async {
+      String licensePlate, String model, String color, {int seats = 4}) async {
     try {
       final response = await _dio.post('fleet/vehicles', data: {
         'licensePlate': licensePlate,
         'model': model,
         'color': color,
+        'seats': seats,
       });
 
       final data = response.data;
@@ -1130,41 +1200,34 @@ class ApiService {
     }
   }
 
-  // ============== ROTAS ==============
-
-  /// Listar rotas disponíveis (tráfego e preços)
-  Future<ApiResponse<List<TaxiRoute>>> getRoutes() async {
+  Future<ApiResponse<Vehicle>> updateVehicle(
+      String vehicleId, {
+        String? licensePlate,
+        String? model,
+        String? color,
+        int? seats,
+      }) async {
     try {
-      Response response;
-      try {
-        response = await _dio.get('routes');
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404) {
-          response = await _dio.get('taxi-routes');
-        } else {
-          rethrow;
-        }
-      }
-
-      final raw = response.data;
-      List<dynamic> list = [];
-      if (raw is List) {
-        list = raw;
-      } else if (raw is Map) {
-        final nested = raw['data'] ?? raw['routes'] ?? raw['items'];
-        if (nested is List) {
-          list = nested;
-        }
-      }
-
-      final routes = list
-          .map((r) => TaxiRoute.fromJson((r as Map).cast<String, dynamic>()))
-          .toList();
-      return ApiResponse.success(routes);
+      final data = <String, dynamic>{
+        if (licensePlate != null) 'licensePlate': licensePlate,
+        if (model != null) 'model': model,
+        if (color != null) 'color': color,
+        if (seats != null) 'seats': seats,
+      };
+      final response = await _dio.put('fleet/vehicles/$vehicleId', data: data);
+      final vData = response.data['data'] ?? response.data;
+      return ApiResponse._(data: Vehicle.fromJson(vData as Map<String, dynamic>), isSuccess: true);
     } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
-    } catch (e) {
-      return ApiResponse.error('Erro ao carregar rotas: $e');
+      return ApiResponse._(error: _parseError(e), isSuccess: false);
+    }
+  }
+
+  Future<ApiResponse<void>> deleteVehicle(String vehicleId) async {
+    try {
+      await _dio.delete('fleet/vehicles/$vehicleId');
+      return ApiResponse._(data: null, isSuccess: true);
+    } on DioException catch (e) {
+      return ApiResponse._(error: _parseError(e), isSuccess: false);
     }
   }
 
@@ -1189,6 +1252,141 @@ class ApiService {
       default:
         return 'Erro de comunicação com o servidor. (${e.type})';
     }
+  }
+}
+
+// ============ NOVOS MODELOS — QR SETUP + SESSÃO ============
+
+class QrSetupResult {
+  final QrData parentQr;
+  final List<ChildQrData> childQrs;
+
+  QrSetupResult({required this.parentQr, required this.childQrs});
+
+  factory QrSetupResult.fromJson(Map<String, dynamic> json) {
+    // API renomeou 'parentQr' para 'qrCode' — suporta ambos
+    final parentQrMap =
+        ((json['qrCode'] ?? json['parentQr']) as Map?)?.cast<String, dynamic>() ?? {};
+    final childQrsList = json['childQrs'] as List? ?? [];
+    return QrSetupResult(
+      parentQr: QrData.fromJson(parentQrMap),
+      childQrs: childQrsList
+          .map((c) => ChildQrData.fromJson((c as Map).cast<String, dynamic>()))
+          .toList(),
+    );
+  }
+}
+
+class QrData {
+  final String id;
+  final String publicToken;
+  final String image; // data:image/png;base64,...
+  final int tripPrice;
+
+  QrData({required this.id, required this.publicToken, required this.image, required this.tripPrice});
+
+  factory QrData.fromJson(Map<String, dynamic> json) {
+    return QrData(
+      id: json['id']?.toString() ?? '',
+      publicToken: json['publicToken']?.toString() ?? '',
+      image: json['image']?.toString() ?? '',
+      // API renomeou 'tripPrice' para 'pricePerSeat' — suporta ambos
+      tripPrice: int.tryParse((json['pricePerSeat'] ?? json['tripPrice'])?.toString() ?? '0') ?? 0,
+    );
+  }
+}
+
+class ChildQrData {
+  final String id;
+  final String label;
+  final String publicToken;
+  final String image;
+
+  ChildQrData({required this.id, required this.label, required this.publicToken, required this.image});
+
+  factory ChildQrData.fromJson(Map<String, dynamic> json) {
+    return ChildQrData(
+      id: json['id']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      publicToken: json['publicToken']?.toString() ?? '',
+      image: json['image']?.toString() ?? '',
+    );
+  }
+}
+
+class SessionSeatsResult {
+  final bool active;
+  final String? parentQrId;
+  final String? publicToken;
+  final int pricePerSeat;
+  final int totalSeats;
+  final int paidSeats;
+  final int availableSeats;
+  final int revenue;
+  final int childQrCount;
+
+  SessionSeatsResult({
+    required this.active,
+    this.parentQrId,
+    this.publicToken,
+    this.pricePerSeat = 0,
+    this.totalSeats = 0,
+    this.paidSeats = 0,
+    this.availableSeats = 0,
+    this.revenue = 0,
+    this.childQrCount = 0,
+  });
+
+  factory SessionSeatsResult.fromJson(Map<String, dynamic> json) {
+    return SessionSeatsResult(
+      active: json['active'] == true,
+      parentQrId: json['parentQrId']?.toString(),
+      publicToken: json['publicToken']?.toString(),
+      pricePerSeat:
+          int.tryParse(json['pricePerSeat']?.toString() ?? '0') ?? 0,
+      totalSeats:
+          int.tryParse(json['totalSeats']?.toString() ?? '0') ?? 0,
+      // API renomeou 'paidSeats' para 'totalPayments'
+      paidSeats:
+          int.tryParse((json['totalPayments'] ?? json['paidSeats'])?.toString() ?? '0') ?? 0,
+      availableSeats:
+          int.tryParse(json['availableSeats']?.toString() ?? '0') ?? 0,
+      revenue: int.tryParse(json['revenue']?.toString() ?? '0') ?? 0,
+      childQrCount:
+          int.tryParse(json['childQrCount']?.toString() ?? '0') ?? 0,
+    );
+  }
+}
+
+class PassengerQrPaymentResult {
+  final bool success;
+  final String transactionId;
+  final String? tripId;
+  final int platformFeeApplied;
+  final int newBalance;
+
+  PassengerQrPaymentResult({
+    required this.success,
+    required this.transactionId,
+    this.tripId,
+    this.platformFeeApplied = 0,
+    this.newBalance = 0,
+  });
+
+  factory PassengerQrPaymentResult.fromJson(Map<String, dynamic> json) {
+    return PassengerQrPaymentResult(
+      success: json['success'] == true,
+      transactionId: json['transactionId']?.toString() ??
+          json['id']?.toString() ??
+          '',
+      tripId: json['tripId']?.toString(),
+      platformFeeApplied: int.tryParse(
+              json['platformFeeApplied']?.toString() ?? '0') ??
+          0,
+      newBalance: int.tryParse(
+              (json['newBalance'] ?? json['balance'] ?? 0).toString()) ??
+          0,
+    );
   }
 }
 

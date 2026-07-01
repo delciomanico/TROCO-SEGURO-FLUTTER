@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/widgets/custom_widgets.dart'
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/widgets/custom_widgets.dart'
     show CustomInput, CustomButton;
 
-/// Modal para escanear QR Code do cartão virtual do passageiro
+/// Modal para escanear QR Code de pagamento do passageiro (Fluxo 2)
 class QRScannerModal extends StatefulWidget {
   final Function(String scannedData) onQRScanned;
   final VoidCallback onCancel;
@@ -52,7 +52,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
     final qrData = manualQRController.text.trim();
 
     if (qrData.isEmpty) {
-      setState(() => error = 'Digite o código do cartão virtual');
+      setState(() => error = 'Digite o código QR do passageiro');
       return;
     }
 
@@ -98,7 +98,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   height: 4,
                   decoration: BoxDecoration(
                     color:
-                        Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                        Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -106,7 +106,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                 Container(
                   padding: EdgeInsets.all(responsive.scaledWidth(12)),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
+                    color: AppColors.accent.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -117,7 +117,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                 ),
                 SizedBox(height: responsive.scaledHeight(12)),
                 Text(
-                  'ESCANEAR CARTÃO VIRTUAL',
+                  'ESCANEAR QR DO PASSAGEIRO',
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(16),
                     fontWeight: FontWeight.w900,
@@ -126,13 +126,13 @@ class _QRScannerModalState extends State<QRScannerModal> {
                 ),
                 SizedBox(height: responsive.scaledHeight(8)),
                 Text(
-                  'Aponte a câmera para o QR code do passageiro',
+                  'Aponte a câmera para o QR code de pagamento do passageiro',
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(12),
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
-                        .withOpacity(0.6),
+                        .withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -172,24 +172,24 @@ class _QRScannerModalState extends State<QRScannerModal> {
                       Icon(
                         Icons.credit_card,
                         size: responsive.scaledWidth(64),
-                        color: AppColors.accent.withOpacity(0.3),
+                        color: AppColors.accent.withValues(alpha: 0.3),
                       ),
                       SizedBox(height: responsive.scaledHeight(16)),
                       Text(
-                        'Digite o código do cartão virtual',
+                        'Digite o código QR do passageiro',
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(13),
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.7),
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                       SizedBox(height: responsive.scaledHeight(12)),
                       CustomInput(
                         label: '',
-                        hint: 'Cole ou digite o código do cartão',
+                        hint: 'Cole ou digite o código QR',
                         controller: manualQRController,
                         onChanged: (val) {
                           if (error != null) {
@@ -263,7 +263,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                         color: Theme.of(context)
                             .colorScheme
                             .onSurface
-                            .withOpacity(0.6),
+                            .withValues(alpha: 0.6),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -309,7 +309,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                     vertical: responsive.scaledHeight(8),
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -360,14 +360,14 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   scannerController.toggleTorch();
                 },
                 tooltip: 'Flash',
-                backgroundColor: Colors.black.withOpacity(0.6),
+                backgroundColor: Colors.black.withValues(alpha: 0.6),
                 child: const Icon(Icons.flash_on, color: Colors.white),
               ),
               FloatingActionButton(
                 heroTag: 'keyboard',
                 onPressed: () => setState(() => showManualInput = true),
                 tooltip: 'Digite Manualmente',
-                backgroundColor: Colors.black.withOpacity(0.6),
+                backgroundColor: Colors.black.withValues(alpha: 0.6),
                 child: const Icon(Icons.keyboard, color: Colors.white),
               ),
               FloatingActionButton(
@@ -377,7 +377,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   Navigator.pop(context);
                 },
                 tooltip: 'Cancelar',
-                backgroundColor: Colors.red.withOpacity(0.7),
+                backgroundColor: Colors.red.withValues(alpha: 0.7),
                 child: const Icon(Icons.close, color: Colors.white),
               ),
             ],

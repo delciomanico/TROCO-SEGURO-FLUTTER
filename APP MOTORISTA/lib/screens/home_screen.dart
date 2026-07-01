@@ -1,16 +1,18 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/models/qr_config.dart';
-import 'package:troco_seguro_motorista/models/transaction.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/widgets/qr_display_modal.dart';
-import 'package:troco_seguro_motorista/widgets/qr_scanner_modal.dart';
-import 'package:troco_seguro_motorista/widgets/qr_config_modal.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
-import 'package:troco_seguro_motorista/screens/vehicles_screen.dart';
-import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/models/qr_config.dart';
+import 'package:troco_seguro_pro/models/transaction.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/widgets/qr_display_modal.dart';
+import 'package:troco_seguro_pro/widgets/qr_scanner_modal.dart';
+import 'package:troco_seguro_pro/widgets/qr_config_modal.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/screens/vehicles_screen.dart';
+import 'package:troco_seguro_pro/screens/earnings_screen.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -51,6 +53,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
   QrConfig? _qrConfig;
 
+  // Sessão activa de assentos
+  bool _hasActiveSession = false;
+  int _paidSeats = 0;
+  int _totalSeats = 0;
+  String? _sessionPublicToken;
+  StreamSubscription<SessionSeatsResult>? _sseSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +67,31 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadQrConfig();
     _loadBalance();
     _loadRating();
+    _startSseStream();
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startSseStream() async {
+    await _api.loadTokens(); // garantir token antes de SSE e REST
+    _loadSessionSeats(); // snapshot imediato via REST
+    if (!mounted) return;
+    _sseSubscription = _api.streamSessionSeats().listen(
+      (seats) {
+        if (!mounted) return;
+        setState(() {
+          _hasActiveSession = seats.active;
+          _paidSeats = seats.paidSeats;
+          _totalSeats = seats.totalSeats;
+          _sessionPublicToken = seats.publicToken;
+        });
+      },
+      onError: (e) => debugPrint('SSE error: $e'),
+    );
   }
 
   Future<void> _loadRating() async {
@@ -96,7 +130,32 @@ class _HomeScreenState extends State<HomeScreen> {
       config = QrConfig(driverToken: token);
       await config.save();
     }
-    setState(() => _qrConfig = config);
+    if (mounted) setState(() => _qrConfig = config);
+  }
+
+  Future<void> _loadSessionSeats() async {
+    await _api.loadTokens();
+    final result = await _api.getSessionSeats();
+    if (!mounted) return;
+    if (result.isSuccess && result.data != null) {
+      final seats = result.data!;
+      setState(() {
+        _hasActiveSession = seats.active;
+        _paidSeats = seats.paidSeats;
+        _totalSeats = seats.totalSeats;
+        _sessionPublicToken = seats.publicToken;
+      });
+      // Sincronizar publicToken no QrConfig local se diferente
+      if (seats.publicToken != null &&
+          seats.publicToken != _qrConfig?.sessionPublicToken &&
+          _qrConfig != null) {
+        final updated = _qrConfig!.copyWith(sessionPublicToken: seats.publicToken);
+        await updated.save();
+        if (mounted) setState(() => _qrConfig = updated);
+      }
+    } else {
+      setState(() => _hasActiveSession = false);
+    }
   }
 
   Future<void> _loadTodayStats() async {
@@ -143,81 +202,83 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showQRCode() async {
-    if (_qrConfig == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Carregando configuração...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+    final qrImage = _qrConfig?.parentQrImage;
+
+    // Sem sessão activa — redirigir para configuração
+    if (!_hasActiveSession || qrImage == null || qrImage.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              !_hasActiveSession && qrImage != null && qrImage.isNotEmpty
+                  ? 'Sessão expirada. Defina um novo preço para iniciar.'
+                  : 'Configure o preço para iniciar uma sessão.',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      _showQRConfig();
       return;
     }
 
-    setState(() => _isLoadingQr = true);
-    await _api.loadTokens();
-    final result = await _api.getMyStaticQrCode();
     if (!mounted) return;
-    setState(() => _isLoadingQr = false);
-
-    if (!result.isSuccess || result.data == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Não foi possível carregar o QR Code.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final qr = result.data!;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => QrDisplayModal(
-        qrData: qr.publicToken,
-        qrCodeImage: qr.qrCodeImage,
-        amount: qr.currentAmount > 0
-            ? qr.currentAmount
-            : ((_qrConfig?.currentFare ?? 0) > 0
-                ? _qrConfig!.currentFare
-                : null),
-        currency: qr.currency,
-        driverName:
-            qr.driverName.isNotEmpty ? qr.driverName : widget.driver.fullName,
-        routeName: _qrConfig?.activeRouteName,
+        qrData: _qrConfig?.sessionPublicToken ?? '',
+        qrCodeImage: qrImage,
+        amount: (_qrConfig?.currentFare ?? 0) > 0 ? _qrConfig!.currentFare : null,
+        currency: 'AOA',
+        driverName: widget.driver.fullName,
+        childQrs: _qrConfig?.childQrs ?? [],
         onClose: () {},
         onUpdateAmount: (newAmount) async {
           await _api.loadTokens();
-          final description = (_qrConfig?.activeRouteName != null &&
-                  _qrConfig!.activeRouteName!.trim().isNotEmpty)
-              ? _qrConfig!.activeRouteName!.trim()
-              : 'Corrida';
-          final priceResult = await _api.setQrCodePrice(
+          // Encerrar sessão activa antes de iniciar nova com novo preço
+          if (_hasActiveSession) await _api.endSession();
+          final setupResult = await _api.setupQrSession(
             amount: newAmount,
-            description: description,
             activeVehicleId: widget.activeVehicleId,
           );
-
-          if (priceResult.isSuccess) {
-            if (_qrConfig != null) {
-              final newConfig = _qrConfig!.copyWith(currentFare: newAmount);
-              await newConfig.save();
-              if (mounted) setState(() => _qrConfig = newConfig);
-            }
-            return true;
-          } else {
+          if (!setupResult.isSuccess || setupResult.data == null) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(priceResult.error ?? 'Erro ao atualizar valor'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(setupResult.error ?? 'Erro ao actualizar valor'),
+                backgroundColor: Colors.red,
+              ));
             }
             return false;
           }
+          final setup = setupResult.data!;
+          final publicToken = setup.parentQr.publicToken.isNotEmpty
+              ? setup.parentQr.publicToken
+              : null;
+          if (_qrConfig != null) {
+            final newConfig = _qrConfig!.copyWith(
+              currentFare: newAmount,
+              parentQrImage: setup.parentQr.image.isNotEmpty
+                  ? setup.parentQr.image
+                  : _qrConfig!.parentQrImage,
+              sessionPublicToken: publicToken ?? _qrConfig!.sessionPublicToken,
+              childQrs: setup.childQrs
+                  .map((c) => {'id': c.id, 'label': c.label, 'image': c.image})
+                  .toList(),
+            );
+            await newConfig.save();
+            if (mounted) {
+              setState(() {
+                _qrConfig = newConfig;
+                _sessionPublicToken = publicToken;
+                _hasActiveSession = true;
+                _paidSeats = 0;
+                _totalSeats = setup.childQrs.length;
+              });
+            }
+          }
+          return true;
         },
       ),
     );
@@ -239,13 +300,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _processScannedQR(String scannedData) async {
+    // Tentar detectar QR de pagamento do passageiro (PAYMENT_INTENT)
+    try {
+      final qrJson = jsonDecode(scannedData);
+      if (qrJson is Map && qrJson['type'] == 'PAYMENT_INTENT') {
+        final passengerName = qrJson['name']?.toString() ??
+            qrJson['phoneNumber']?.toString() ??
+            'Passageiro';
+        final amount =
+            int.tryParse(qrJson['amount']?.toString() ?? '0') ?? 0;
+        if (!mounted) return;
+        _showPassengerPaymentModal(
+          rawQrData: scannedData,
+          passengerName: passengerName,
+          amount: amount,
+        );
+        return;
+      }
+    } catch (_) {
+      // Não é JSON — tentar como cartão virtual
+    }
+
+    // Fallback: cartão virtual
     await _api.loadTokens();
     final result = await _api.resolveVirtualCardQr(scannedData);
     if (!mounted) return;
 
     if (!result.isSuccess || result.data == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'QR inválido ou não reconhecido'),
+        content: Text(result.error ??
+            'QR inválido. Peça ao passageiro para gerar um QR de pagamento no app Troco Seguro.'),
         backgroundColor: Colors.red,
       ));
       return;
@@ -257,6 +341,35 @@ class _HomeScreenState extends State<HomeScreen> {
       cardId: card.cardId ?? '',
       amount: 0,
       rawData: scannedData,
+    );
+  }
+
+  void _showPassengerPaymentModal({
+    required String rawQrData,
+    required String passengerName,
+    required int amount,
+  }) {
+    final responsive = ResponsiveHelper(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => _PassengerQRPaymentModal(
+        rawQrData: rawQrData,
+        passengerName: passengerName,
+        amount: amount,
+        sessionPublicToken:
+            _sessionPublicToken ?? _qrConfig?.sessionPublicToken,
+        api: _api,
+        responsive: responsive,
+        onSuccess: (_) {
+          _loadTodayStats();
+          _loadBalance();
+          _loadSessionSeats();
+        },
+      ),
     );
   }
 
@@ -477,6 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
         passengerName: passengerName,
         amount: amount,
         driverId: widget.driver.id ?? '',
+        paymentToken: _sessionPublicToken ?? _qrConfig?.sessionPublicToken,
         api: _api,
         responsive: responsive,
         onSuccess: (result) {
@@ -518,7 +632,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? Colors.white.withValues(alpha: 0.06)
                           : Colors.black.withValues(alpha: 0.05),
                     ),
-                    SizedBox(height: responsive.scaledHeight(24)),
+                    SizedBox(height: responsive.scaledHeight(16)),
+                    if (_hasActiveSession)
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(20),
+                          vertical: responsive.scaledHeight(8),
+                        ),
+                        child: _buildSeatCounter(responsive, isDark),
+                      ),
+                    SizedBox(height: responsive.scaledHeight(16)),
                     _buildQuickActions(responsive),
                     SizedBox(height: responsive.scaledHeight(32)),
                     _buildRecentTransactions(responsive, isDark),
@@ -783,6 +906,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: a.label,
                     onTap: a.onTap,
                     isLoading: a.label == 'QR Code' && _isLoadingQr,
+                    badge: a.label == 'QR Code' && _hasActiveSession && _totalSeats > 0
+                        ? '$_paidSeats/$_totalSeats'
+                        : null,
                   ),
                 ))
             .toList(),
@@ -997,45 +1123,53 @@ class _HomeScreenState extends State<HomeScreen> {
       currentConfig: _qrConfig!,
       onConfigSaved: (newConfig) async {
         final fare = newConfig.currentFare;
-        if (fare <= 0) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Defina um valor maior que 0 para o QR Code.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
+
+        // Veículo obrigatório para iniciar sessão
+        if (widget.activeVehicleId == null || widget.activeVehicleId!.isEmpty) {
+          return 'Seleccione um veículo antes de iniciar a sessão. Vá offline e escolha um veículo.';
         }
 
+        setState(() => _isLoadingQr = true);
         await _api.loadTokens();
-        final description = (newConfig.activeRouteName != null &&
-                newConfig.activeRouteName!.trim().isNotEmpty)
-            ? newConfig.activeRouteName!.trim()
-            : 'Corrida';
-        final priceResult = await _api.setQrCodePrice(
+        // Encerrar sessão anterior antes de iniciar nova
+        if (_hasActiveSession) await _api.endSession();
+        final setupResult = await _api.setupQrSession(
           amount: fare,
-          description: description,
           activeVehicleId: widget.activeVehicleId,
         );
+        if (!mounted) return null;
+        setState(() => _isLoadingQr = false);
 
-        if (!priceResult.isSuccess) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                priceResult.error ??
-                    'Não foi possível definir o preço do QR Code na API.',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
+        if (!setupResult.isSuccess || setupResult.data == null) {
+          return setupResult.error ?? 'Não foi possível iniciar a sessão.';
         }
 
-        await newConfig.save();
-        if (!mounted) return;
-        setState(() => _qrConfig = newConfig);
+        final setup = setupResult.data!;
+        final publicToken = setup.parentQr.publicToken.isNotEmpty
+            ? setup.parentQr.publicToken
+            : null;
+
+        final updatedConfig = newConfig.copyWith(
+          parentQrImage: setup.parentQr.image.isNotEmpty
+              ? setup.parentQr.image
+              : newConfig.parentQrImage,
+          sessionPublicToken: publicToken ?? newConfig.sessionPublicToken,
+          childQrs: setup.childQrs
+              .map((c) => {'id': c.id, 'label': c.label, 'image': c.image})
+              .toList(),
+        );
+
+        await updatedConfig.save();
+        if (!mounted) return null;
+
+        setState(() {
+          _qrConfig = updatedConfig;
+          _sessionPublicToken = publicToken;
+          _hasActiveSession = true;
+          _paidSeats = 0;
+          _totalSeats = setup.childQrs.length;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1044,7 +1178,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Preço do QR atualizado: ${_formatCurrency(newConfig.currentFare)}',
+                    'Sessão iniciada — ${_formatCurrency(fare)} por assento. '
+                    '${setup.childQrs.length} QR${setup.childQrs.length != 1 ? "s" : ""} gerados.',
                   ),
                 ),
               ],
@@ -1055,6 +1190,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
+
+        return null; // sucesso
       },
     );
   }
@@ -1072,6 +1209,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required VoidCallback onTap,
     bool isLoading = false,
+    String? badge,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accentColor = AppColors.accentOf(context);
@@ -1083,26 +1221,52 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         GestureDetector(
           onTap: onTap,
-          child: Container(
-            width: responsive.scaledWidth(58),
-            height: responsive.scaledWidth(58),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accentColor,
-            ),
-            child: isLoading
-                ? Padding(
-                    padding: EdgeInsets.all(responsive.scaledWidth(14)),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: iconColor,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: responsive.scaledWidth(58),
+                height: responsive.scaledWidth(58),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accentColor,
+                ),
+                child: isLoading
+                    ? Padding(
+                        padding: EdgeInsets.all(responsive.scaledWidth(14)),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: iconColor,
+                        ),
+                      )
+                    : Icon(
+                        icon,
+                        color: iconColor,
+                        size: responsive.scaledWidth(24),
+                      ),
+              ),
+              if (badge != null)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade600,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
                     ),
-                  )
-                : Icon(
-                    icon,
-                    color: iconColor,
-                    size: responsive.scaledWidth(24),
+                    child: Text(
+                      badge,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
+                ),
+            ],
           ),
         ),
         SizedBox(height: responsive.scaledHeight(8)),
@@ -1121,6 +1285,170 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildSeatCounter(ResponsiveHelper responsive, bool isDark) {
+    final accent = AppColors.accentOf(context);
+    final filled = _totalSeats > 0 ? _paidSeats / _totalSeats : 0.0;
+
+    return GestureDetector(
+      onTap: _loadSessionSeats,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: responsive.scaledWidth(16),
+          vertical: responsive.scaledHeight(12),
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.event_seat_rounded,
+                color: accent,
+                size: responsive.scaledWidth(20),
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(12)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sessão activa',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(11),
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : Colors.black.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  SizedBox(height: responsive.scaledHeight(3)),
+                  Row(
+                    children: [
+                      Text(
+                        '$_paidSeats / $_totalSeats assentos pagos',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(13),
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : AppColors.textDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: responsive.scaledHeight(5)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: filled.clamp(0.0, 1.0),
+                      minHeight: responsive.scaledHeight(5),
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.black.withValues(alpha: 0.08),
+                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: responsive.scaledWidth(8)),
+            GestureDetector(
+              onTap: _confirmEndSession,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.scaledWidth(10),
+                  vertical: responsive.scaledHeight(6),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Encerrar',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(11),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.red.shade600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmEndSession() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Encerrar sessão'),
+        content: const Text(
+          'Tem a certeza que deseja encerrar a sessão? Os QR codes dos assentos ficarão inválidos.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Encerrar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _api.loadTokens();
+    final result = await _api.endSession();
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      setState(() {
+        _hasActiveSession = false;
+        _paidSeats = 0;
+        _totalSeats = 0;
+        _sessionPublicToken = null;
+      });
+      // Limpar QrConfig local
+      if (_qrConfig != null) {
+        final cleared = _qrConfig!.copyWith(
+          parentQrImage: '',
+          sessionPublicToken: null,
+          childQrs: [],
+        );
+        await cleared.save();
+        setState(() => _qrConfig = cleared);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sessão encerrada com sucesso.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Erro ao encerrar sessão.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildRecentTransactions(ResponsiveHelper responsive, bool isDark) {
@@ -1299,6 +1627,636 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ─── Passenger QR Payment Modal (Fluxo 2: motorista escaneia QR do passageiro) ─
+
+enum _PassengerStep { info, pin, processing, success, error }
+
+class _PassengerQRPaymentModal extends StatefulWidget {
+  final String rawQrData;
+  final String passengerName;
+  final int amount;
+  final String? sessionPublicToken;
+  final ApiService api;
+  final ResponsiveHelper responsive;
+  final void Function(PassengerQrPaymentResult result) onSuccess;
+
+  const _PassengerQRPaymentModal({
+    required this.rawQrData,
+    required this.passengerName,
+    required this.amount,
+    this.sessionPublicToken,
+    required this.api,
+    required this.responsive,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_PassengerQRPaymentModal> createState() =>
+      _PassengerQRPaymentModalState();
+}
+
+class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
+  _PassengerStep _step = _PassengerStep.info;
+  final _originController = TextEditingController();
+  final _destinationController = TextEditingController();
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+  String _enteredPin = '';
+  String? _errorMessage;
+  int _seatsCount = 1;
+
+  static const int _pinLength = 6;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinController.addListener(
+        () => setState(() => _enteredPin = _pinController.text));
+  }
+
+  @override
+  void dispose() {
+    _originController.dispose();
+    _destinationController.dispose();
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _proceedToPin() {
+    if (_originController.text.trim().isEmpty ||
+        _destinationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Preencha a origem e o destino.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    setState(() => _step = _PassengerStep.pin);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FocusScope.of(context).requestFocus(_pinFocusNode);
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_enteredPin.length != _pinLength) return;
+
+    setState(() => _step = _PassengerStep.processing);
+    await widget.api.loadTokens();
+
+    final result = await widget.api.authorizePassengerQr(
+      qrData: widget.rawQrData,
+      passengerPin: _enteredPin,
+      origin: _originController.text.trim(),
+      destination: _destinationController.text.trim(),
+      seatsCount: _seatsCount,
+      parentQrToken: widget.sessionPublicToken,
+    );
+
+    if (!mounted) return;
+
+    if (result.isSuccess && result.data != null) {
+      setState(() => _step = _PassengerStep.success);
+      widget.onSuccess(result.data!);
+    } else {
+      setState(() {
+        _step = _PassengerStep.error;
+        _errorMessage = result.error ?? 'Pagamento recusado pela API.';
+      });
+    }
+  }
+
+  void _retry() {
+    _pinController.clear();
+    setState(() {
+      _step = _PassengerStep.info;
+      _errorMessage = null;
+    });
+  }
+
+  String _formatAmt(int v) {
+    return '${v.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} Kz';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.responsive;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.darkCard : Colors.white;
+    final primaryText = isDark ? Colors.white : AppColors.textDark;
+    final subtleText = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : Colors.black.withValues(alpha: 0.4);
+    const accent = AppColors.primaryGold;
+
+    return Container(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            r.scaledWidth(24), r.scaledHeight(16), r.scaledWidth(24), r.scaledHeight(32)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: r.scaledHeight(24)),
+            if (_step == _PassengerStep.info)
+              ..._buildInfoStep(r, isDark, primaryText, subtleText, accent),
+            if (_step == _PassengerStep.pin)
+              ..._buildPinStep(r, isDark, primaryText, subtleText, accent),
+            if (_step == _PassengerStep.processing)
+              ..._buildProcessingStep(r, primaryText, subtleText),
+            if (_step == _PassengerStep.success)
+              ..._buildSuccessStep(r, primaryText, subtleText),
+            if (_step == _PassengerStep.error)
+              ..._buildErrorStep(r, primaryText),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildInfoStep(ResponsiveHelper r, bool isDark, Color primaryText,
+      Color subtleText, Color accent) {
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.12);
+
+    return [
+      Icon(Icons.qr_code_scanner_rounded, size: r.scaledWidth(48), color: accent),
+      SizedBox(height: r.scaledHeight(8)),
+      Text('PAGAMENTO DO PASSAGEIRO',
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(12),
+              fontWeight: FontWeight.w800,
+              color: accent,
+              letterSpacing: 0.8)),
+      SizedBox(height: r.scaledHeight(4)),
+      Text(widget.passengerName,
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(18),
+              fontWeight: FontWeight.w700,
+              color: primaryText)),
+      SizedBox(height: r.scaledHeight(4)),
+      Text(_formatAmt(widget.amount),
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(28),
+              fontWeight: FontWeight.w900,
+              color: primaryText)),
+      SizedBox(height: r.scaledHeight(20)),
+      TextField(
+        controller: _originController,
+        style: TextStyle(fontSize: r.responsiveFontSize(14), color: primaryText),
+        decoration: InputDecoration(
+          labelText: 'Origem',
+          hintText: 'Ex: Roque Santeiro',
+          labelStyle: TextStyle(color: subtleText),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primaryGold, width: 2)),
+          prefixIcon: Icon(Icons.location_on_outlined, color: subtleText),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(12)),
+      TextField(
+        controller: _destinationController,
+        style: TextStyle(fontSize: r.responsiveFontSize(14), color: primaryText),
+        decoration: InputDecoration(
+          labelText: 'Destino',
+          hintText: 'Ex: Talatona',
+          labelStyle: TextStyle(color: subtleText),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primaryGold, width: 2)),
+          prefixIcon:
+              Icon(Icons.flag_outlined, color: subtleText),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      // Selector de assentos
+      Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: r.scaledWidth(16),
+          vertical: r.scaledHeight(12),
+        ),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_seat_rounded, color: accent, size: r.scaledWidth(20)),
+            SizedBox(width: r.scaledWidth(10)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nº de assentos',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(11),
+                          color: subtleText,
+                          fontWeight: FontWeight.w600)),
+                  Text(
+                    'Total: ${_formatAmt(widget.amount * _seatsCount)}',
+                    style: TextStyle(
+                        fontSize: r.responsiveFontSize(13),
+                        fontWeight: FontWeight.w800,
+                        color: primaryText),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: _seatsCount > 1
+                      ? () => setState(() => _seatsCount--)
+                      : null,
+                  child: AnimatedOpacity(
+                    opacity: _seatsCount > 1 ? 1.0 : 0.3,
+                    duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      width: r.scaledWidth(36),
+                      height: r.scaledWidth(36),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.remove_rounded, color: accent, size: r.scaledWidth(18)),
+                    ),
+                  ),
+                ),
+                SizedBox(width: r.scaledWidth(14)),
+                Text(
+                  '$_seatsCount',
+                  style: TextStyle(
+                    fontSize: r.responsiveFontSize(22),
+                    fontWeight: FontWeight.w900,
+                    color: primaryText,
+                  ),
+                ),
+                SizedBox(width: r.scaledWidth(14)),
+                GestureDetector(
+                  onTap: _seatsCount < 15
+                      ? () => setState(() => _seatsCount++)
+                      : null,
+                  child: AnimatedOpacity(
+                    opacity: _seatsCount < 15 ? 1.0 : 0.3,
+                    duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      width: r.scaledWidth(36),
+                      height: r.scaledWidth(36),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.add_rounded, color: Colors.black, size: r.scaledWidth(18)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      Row(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('CANCELAR',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(14),
+                          fontWeight: FontWeight.w700,
+                          color: primaryText))),
+            ),
+          ),
+        ),
+        SizedBox(width: r.scaledWidth(12)),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _proceedToPin,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  color: accent, borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('CONTINUAR',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(14),
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black.withValues(alpha: 0.85)))),
+            ),
+          ),
+        ),
+      ]),
+    ];
+  }
+
+  List<Widget> _buildPinStep(ResponsiveHelper r, bool isDark, Color primaryText,
+      Color subtleText, Color accent) {
+    return [
+      Icon(Icons.lock_rounded, size: r.scaledWidth(44), color: accent),
+      SizedBox(height: r.scaledHeight(10)),
+      Text('PIN DO PASSAGEIRO',
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(12),
+              fontWeight: FontWeight.w800,
+              color: accent,
+              letterSpacing: 0.8)),
+      SizedBox(height: r.scaledHeight(4)),
+      Text(widget.passengerName,
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(16),
+              fontWeight: FontWeight.w700,
+              color: primaryText)),
+      SizedBox(height: r.scaledHeight(16)),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          'Peça ao passageiro para digitar o seu PIN de 6 dígitos',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: r.responsiveFontSize(13), color: primaryText),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(20)),
+      LayoutBuilder(builder: (context, constraints) {
+        final boxSize =
+            ((constraints.maxWidth - r.scaledWidth(6) * _pinLength * 2) /
+                    _pinLength)
+                .clamp(36.0, 52.0);
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+              _pinLength,
+              (i) => Container(
+                    width: boxSize,
+                    height: boxSize,
+                    margin: EdgeInsets.symmetric(horizontal: r.scaledWidth(4)),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : Colors.black.withValues(alpha: 0.04),
+                      border: Border.all(
+                        color: _enteredPin.length > i
+                            ? accent
+                            : (isDark ? Colors.white30 : Colors.black26),
+                        width: _enteredPin.length > i ? 2 : 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: _enteredPin.length > i
+                        ? Text('•',
+                            style: TextStyle(
+                                fontSize: boxSize * 0.5,
+                                fontWeight: FontWeight.bold,
+                                color: accent))
+                        : null,
+                  )),
+        );
+      }),
+      SizedBox(height: r.scaledHeight(8)),
+      SizedBox(
+        height: 1,
+        child: TextField(
+          controller: _pinController,
+          focusNode: _pinFocusNode,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: _pinLength,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            counterText: '',
+          ),
+          style: const TextStyle(color: Colors.transparent, height: 0.1),
+        ),
+      ),
+      SizedBox(height: r.scaledHeight(20)),
+      Row(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _step = _PassengerStep.info),
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('VOLTAR',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(14),
+                          fontWeight: FontWeight.w700,
+                          color: primaryText))),
+            ),
+          ),
+        ),
+        SizedBox(width: r.scaledWidth(12)),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _enteredPin.length == _pinLength ? _submit : null,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  color: _enteredPin.length == _pinLength
+                      ? accent
+                      : accent.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('CONFIRMAR',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(14),
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black.withValues(alpha: 0.85)))),
+            ),
+          ),
+        ),
+      ]),
+    ];
+  }
+
+  List<Widget> _buildProcessingStep(
+      ResponsiveHelper r, Color primaryText, Color subtleText) {
+    return [
+      SizedBox(height: r.scaledHeight(32)),
+      const CircularProgressIndicator(color: AppColors.primaryGold),
+      SizedBox(height: r.scaledHeight(24)),
+      Text('A processar pagamento…',
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(16),
+              fontWeight: FontWeight.w600,
+              color: primaryText)),
+      SizedBox(height: r.scaledHeight(8)),
+      Text('Aguarde um momento',
+          style: TextStyle(fontSize: r.responsiveFontSize(13), color: subtleText)),
+      SizedBox(height: r.scaledHeight(48)),
+    ];
+  }
+
+  List<Widget> _buildSuccessStep(
+      ResponsiveHelper r, Color primaryText, Color subtleText) {
+    return [
+      Container(
+        width: r.scaledWidth(88),
+        height: r.scaledWidth(88),
+        decoration: BoxDecoration(
+            color: Colors.green.withValues(alpha: 0.12), shape: BoxShape.circle),
+        child: Icon(Icons.check_circle_rounded,
+            size: r.scaledWidth(56), color: Colors.green),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      Text('PAGAMENTO RECEBIDO!',
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(16),
+              fontWeight: FontWeight.w900,
+              color: Colors.green,
+              letterSpacing: 0.5)),
+      SizedBox(height: r.scaledHeight(8)),
+      Text(_formatAmt(widget.amount),
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(36),
+              fontWeight: FontWeight.w900,
+              color: primaryText)),
+      SizedBox(height: r.scaledHeight(4)),
+      Text('de ${widget.passengerName}',
+          style: TextStyle(fontSize: r.responsiveFontSize(14), color: subtleText)),
+      SizedBox(height: r.scaledHeight(32)),
+      SizedBox(
+        width: double.infinity,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+            decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(12)),
+            child: Center(
+                child: Text('CONTINUAR',
+                    style: TextStyle(
+                        fontSize: r.responsiveFontSize(14),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black.withValues(alpha: 0.85)))),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildErrorStep(ResponsiveHelper r, Color primaryText) {
+    return [
+      Container(
+        width: r.scaledWidth(88),
+        height: r.scaledWidth(88),
+        decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle),
+        child: Icon(Icons.cancel_rounded,
+            size: r.scaledWidth(56), color: Colors.red),
+      ),
+      SizedBox(height: r.scaledHeight(16)),
+      Text('PAGAMENTO RECUSADO',
+          style: TextStyle(
+              fontSize: r.responsiveFontSize(15),
+              fontWeight: FontWeight.w900,
+              color: Colors.red,
+              letterSpacing: 0.5)),
+      SizedBox(height: r.scaledHeight(10)),
+      Text(_errorMessage ?? 'Tente novamente.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: r.responsiveFontSize(13), color: primaryText)),
+      SizedBox(height: r.scaledHeight(28)),
+      Row(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black12),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('FECHAR',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(14),
+                          fontWeight: FontWeight.w700,
+                          color: primaryText))),
+            ),
+          ),
+        ),
+        SizedBox(width: r.scaledWidth(12)),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _retry,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
+              decoration: BoxDecoration(
+                  color: AppColors.primaryGold,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Center(
+                  child: Text('TENTAR NOVAMENTE',
+                      style: TextStyle(
+                          fontSize: r.responsiveFontSize(13),
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black.withValues(alpha: 0.85)))),
+            ),
+          ),
+        ),
+      ]),
+    ];
+  }
+}
+
 // ─── POS Terminal Modal ────────────────────────────────────────────────────────
 
 enum _PosStep { pin, processing, success, error }
@@ -1308,6 +2266,7 @@ class _PosTerminalModal extends StatefulWidget {
   final String passengerName;
   final int amount;
   final String driverId;
+  final String? paymentToken;
   final ApiService api;
   final ResponsiveHelper responsive;
   final void Function(PaymentResult result) onSuccess;
@@ -1317,6 +2276,7 @@ class _PosTerminalModal extends StatefulWidget {
     required this.passengerName,
     required this.amount,
     required this.driverId,
+    this.paymentToken,
     required this.api,
     required this.responsive,
     required this.onSuccess,
@@ -1367,28 +2327,23 @@ class _PosTerminalModalState extends State<_PosTerminalModal> {
 
     await widget.api.loadTokens();
 
-    // Get driver's own paymentToken from static QR
-    final qrResult = await widget.api.getMyStaticQrCode();
-    if (!mounted) return;
+    ApiResponse<PaymentResult> result;
 
-    if (!qrResult.isSuccess || qrResult.data == null) {
+    if (widget.cardId.isNotEmpty) {
+      // Fluxo de cartão virtual — cobrar directamente pelo cardId
+      result = await widget.api.chargeVirtualCard(
+        cardId: widget.cardId,
+        amount: widget.amount,
+        cardPin: _enteredPin,
+      );
+    } else {
+      // Sem cardId — não é possível processar cartão virtual
       setState(() {
         _step = _PosStep.error;
-        _errorMessage = qrResult.error ?? 'Erro ao obter token de pagamento';
+        _errorMessage = 'Cartão não identificado. Peça ao passageiro para gerar um QR de pagamento na app.';
       });
       return;
     }
-
-    final driverId = widget.driverId;
-    final paymentToken = qrResult.data!.publicToken;
-
-    final result = await widget.api.processPayment(
-      driverId: driverId,
-      cardId: widget.cardId,
-      amount: widget.amount,
-      pin: _enteredPin,
-      paymentToken: paymentToken,
-    );
     if (!mounted) return;
 
     if (result.isSuccess && result.data != null) {

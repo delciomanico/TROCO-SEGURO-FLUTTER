@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/models/user.dart';
@@ -13,7 +14,7 @@ import 'dart:convert';
 
 /// Serviço para comunicação com a API do Troco Seguro
 class ApiService {
-  static const String baseUrl = 'https://troco-seguro.onrender.com/api/v1';
+  static final String baseUrl = dotenv.get('BASE_URL', fallback: 'https://trocoseguro.wemof.tech/api/v1/');
 
   final Dio _dio;
   // Singleton pattern
@@ -124,7 +125,7 @@ class ApiService {
     String role = 'PASSENGER',
   }) async {
     try {
-      final response = await _dio.post('/auth/register', data: {
+      final response = await _dio.post('auth/register', data: {
         'fullName': fullName,
         'phoneNumber': phoneNumber,
         'password': password,
@@ -147,7 +148,7 @@ class ApiService {
     required String otpCode,
   }) async {
     try {
-      final response = await _dio.post('/auth/verify-otp', data: {
+      final response = await _dio.post('auth/verify-otp', data: {
         'phoneNumber': phoneNumber,
         'otpCode': otpCode,
       });
@@ -170,7 +171,7 @@ class ApiService {
   /// Reenviar código OTP
   Future<ApiResponse<void>> resendOtp(String phoneNumber) async {
     try {
-      await _dio.post('/auth/resend-otp', data: {
+      await _dio.post('auth/resend-otp', data: {
         'phoneNumber': phoneNumber,
       });
       return ApiResponse.success(null);
@@ -185,7 +186,7 @@ class ApiService {
     required String password,
   }) async {
     try {
-      final response = await _dio.post('/auth/login', data: {
+      final response = await _dio.post('auth/login', data: {
         'phoneNumber': phoneNumber,
         'password': password,
       });
@@ -206,7 +207,7 @@ class ApiService {
   /// Logout
   Future<ApiResponse<void>> logout() async {
     try {
-      await _dio.post('/auth/logout');
+      await _dio.post('auth/logout');
       await clearTokens();
       return ApiResponse.success(null);
     } on DioException catch (e) {
@@ -217,7 +218,7 @@ class ApiService {
 
   Future<ApiResponse<void>> deleteAccount({String? iban}) async {
     try {
-      await _dio.delete('/users/me',
+      await _dio.delete('users/me',
           data: iban != null && iban.isNotEmpty ? {'iban': iban} : null);
       await clearTokens();
       return ApiResponse.success(null);
@@ -232,7 +233,7 @@ class ApiService {
     required String newPassword,
   }) async {
     try {
-      await _dio.put('/users/me/pin', data: {
+      await _dio.put('users/me/pin', data: {
         'currentPin': currentPassword,
         'newPin': newPassword,
       });
@@ -245,7 +246,7 @@ class ApiService {
   /// Solicitar código OTP para recuperação de senha
   Future<ApiResponse<void>> forgotPassword(String phoneNumber) async {
     try {
-      await _dio.post('/auth/forgot-password', data: {'phoneNumber': phoneNumber});
+      await _dio.post('auth/forgot-password', data: {'phoneNumber': phoneNumber});
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -258,7 +259,7 @@ class ApiService {
     required String otp,
   }) async {
     try {
-      final response = await _dio.post('/auth/forgot-password/verify-otp',
+      final response = await _dio.post('auth/forgot-password/verify-otp',
           data: {'phoneNumber': phoneNumber, 'otp': otp});
       final token = response.data['resetToken'] as String;
       return ApiResponse.success(token);
@@ -273,7 +274,7 @@ class ApiService {
     required String newPassword,
   }) async {
     try {
-      await _dio.post('/auth/reset-password', data: {
+      await _dio.post('auth/reset-password', data: {
         'resetToken': resetToken,
         'newPassword': newPassword,
         'confirmPassword': newPassword,
@@ -289,7 +290,7 @@ class ApiService {
     if (_refreshToken == null) return false;
 
     try {
-      final response = await _dio.post('/auth/refresh', data: {
+      final response = await _dio.post('auth/refresh', data: {
         'refreshToken': _refreshToken,
       });
 
@@ -305,7 +306,7 @@ class ApiService {
   /// Verificar PIN
   Future<ApiResponse<bool>> verifyPin(String pin) async {
     try {
-      final response = await _dio.post('/auth/verify-pin', data: {
+      final response = await _dio.post('auth/verify-pin', data: {
         'pin': pin,
       });
       return ApiResponse.success(response.data['valid'] ?? true);
@@ -319,7 +320,7 @@ class ApiService {
   /// Obter perfil do utilizador logado
   Future<ApiResponse<User>> getProfile() async {
     try {
-      final response = await _dio.get('/auth/profile');
+      final response = await _dio.get('users/me');
       return ApiResponse.success(User.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -336,7 +337,7 @@ class ApiService {
       if (fullName != null) data['fullName'] = fullName;
       if (email != null) data['email'] = email;
 
-      final response = await _dio.put('/users/me', data: data);
+      final response = await _dio.put('users/me', data: data);
       return ApiResponse.success(User.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -349,7 +350,7 @@ class ApiService {
     required String newPin,
   }) async {
     try {
-      await _dio.put('/users/me/pin', data: {
+      await _dio.put('users/me/pin', data: {
         'currentPin': currentPin,
         'newPin': newPin,
       });
@@ -370,7 +371,7 @@ class ApiService {
       final data = <String, dynamic>{'amount': amount};
       if (reference != null) data['reference'] = reference;
 
-      final response = await _dio.post('/transactions/deposit', data: data);
+      final response = await _dio.post('transactions/deposit', data: data);
       return ApiResponse.success(TransactionResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -390,7 +391,7 @@ class ApiService {
       };
       if (description != null) data['description'] = description;
 
-      final response = await _dio.post('/transactions/transfer', data: data);
+      final response = await _dio.post('transactions/transfer', data: data);
       return ApiResponse.success(TransactionResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -400,7 +401,7 @@ class ApiService {
   /// Histórico de transações
   Future<ApiResponse<List<Transaction>>> getTransactionHistory() async {
     try {
-      final response = await _dio.get('/transactions/history');
+      final response = await _dio.get('transactions/history');
       // API pode retornar array direto ou objeto com chave 'transactions'
       final List<dynamic> data = response.data is List
           ? response.data
@@ -420,7 +421,7 @@ class ApiService {
       String phone) async {
     try {
       final response =
-          await _dio.get('/wallet/transfer/verify/${Uri.encodeComponent(phone)}');
+          await _dio.get('wallet/transfer/verify/${Uri.encodeComponent(phone)}');
       return ApiResponse.success(RecipientInfo.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -435,7 +436,7 @@ class ApiService {
     required String pin,
   }) async {
     try {
-      final response = await _dio.post('/wallet/transfer', data: {
+      final response = await _dio.post('wallet/transfer', data: {
         'fromCardId': fromCardId,
         'toCardId': toCardId,
         'amount': amount,
@@ -454,7 +455,7 @@ class ApiService {
     required String pin,
   }) async {
     try {
-      final response = await _dio.post('/wallet/transfer-to-card', data: {
+      final response = await _dio.post('wallet/transfer-to-card', data: {
         'cardNumber': cardNumber,
         'amount': amount,
         'pin': pin,
@@ -471,7 +472,7 @@ class ApiService {
     required int amount,
   }) async {
     try {
-      final response = await _dio.post('/wallet/card/deposit', data: {
+      final response = await _dio.post('wallet/card/deposit', data: {
         'cardId': cardId,
         'amount': amount,
       });
@@ -486,7 +487,7 @@ class ApiService {
   /// Obter QR Code de identidade
   Future<ApiResponse<String>> getMyQrCode() async {
     try {
-      final response = await _dio.get('/qr-code/my-code');
+      final response = await _dio.get('qr-code/my-code');
       return ApiResponse.success(
           response.data['qrCode'] ?? response.data['image']);
     } on DioException catch (e) {
@@ -497,7 +498,7 @@ class ApiService {
   /// Gerar QR Code de cobrança (para taxistas)
   Future<ApiResponse<String>> generatePaymentQr(int amount) async {
     try {
-      final response = await _dio.post('/qr-code/payment-request', data: {
+      final response = await _dio.post('qr-code/payment-request', data: {
         'amount': amount,
       });
       return ApiResponse.success(
@@ -514,7 +515,7 @@ class ApiService {
   /// Resolver QR por token (GET /qrcodes/resolve?token=)
   Future<ApiResponse<QrValidationResult>> resolveQrToken(String token) async {
     try {
-      final response = await _dio.get('/qrcodes/resolve', queryParameters: {
+      final response = await _dio.get('qrcodes/resolve', queryParameters: {
         'token': token,
       });
       return ApiResponse.success(QrValidationResult.fromJson(response.data));
@@ -538,9 +539,9 @@ class ApiService {
     int durationMinutes = 0,
   }) async {
     try {
+      // API extrai amount do paymentToken JWT — não enviar amount no body
       final payload = <String, dynamic>{
         'driverId': driverId,
-        'amount': amount,
         'pin': pin,
         'origin': origin,
         'destination': destination,
@@ -549,7 +550,7 @@ class ApiService {
         'durationMinutes': durationMinutes,
       };
       if (cardId != null && cardId.isNotEmpty) payload['cardId'] = cardId;
-      final response = await _dio.post('/payments/process', data: payload);
+      final response = await _dio.post('payments/process', data: payload);
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -561,7 +562,7 @@ class ApiService {
   /// Listar cartões virtuais
   Future<ApiResponse<List<VirtualCard>>> getVirtualCards() async {
     try {
-      final response = await _dio.get('/virtual-cards');
+      final response = await _dio.get('virtual-cards');
       final dynamic data = response.data;
       List<dynamic> list;
 
@@ -587,7 +588,7 @@ class ApiService {
   ) async {
     try {
       final response =
-          await _dio.post('/virtual-cards', data: payload.toJson());
+          await _dio.post('virtual-cards', data: payload.toJson());
       return ApiResponse.success(VirtualCardResponse.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -597,7 +598,7 @@ class ApiService {
   /// Detalhes do cartão
   Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(String qrData) async {
     try {
-      final response = await _dio.post('/virtual-cards/resolve-qr', data: {'qrData': qrData});
+      final response = await _dio.post('virtual-cards/resolve-qr', data: {'qrData': qrData});
       return ApiResponse.success(VirtualCardQrResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -606,7 +607,7 @@ class ApiService {
 
   Future<ApiResponse<CardBalanceResult>> getWalletBalanceByQr(String qrId) async {
     try {
-      final response = await _dio.get('/wallet/balance-by-qr/${Uri.encodeComponent(qrId)}');
+      final response = await _dio.get('wallet/balance-by-qr/${Uri.encodeComponent(qrId)}');
       return ApiResponse.success(CardBalanceResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -615,7 +616,7 @@ class ApiService {
 
   Future<ApiResponse<VirtualCard>> getVirtualCard(String cardId) async {
     try {
-      final response = await _dio.get('/virtual-cards/$cardId');
+      final response = await _dio.get('virtual-cards/$cardId');
       return ApiResponse.success(VirtualCard.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -626,7 +627,7 @@ class ApiService {
   /// O valor retornado é o JSON string que deve ser codificado no QR code.
   Future<ApiResponse<String>> getVirtualCardQr(String cardId) async {
     try {
-      final response = await _dio.get('/virtual-cards/$cardId/qr');
+      final response = await _dio.get('virtual-cards/$cardId/qr');
       // O servidor pode retornar { qrData: "..." } ou a string directamente
       final data = response.data;
       final qrString = data is String
@@ -641,7 +642,7 @@ class ApiService {
   /// Excluir cartão
   Future<ApiResponse<DeleteCardResult>> deleteVirtualCard(String cardId) async {
     try {
-      final response = await _dio.delete('/virtual-cards/$cardId');
+      final response = await _dio.delete('virtual-cards/$cardId');
       return ApiResponse.success(DeleteCardResult(
         refundedAmount: response.data['refundedAmount'] ?? 0,
         walletBalance: response.data['walletBalance'] ?? 0,
@@ -657,7 +658,7 @@ class ApiService {
     required int amount,
   }) async {
     try {
-      final response = await _dio.post('/virtual-cards/$cardId/topup', data: {
+      final response = await _dio.post('virtual-cards/$cardId/topup', data: {
         'amount': amount,
       });
       return ApiResponse.success(TopupCardResult(
@@ -675,7 +676,7 @@ class ApiService {
     required String status, // 'active' ou 'frozen'
   }) async {
     try {
-      final response = await _dio.put('/virtual-cards/$cardId/status', data: {
+      final response = await _dio.put('virtual-cards/$cardId/status', data: {
         'status': status,
       });
       return ApiResponse.success(response.data['status'] ?? status);
@@ -690,7 +691,7 @@ class ApiService {
     required int dailyLimit,
   }) async {
     try {
-      final response = await _dio.put('/virtual-cards/$cardId/limit', data: {
+      final response = await _dio.put('virtual-cards/$cardId/limit', data: {
         'dailyLimit': dailyLimit,
       });
       return ApiResponse.success(response.data['dailyLimit'] ?? dailyLimit);
@@ -704,7 +705,7 @@ class ApiService {
   /// Listar viagens
   Future<ApiResponse<List<Trip>>> getTrips() async {
     try {
-      final response = await _dio.get('/trips');
+      final response = await _dio.get('trips');
       dynamic raw = response.data;
       if (raw is String) {
         try {
@@ -760,7 +761,7 @@ class ApiService {
   /// Detalhes da viagem
   Future<ApiResponse<Trip>> getTrip(String tripId) async {
     try {
-      final response = await _dio.get('/trips/$tripId');
+      final response = await _dio.get('trips/$tripId');
       return ApiResponse.success(Trip.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -772,7 +773,7 @@ class ApiService {
   /// Obter histórico de avaliações feitas por um utilizador
   Future<ApiResponse<List<Rating>>> getRatings(String userId) async {
     try {
-      final response = await _dio.get('/ratings/$userId');
+      final response = await _dio.get('ratings/$userId');
       final raw = response.data;
       List<dynamic> list;
       if (raw is List) {
@@ -806,7 +807,7 @@ class ApiService {
       };
       if (comment != null) data['comment'] = comment;
 
-      await _dio.post('/ratings', data: data);
+      await _dio.post('ratings', data: data);
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -818,7 +819,7 @@ class ApiService {
   /// Listar notificações
   Future<ApiResponse<NotificationsResult>> getNotifications() async {
     try {
-      final response = await _dio.get('/notifications');
+      final response = await _dio.get('notifications');
       return ApiResponse.success(NotificationsResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -828,7 +829,7 @@ class ApiService {
   /// Marcar notificação como lida
   Future<ApiResponse<void>> markNotificationRead(String notificationId) async {
     try {
-      await _dio.put('/notifications/$notificationId/read');
+      await _dio.put('notifications/$notificationId/read');
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -838,7 +839,7 @@ class ApiService {
   /// Marcar todas como lidas
   Future<ApiResponse<void>> markAllNotificationsRead() async {
     try {
-      await _dio.put('/notifications/read-all');
+      await _dio.put('notifications/read-all');
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -853,7 +854,7 @@ class ApiService {
     required double longitude,
   }) async {
     try {
-      await _dio.post('/safety/panic', data: {
+      await _dio.post('safety/panic', data: {
         'latitude': latitude,
         'longitude': longitude,
       });
@@ -867,7 +868,7 @@ class ApiService {
 
   Future<ApiResponse<List<EmergencyContact>>> getEmergencyContacts() async {
     try {
-      final response = await _dio.get('/safety/emergency-contacts');
+      final response = await _dio.get('safety/emergency-contacts');
       final raw = response.data;
       List<dynamic> items;
       if (raw is List) {
@@ -895,7 +896,7 @@ class ApiService {
     required String phoneNumber,
   }) async {
     try {
-      final response = await _dio.post('/safety/emergency-contacts',
+      final response = await _dio.post('safety/emergency-contacts',
           data: {'name': name, 'phoneNumber': phoneNumber});
       final raw = response.data;
       final Map<String, dynamic> json = raw is Map<String, dynamic>
@@ -911,7 +912,7 @@ class ApiService {
 
   Future<ApiResponse<void>> deleteEmergencyContact(String id) async {
     try {
-      await _dio.delete('/safety/emergency-contacts/$id');
+      await _dio.delete('safety/emergency-contacts/$id');
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -923,7 +924,7 @@ class ApiService {
   /// Listar perguntas frequentes
   Future<ApiResponse<List<FAQItem>>> getFaq() async {
     try {
-      final response = await _dio.get('/faq');
+      final response = await _dio.get('faq');
       final List<dynamic> data = response.data['items'] ?? response.data;
       return ApiResponse.success(
         data.map((e) => FAQItem.fromJson(e)).toList(),
@@ -937,7 +938,7 @@ class ApiService {
 
   Future<ApiResponse<void>> updateFcmToken(String token) async {
     try {
-      await _dio.put('/users/me/fcm-token', data: {'token': token});
+      await _dio.put('users/me/fcm-token', data: {'token': token});
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -954,7 +955,7 @@ class ApiService {
     try {
       final data = <String, dynamic>{'stars': stars};
       if (comment != null) data['comment'] = comment;
-      await _dio.post('/trips/$tripId/rate', data: data);
+      await _dio.post('trips/$tripId/rate', data: data);
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -969,7 +970,7 @@ class ApiService {
     required String pin,
   }) async {
     try {
-      final response = await _dio.post('/wallet/card/withdraw', data: {
+      final response = await _dio.post('wallet/card/withdraw', data: {
         'cardId': cardId,
         'amount': amount,
         'pin': pin,
@@ -984,7 +985,7 @@ class ApiService {
 
   Future<ApiResponse<TripStats>> getTripStats() async {
     try {
-      final response = await _dio.get('/trips/stats');
+      final response = await _dio.get('trips/stats');
       return ApiResponse.success(TripStats.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -1008,7 +1009,7 @@ class ApiService {
       };
       if (transactionId != null) data['transactionId'] = transactionId;
       if (tripId != null) data['tripId'] = tripId;
-      await _dio.post('/complaints', data: data);
+      await _dio.post('complaints', data: data);
       return ApiResponse.success(null);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -1017,7 +1018,7 @@ class ApiService {
 
   Future<ApiResponse<List<Complaint>>> getComplaints() async {
     try {
-      final response = await _dio.get('/complaints');
+      final response = await _dio.get('complaints');
       final list = (response.data as List)
           .map((e) => Complaint.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -1029,10 +1030,13 @@ class ApiService {
 
   Future<ApiResponse<Complaint>> getComplaint(String id) async {
     try {
-      final response = await _dio.get('/complaints/$id');
+      final response = await _dio.get('complaints/$id');
       return ApiResponse.success(
           Complaint.fromJson(response.data as Map<String, dynamic>));
     } on DioException catch (e) {
+      if (e.response?.statusCode == 500) {
+        return ApiResponse.error('Detalhe da reclamação temporariamente indisponível.');
+      }
       return ApiResponse.error(_parseError(e));
     }
   }
@@ -1044,7 +1048,7 @@ class ApiService {
     required String iban,
   }) async {
     try {
-      await _dio.post('/transactions/withdraw', data: {
+      await _dio.post('transactions/withdraw', data: {
         'amount': amount,
         'iban': iban,
       });

@@ -1,4 +1,4 @@
-import 'package:troco_seguro_motorista/models/passenger.dart';
+import 'package:troco_seguro_pro/models/passenger.dart';
 
 /// Modelo de viagem do motorista
 class Trip {

@@ -85,7 +85,7 @@ class AppColors {
 
 class Constants {
   // URL base da API
-  static const String apiBaseUrl = 'https://troco-seguro.onrender.com';
+  static const String apiBaseUrl = 'https://trocoseguro.wemof.tech';
 
   static final List<FAQItem> faqData = [
     FAQItem(

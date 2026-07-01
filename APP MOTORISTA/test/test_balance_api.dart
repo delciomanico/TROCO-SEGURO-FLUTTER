@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
 
 void main() async {
   print('🧪 Testando API de Saldo...\n');

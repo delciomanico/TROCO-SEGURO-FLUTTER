@@ -79,24 +79,67 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
         child: Column(
           children: [
-            // Skip button — only shown when not on the last page
-            if (_currentPage < _pages.length - 1)
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.all(responsive.responsivePadding()),
-                  child: TextButton(
-                    onPressed: widget.onComplete,
-                    child: Text(
-                      'Pular',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : AppColors.textSecondary,
-                        fontSize: responsive.responsiveFontSize(14),
+            // App identity header
+            Padding(
+              padding: EdgeInsets.only(
+                top: responsive.scaledHeight(12),
+                left: responsive.responsivePadding(),
+                right: responsive.responsivePadding(),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: isDark ? 0.18 : 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.35),
+                        width: 1,
                       ),
                     ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_car_rounded,
+                            size: 14, color: AppColors.accent),
+                        const SizedBox(width: 6),
+                        Text(
+                          'APP DO MOTORISTA',
+                          style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(10),
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.accent,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  // Skip button — only shown when not on the last page
+                  if (_currentPage < _pages.length - 1)
+                    TextButton(
+                      onPressed: widget.onComplete,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Pular',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          fontSize: responsive.responsiveFontSize(14),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 48),
+                ],
               ),
+            ),
             // Page content
             Expanded(
               child: PageView.builder(

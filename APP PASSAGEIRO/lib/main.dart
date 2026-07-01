@@ -29,6 +29,8 @@ import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
@@ -44,6 +46,7 @@ Future<void> main() async {
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
   await ThemeController.instance.load();
+  await dotenv.load();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -1338,6 +1341,13 @@ class _SettingsModalState extends State<_SettingsModal> {
             _actionTile(isDark, Icons.report_problem_outlined, 'Reclamações', 'Reportar um problema ou incidente', () => ComplaintModal.show(context)),
             _actionTile(isDark, Icons.info_outline_rounded, 'Sobre', 'Versão e informações do aplicativo', _showAbout),
             _actionTile(isDark, Icons.description_outlined, 'Termos e Condições', 'Política de uso e privacidade', _showTerms),
+            _actionTile(isDark, Icons.privacy_tip_outlined, 'Política de Privacidade', 'Como tratamos os seus dados pessoais', () async {
+              Navigator.pop(context);
+              final uri = Uri.parse('https://trocoseguro.wemof.tech/termos');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            }),
             Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
             InkWell(
               onTap: () => _showDeleteAccountDialog(context),

@@ -2,12 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/screens/earnings_screen.dart';
-import 'package:troco_seguro_motorista/screens/trips_screen.dart';
-import 'package:troco_seguro_motorista/screens/wallet_screen.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/screens/earnings_screen.dart';
+import 'package:troco_seguro_pro/screens/trips_screen.dart';
+import 'package:troco_seguro_pro/screens/wallet_screen.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 
 enum DriverDockTab {
   home,
@@ -116,7 +116,7 @@ class DriverBottomDock extends StatelessWidget {
     final accent = isDark ? AppColors.primaryGold : AppColors.primaryOrange;
     final dockBg = isDark ? AppColors.darkSurface : AppColors.lightCard;
     final dockBorder =
-        isDark ? Colors.white.withOpacity(0.08) : AppColors.lightBorder;
+        isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.lightBorder;
 
     return Container(
       margin: EdgeInsets.fromLTRB(

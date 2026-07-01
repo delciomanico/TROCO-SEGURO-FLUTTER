@@ -28,6 +28,7 @@ import 'package:troco_seguro_pro/widgets/withdrawal_modal.dart';
 import 'package:troco_seguro_pro/widgets/success_modal.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:troco_seguro_pro/services/secure_storage_service.dart';
 import 'package:troco_seguro_pro/services/notification_service.dart';
@@ -149,8 +150,9 @@ class _AppControllerState extends State<AppController>
         final didAuth = await auth.authenticate(
           localizedReason: 'Desbloqueie Troco Seguro Motorista',
           options: const AuthenticationOptions(
-            biometricOnly: true,
+            biometricOnly: false,
             useErrorDialogs: true,
+            stickyAuth: true,
           ),
         );
         if (didAuth && mounted) {
@@ -507,6 +509,11 @@ class _ReauthScreenState extends State<ReauthScreen> {
 
   Future<void> _checkBiometrics() async {
     try {
+      // Verificar se o utilizador activou a biometria nas definições
+      final prefs = await SharedPreferences.getInstance();
+      final bioEnabled = prefs.getBool('ts_bio_enabled') ?? false;
+      if (!bioEnabled) return;
+
       final localAuth = LocalAuthentication();
       final canCheck = await localAuth.canCheckBiometrics;
       final isSupported = await localAuth.isDeviceSupported();
@@ -517,7 +524,6 @@ class _ReauthScreenState extends State<ReauthScreen> {
         });
       }
 
-      // Tentar biometria automaticamente se disponÃ­vel
       if (_biometricsAvailable) {
         _tryBiometric();
       }
@@ -588,283 +594,279 @@ class _ReauthScreenState extends State<ReauthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = ResponsiveHelper(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final accentColor = AppColors.adaptiveAccent(context);
-    final backgroundColor =
-        isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.white;
-    final textSecondaryColor =
-        isDark ? Colors.white70 : AppColors.textSecondary;
-    final inputFillColor =
-        isDark ? const Color(0xFF2A2A2A) : AppColors.lightCard;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = AppColors.adaptiveAccent(context);
+    final bg = isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final labelColor = isDark ? Colors.white70 : const Color(0xFF6C6C70);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1A1A1A) : AppColors.lightBackground,
-      resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : AppColors.lightBackground,
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: responsive.scaledWidth(24),
-                  vertical: responsive.scaledHeight(18),
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight:
-                        constraints.maxHeight - responsive.scaledHeight(36),
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Image.asset(
-                            'assets/images/logo.png',
-                            width: responsive.scaledWidth(104),
-                            height: responsive.scaledWidth(104),
-                            fit: BoxFit.contain,
-                          ),
-                          SizedBox(height: responsive.scaledHeight(18)),
-                          Text(
-                            'Voltar ao app',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(26),
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? Colors.white : AppColors.textDark,
-                            ),
-                          ),
-                          SizedBox(height: responsive.scaledHeight(8)),
-                          Text(
-                            'Confirme seu PIN ou use biometria para continuar.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(14),
-                              color: textSecondaryColor,
-                            ),
-                          ),
-                          SizedBox(height: responsive.scaledHeight(10)),
-                          Text(
-                            _maskPhoneNumber(widget.phoneNumber),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: responsive.responsiveFontSize(14),
-                              color: accentColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: responsive.scaledHeight(16)),
-                          Align(
-                            alignment: Alignment.center,
-                            child: Container(
-                              width: responsive.scaledWidth(72),
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: accentColor,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: responsive.scaledHeight(28)),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: List.generate(6, (index) {
-                              return Expanded(
-                                child: Container(
-                                  height: 55,
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 3),
-                                  child: TextField(
-                                    controller: _pinControllers[index],
-                                    focusNode: _focusNodes[index],
-                                    textAlign: TextAlign.center,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 1,
-                                    obscureText: _obscurePin,
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: textColor,
-                                    ),
-                                    decoration: InputDecoration(
-                                      counterText: '',
-                                      filled: true,
-                                      fillColor: inputFillColor,
-                                      contentPadding: EdgeInsets.zero,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: const BorderSide(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: const BorderSide(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: accentColor,
-                                          width: 2,
-                                        ),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      if (value.isNotEmpty && index < 5) {
-                                        _focusNodes[index + 1].requestFocus();
-                                      } else if (value.isEmpty && index > 0) {
-                                        _focusNodes[index - 1].requestFocus();
-                                      }
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
 
-                                      final pin = _pinControllers
-                                          .map((c) => c.text)
-                                          .join();
-                                      if (pin.length == 6) {
-                                        _verifyPin();
-                                      }
-                                    },
-                                  ),
-                                ),
-                              );
-                            }),
+              // Logo
+              Image.asset(
+                'assets/images/logo.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 20),
+
+              // Título
+              Text(
+                'Verificar identidade',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _maskPhoneNumber(widget.phoneNumber),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: labelColor,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+
+              const Spacer(flex: 2),
+
+              // Campos PIN
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
-                          const SizedBox(height: 12),
-                          TextButton.icon(
-                            onPressed: () =>
-                                setState(() => _obscurePin = !_obscurePin),
-                            icon: Icon(
-                              _obscurePin
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              size: 16,
-                              color: accentColor.withValues(alpha: 0.8),
-                            ),
-                            label: Text(
-                              _obscurePin ? 'Ver PIN' : 'Ocultar PIN',
-                              style: TextStyle(
-                                fontSize: responsive.responsiveFontSize(12),
-                                color: accentColor.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                        ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'PIN de 6 dígitos',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: labelColor,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: List.generate(6, (index) {
+                        return Expanded(
+                          child: Container(
+                          height: 52,
+                          margin: EdgeInsets.only(
+                            left: index == 0 ? 0 : 3,
+                            right: index == 5 ? 0 : 3,
                           ),
-                          SizedBox(height: responsive.scaledHeight(16)),
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF3A1F2A)
-                                    : const Color(0xFFFFF2F4),
+                          child: TextField(
+                            controller: _pinControllers[index],
+                            focusNode: _focusNodes[index],
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            maxLength: 1,
+                            obscureText: _obscurePin,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                            ),
+                            decoration: InputDecoration(
+                              counterText: '',
+                              filled: true,
+                              fillColor: isDark
+                                  ? const Color(0xFF2C2C2E)
+                                  : const Color(0xFFF2F2F7),
+                              contentPadding: EdgeInsets.zero,
+                              border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFFFFC3CD),
-                                ),
-                              ),
-                              child: Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
+                                borderSide: BorderSide(
                                   color: isDark
-                                      ? const Color(0xFFFFD5DD)
-                                      : const Color(0xFFB23A4E),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                                      ? const Color(0xFF3A3A3C)
+                                      : const Color(0xFFD1D1D6),
+                                  width: 1.5,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF3A3A3C)
+                                      : const Color(0xFFD1D1D6),
+                                  width: 1.5,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: accent,
+                                  width: 2.5,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFFF3B30),
+                                  width: 2,
                                 ),
                               ),
                             ),
-                          ],
-                          const SizedBox(height: 28),
-                          if (_isLoading)
-                            Center(
-                              child: SizedBox(
-                                width: 60,
-                                height: 60,
-                                child: CircularProgressIndicator(
-                                  color: accentColor,
-                                  strokeWidth: 4,
-                                ),
-                              ),
-                            )
-                          else ...[
-                            if (_biometricsAvailable) ...[
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton.icon(
-                                  onPressed: _tryBiometric,
-                                  icon: const Icon(
-                                    Icons.fingerprint_rounded,
-                                    size: 24,
-                                  ),
-                                  label: const Text(
-                                    'Usar biometria',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: accentColor,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: _isLoading ? null : _verifyPin,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: isDark
-                                      ? Colors.white
-                                      : AppColors.textDark,
-                                  side: BorderSide(
-                                    color: accentColor,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Verificar PIN',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                            onChanged: (value) {
+                              if (value.isNotEmpty && index < 5) {
+                                _focusNodes[index + 1].requestFocus();
+                              } else if (value.isEmpty && index > 0) {
+                                _focusNodes[index - 1].requestFocus();
+                              }
+                              final pin = _pinControllers.map((c) => c.text).join();
+                              if (pin.length == 6) _verifyPin();
+                            },
+                          ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => setState(() => _obscurePin = !_obscurePin),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _obscurePin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            size: 14,
+                            color: labelColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _obscurePin ? 'Mostrar PIN' : 'Ocultar PIN',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: labelColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Erro
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                child: _errorMessage != null
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.info_outline_rounded,
+                                size: 14, color: Color(0xFFFF3B30)),
+                            const SizedBox(width: 5),
+                            Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFFFF3B30),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+
+              const Spacer(flex: 2),
+
+              // Acções
+              if (_isLoading)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: CircularProgressIndicator(
+                    color: accent,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              else ...[
+                if (_biometricsAvailable)
+                  GestureDetector(
+                    onTap: _tryBiometric,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.fingerprint_rounded,
+                              color: Colors.white, size: 22),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Usar biometria',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
+                if (_biometricsAvailable) const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _verifyPin,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF3A3A3C)
+                            : const Color(0xFFD1D1D6),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      'Confirmar PIN',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                      ),
+                    ),
+                  ),
                 ),
-              );
-            },
+              ],
+
+              const Spacer(flex: 1),
+            ],
           ),
         ),
       ),
@@ -1708,19 +1710,35 @@ class _SecurityModalState extends State<_SecurityModal> {
       try {
         final auth = LocalAuthentication();
         final isSupported = await auth.isDeviceSupported();
-        final canCheck = await auth.canCheckBiometrics;
-        if (!isSupported || !canCheck) {
+        if (!isSupported) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Biometria indisponível neste dispositivo')),
+              const SnackBar(content: Text('Este dispositivo não suporta autenticação biométrica.')),
             );
           }
           return;
         }
+
+        // Verificar se há biometria inscrita
+        final available = await auth.getAvailableBiometrics();
+        debugPrint('Biometrias disponíveis: $available');
+        if (available.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Nenhuma biometria registada. Configure a impressão digital ou Face ID nas definições do dispositivo.'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+
+        // biometricOnly: false permite fallback para PIN do dispositivo se necessário
         final ok = await auth.authenticate(
           localizedReason: 'Confirme para ativar a biometria',
           options: const AuthenticationOptions(
-            biometricOnly: true,
+            biometricOnly: false,
             useErrorDialogs: true,
             stickyAuth: true,
           ),
@@ -1728,7 +1746,7 @@ class _SecurityModalState extends State<_SecurityModal> {
         if (!ok) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Cancelado')),
+              const SnackBar(content: Text('Autenticação cancelada.')),
             );
           }
           return;
@@ -1737,13 +1755,40 @@ class _SecurityModalState extends State<_SecurityModal> {
         if (mounted) setState(() => _bio = true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Biometria ativada')),
+            const SnackBar(
+              content: Text('Biometria ativada com sucesso.'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
-      } catch (_) {
+      } on PlatformException catch (e) {
+        debugPrint('Biometria erro: code=${e.code} msg=${e.message}');
+        String msg;
+        switch (e.code) {
+          case 'NotEnrolled':
+            msg = 'Nenhuma biometria registada. Configure nas definições do dispositivo.';
+            break;
+          case 'NotAvailable':
+          case 'OtherOperatingSystem':
+            msg = 'Biometria não disponível neste dispositivo.';
+            break;
+          case 'LockedOut':
+          case 'PermanentlyLockedOut':
+            msg = 'Biometria bloqueada por demasiadas tentativas. Desbloqueie nas definições.';
+            break;
+          default:
+            msg = 'Erro ao activar biometria: ${e.message ?? e.code}';
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Biometria indisponível')),
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 4)),
+          );
+        }
+      } catch (e) {
+        debugPrint('Biometria erro inesperado: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro inesperado: $e')),
           );
         }
       }
@@ -1752,7 +1797,7 @@ class _SecurityModalState extends State<_SecurityModal> {
       if (mounted) setState(() => _bio = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Biometria desativada')),
+          const SnackBar(content: Text('Biometria desactivada.')),
         );
       }
     }
@@ -3011,6 +3056,19 @@ class _SettingsModalState extends State<_SettingsModal> {
                 );
               },
             ),
+            _actionTile(
+              isDark,
+              Icons.privacy_tip_outlined,
+              'Política de Privacidade',
+              'Como tratamos os seus dados pessoais',
+              () async {
+                Navigator.pop(context);
+                final uri = Uri.parse('https://trocoseguro.wemof.tech/termos');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
             Container(
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -3061,15 +3119,16 @@ class _SettingsModalState extends State<_SettingsModal> {
               if (balance > 0) ...[
                 const SizedBox(height: 14),
                 Text(
-                  'Tem $balance Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
+                  'Tem saldo de $balance Kz. Indique um IBAN para transferência antes do encerramento.',
                   style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black.withValues(alpha: 0.6), fontSize: 13),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: ibanCtrl,
+                  keyboardType: TextInputType.text,
                   style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'AO06.0040.0000.XXXX.XXXX.X',
+                    hintText: 'IBAN (ex: AO06...)',
                     hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -3097,9 +3156,8 @@ class _SettingsModalState extends State<_SettingsModal> {
     );
     if (confirmed != true || !mounted) return;
 
-    final iban = balance > 0 ? ibanCtrl.text.trim() : null;
     await _api.loadTokens();
-    final result = await _api.deleteAccount(iban: iban);
+    final result = await _api.deleteAccount(iban: balance > 0 ? ibanCtrl.text.trim() : null);
     if (!mounted) return;
 
     if (result.isSuccess) {

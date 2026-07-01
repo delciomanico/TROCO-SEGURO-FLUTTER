@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/models/trip.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/widgets/custom_widgets.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
+import 'package:troco_seguro_pro/models/trip.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/widgets/custom_widgets.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';

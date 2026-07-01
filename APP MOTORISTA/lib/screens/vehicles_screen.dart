@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/models/vehicle.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_pro/models/vehicle.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -43,6 +43,54 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         });
       }
     }
+  }
+
+  Future<void> _confirmDelete(Vehicle v) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Apagar veículo'),
+        content: Text('Tem a certeza que deseja apagar ${v.model} (${v.licensePlate})?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Apagar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && v.id != null) {
+      final result = await _api.deleteVehicle(v.id!);
+      if (mounted) {
+        if (result.isSuccess) {
+          _loadVehicles();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result.error ?? 'Erro ao apagar veículo')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _editVehicle(Vehicle v) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: _EditVehicleModal(vehicle: v),
+      ),
+    );
+    if (result == true) _loadVehicles();
   }
 
   void _showAddVehicleModal() {
@@ -178,7 +226,20 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 children: [
                   const SizedBox(height: 4),
                   Text('Matrícula: ${v.licensePlate}'),
-                  Text('Cor: ${v.color}'),
+                  Text('Cor: ${v.color}  •  ${v.seats} lugares'),
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: AppColors.primaryGold),
+                    onPressed: () => _editVehicle(v),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _confirmDelete(v),
+                  ),
                 ],
               ),
             ),
@@ -202,6 +263,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
   final _licensePlateController = TextEditingController();
   final _modelController = TextEditingController();
   final _colorController = TextEditingController();
+  int _seats = 4;
 
   bool _isSubmitting = false;
 
@@ -222,6 +284,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
       _licensePlateController.text.trim(),
       _modelController.text.trim(),
       _colorController.text.trim(),
+      seats: _seats,
     );
 
     if (mounted) {
@@ -305,6 +368,24 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
               validator: (val) =>
                   val == null || val.isEmpty ? 'Campo obrigatório' : null,
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int>(
+              value: _seats,
+              decoration: const InputDecoration(
+                labelText: 'Nº de lugares',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.event_seat),
+              ),
+              items: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text('$s lugares'),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _seats = val);
+              },
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -326,6 +407,182 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2))
                     : const Text('Salvar Veículo',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditVehicleModal extends StatefulWidget {
+  final Vehicle vehicle;
+  const _EditVehicleModal({required this.vehicle});
+
+  @override
+  State<_EditVehicleModal> createState() => _EditVehicleModalState();
+}
+
+class _EditVehicleModalState extends State<_EditVehicleModal> {
+  final ApiService _api = ApiService();
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _licensePlateController;
+  late final TextEditingController _modelController;
+  late final TextEditingController _colorController;
+  late int _seats;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _licensePlateController = TextEditingController(text: widget.vehicle.licensePlate);
+    _modelController = TextEditingController(text: widget.vehicle.model);
+    _colorController = TextEditingController(text: widget.vehicle.color);
+    _seats = widget.vehicle.seats;
+  }
+
+  @override
+  void dispose() {
+    _licensePlateController.dispose();
+    _modelController.dispose();
+    _colorController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+    final response = await _api.updateVehicle(
+      widget.vehicle.id!,
+      licensePlate: _licensePlateController.text.trim(),
+      model: _modelController.text.trim(),
+      color: _colorController.text.trim(),
+      seats: _seats,
+    );
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      if (response.isSuccess) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veículo atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.error ?? 'Erro ao atualizar veículo')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Editar Veículo',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _licensePlateController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Matrícula',
+                hintText: 'Ex: LD-10-20-AB',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.pin),
+              ),
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Campo obrigatório' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _modelController,
+              decoration: const InputDecoration(
+                labelText: 'Modelo do Veículo',
+                hintText: 'Ex: Toyota Rav4',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.directions_car),
+              ),
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Campo obrigatório' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _colorController,
+              decoration: const InputDecoration(
+                labelText: 'Cor',
+                hintText: 'Ex: Branco',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.color_lens),
+              ),
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Campo obrigatório' : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int>(
+              value: _seats,
+              decoration: const InputDecoration(
+                labelText: 'Nº de lugares',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.event_seat),
+              ),
+              items: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text('$s lugares'),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _seats = val);
+              },
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentOf(context),
+                  foregroundColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Text('Guardar Alterações',
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold)),
               ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:intl/intl.dart';
 
 class SuccessModal extends StatefulWidget {
@@ -219,7 +219,7 @@ class _SuccessModalState extends State<SuccessModal>
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -272,15 +272,15 @@ class _SuccessModalState extends State<SuccessModal>
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  iconColor.withOpacity(0.15),
-                                  iconColor.withOpacity(0.05),
+                                  iconColor.withValues(alpha: 0.15),
+                                  iconColor.withValues(alpha: 0.05),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: iconColor.withOpacity(0.3),
+                                color: iconColor.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(
@@ -337,10 +337,10 @@ class _SuccessModalState extends State<SuccessModal>
       height: responsive.scaledWidth(90),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: iconColor.withOpacity(0.1),
+        color: iconColor.withValues(alpha: 0.1),
         boxShadow: [
           BoxShadow(
-            color: iconColor.withOpacity(0.2),
+            color: iconColor.withValues(alpha: 0.2),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -356,7 +356,7 @@ class _SuccessModalState extends State<SuccessModal>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: iconColor.withOpacity(0.3),
+                color: iconColor.withValues(alpha: 0.3),
                 width: 3,
               ),
             ),
@@ -517,7 +517,7 @@ class _ConfettiPainter extends CustomPainter {
       final y = size.height * progress * (1 + (i % 4) * 0.3);
       final color = colors[i % colors.length];
       final paint = Paint()
-        ..color = color.withOpacity(1 - progress)
+        ..color = color.withValues(alpha: 1 - progress)
         ..style = PaintingStyle.fill;
 
       canvas.drawCircle(

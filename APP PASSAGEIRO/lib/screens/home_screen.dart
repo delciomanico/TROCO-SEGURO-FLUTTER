@@ -1026,8 +1026,162 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: responsive.scaledHeight(20)),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: const Text('Cobrar com QR'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _handleGeneratePaymentRequestQr();
+                  },
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(10)),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
+                  child: const Text('Fechar'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleGeneratePaymentRequestQr() async {
+    final amountController = TextEditingController();
+
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cobrar com QR'),
+        content: TextField(
+          controller: amountController,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Valor a cobrar (Kz)',
+            hintText: 'Ex: 1500',
+          ),
+          onSubmitted: (v) {
+            final val = int.tryParse(v.trim());
+            if (val != null && val > 0) Navigator.pop(ctx, val);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final val = int.tryParse(amountController.text.trim());
+              if (val != null && val > 0) Navigator.pop(ctx, val);
+            },
+            child: const Text('Gerar QR'),
+          ),
+        ],
+      ),
+    );
+
+    amountController.dispose();
+    if (amount == null || !mounted) return;
+
+    final apiService = context.read<AppProvider>().apiService;
+    final response = await apiService.generatePaymentQr(amount);
+    if (!mounted) return;
+
+    if (!response.isSuccess || response.data == null || response.data!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response.error ?? 'Erro ao gerar QR de cobrança.')),
+      );
+      return;
+    }
+
+    final qrCode = response.data!;
+    final responsive = ResponsiveHelper(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(
+              color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.08 * 255).round()),
+            ),
+          ),
+          padding: EdgeInsets.only(
+            left: responsive.scaledWidth(24),
+            right: responsive.scaledWidth(24),
+            top: responsive.scaledHeight(16),
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + responsive.scaledHeight(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.outline.withAlpha((0.3 * 255).round()),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(20)),
+              Text(
+                'QR de Cobrança',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(18),
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.textLight : AppColors.textDark,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(4)),
+              Text(
+                '$amount Kz',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(24),
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(12)),
+              Container(
+                width: responsive.scaledWidth(240),
+                height: responsive.scaledWidth(240),
+                padding: EdgeInsets.all(responsive.scaledWidth(16)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Center(child: _buildQrCodePreview(qrCode)),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(16)),
+              Text(
+                'Mostre este QR ao motorista para confirmar o pagamento.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(12),
+                  color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.72 * 255).round()),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(20)),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
                   child: const Text('Fechar'),
                 ),
               ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/models/transaction.dart';
-import 'package:troco_seguro_motorista/models/trip.dart';
-import 'package:troco_seguro_motorista/models/faq_item.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/models/transaction.dart';
+import 'package:troco_seguro_pro/models/trip.dart';
+import 'package:troco_seguro_pro/models/faq_item.dart';
 
 class AppColors {
   // Core brand palette — dark theme accent (gold)
@@ -123,7 +123,7 @@ class AppColors {
 
 class Constants {
   // URL base da API
-  static const String apiBaseUrl = 'https://troco-seguro.onrender.com';
+  static const String apiBaseUrl = 'https://trocoseguro.wemof.tech';
 
   static final DriverUser mockDriver = DriverUser(
     fullName: 'António Silva',

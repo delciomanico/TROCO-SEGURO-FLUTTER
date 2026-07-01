@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
@@ -192,7 +192,7 @@ class AppTheme {
           bodySmall: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
-              color: AppColors.textLight.withOpacity(0.85),
+              color: AppColors.textLight.withValues(alpha: 0.85),
               letterSpacing: 1.5),
         ),
       ),
