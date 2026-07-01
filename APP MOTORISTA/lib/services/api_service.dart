@@ -842,12 +842,14 @@ class ApiService {
     String destination = '',
     double distanceKm = 0.0,
     int durationMinutes = 0,
+    int seatsCount = 1,
   }) async {
     try {
       final body = <String, dynamic>{
         'driverId': driverId,
         'pin': pin,
         'paymentToken': paymentToken,
+        'seatsCount': seatsCount,
         'origin': origin,
         'destination': destination,
         'distanceKm': distanceKm,

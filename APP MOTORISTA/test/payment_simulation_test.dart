@@ -282,32 +282,28 @@ Future<void> setupPassageiro(String phone, String password) async {
     }
   }
 
-  // 4. Gerar QR de pagamento do passageiro (PAYMENT_INTENT) para Fluxo 2
-  print('\n  → A gerar QR de pagamento do passageiro (POST /qr-code/payment-request)...');
+  // 4. Gerar QR PAYMENT_INTENT do passageiro para Fluxo 2.
+  // Segundo a documentação, o QR é gerado localmente pelo app do passageiro
+  // (não passa pelo backend). O JSON gerado é scaneado pelo motorista.
   const amount = 1500;
-  final rq = await req('POST', '/qr-code/payment-request',
-      body: {'amount': amount}, token: _passengerToken);
-  result(rq.status, rq.body);
-  if (rq.status == 200 || rq.status == 201) {
-    final qb = _asMap(rq.body);
-    // A resposta é um PNG base64 — descodificar para obter o JSON PAYMENT_INTENT
-    final imgB64 = qb['qrCode']?.toString() ?? qb['image']?.toString() ?? '';
-    if (imgB64.isNotEmpty) {
-      _passengerPaymentQrData = await _decodeQrPng(imgB64, '');
-      if (_passengerPaymentQrData.isNotEmpty) {
-        ok('QR PAYMENT_INTENT gerado e descodificado', 'qrData=${_short(_passengerPaymentQrData)}');
-        info('Conteúdo completo: $_passengerPaymentQrData');
-      } else {
-        // Tentar o campo 'amount' da resposta — construir manualmente
-        _passengerPaymentQrData = '{"type":"PAYMENT_INTENT","userId":"$_passengerId","amount":$amount}';
-        warn('Não foi possível descodificar PNG — usando JSON manual', _passengerPaymentQrData);
-      }
-    } else {
-      warn('POST /qr-code/payment-request sem imagem', 'keys=${qb.keys.toList()}');
-    }
-  } else {
-    warn('POST /qr-code/payment-request → ${rq.status}', '${rq.body}');
+  final passengerProfile = await req('GET', '/users/me', token: _passengerToken);
+  String passengerName = 'Passageiro';
+  String passengerPhone = '';
+  if (passengerProfile.status == 200) {
+    final pb = _asMap(passengerProfile.body);
+    final pd = pb.containsKey('data') ? _asMap(pb['data']) : pb;
+    passengerName = pd['fullName']?.toString() ?? 'Passageiro';
+    passengerPhone = pd['phoneNumber']?.toString() ?? '';
   }
+  _passengerPaymentQrData = jsonEncode({
+    'type': 'PAYMENT_INTENT',
+    'userId': _passengerId,
+    'amount': amount,
+    'name': passengerName,
+    'phoneNumber': passengerPhone,
+  });
+  ok('QR PAYMENT_INTENT gerado localmente', 'userId=$_passengerId  amount=$amount AOA');
+  info('qrData=$_passengerPaymentQrData');
 }
 
 // ─── FLUXO 1 — Motorista inicia sessão ───────────────────────────────────────
@@ -397,6 +393,7 @@ Future<void> fluxo1PagarAssento(String passengerPin) async {
       'origin': 'Rangel',
       'destination': 'Maianga',
       'paymentToken': resolvedPaymentToken,
+      'seatsCount': 1,
       'distanceKm': 3.5,
       'durationMinutes': 12,
       if (cardId != null) 'cardId': cardId,

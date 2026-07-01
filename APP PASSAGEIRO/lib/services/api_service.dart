@@ -537,6 +537,7 @@ class ApiService {
     String? cardId,
     double distanceKm = 0.0,
     int durationMinutes = 0,
+    int seatsCount = 1,
   }) async {
     try {
       // API extrai amount do paymentToken JWT — não enviar amount no body
@@ -546,6 +547,7 @@ class ApiService {
         'origin': origin,
         'destination': destination,
         'paymentToken': paymentToken,
+        'seatsCount': seatsCount,
         'distanceKm': distanceKm,
         'durationMinutes': durationMinutes,
       };

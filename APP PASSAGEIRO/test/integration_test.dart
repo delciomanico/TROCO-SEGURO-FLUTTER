@@ -228,6 +228,59 @@ Future<void> testWallet() async {
       fail('GET /wallet/transfer/verify/:phone', r.body);
     }
   }
+
+  // POST /wallet/transfer-to-user — P2P por phoneNumber inválido → 400/404
+  {
+    final r = await req('POST', '/wallet/transfer-to-user', body: {
+      'phoneNumber': '+244900000000',
+      'amount': 1,
+      'pin': '000000',
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 200 || r.status == 201) {
+      ok('POST /wallet/transfer-to-user (${r.status})');
+    } else {
+      fail('POST /wallet/transfer-to-user', r.body);
+    }
+  }
+
+  // POST /wallet/transfer-to-card — PAN inválido → 400/404/422
+  {
+    final r = await req('POST', '/wallet/transfer-to-card', body: {
+      'cardNumber': '0000000000000000',
+      'amount': 1,
+      'pin': '000000',
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 422) {
+      ok('POST /wallet/transfer-to-card (${r.status} — PAN inválido rejeitado)');
+    } else {
+      fail('POST /wallet/transfer-to-card', r.body);
+    }
+  }
+
+  // POST /wallet/card/deposit — cardId inválido → 400/404
+  {
+    final r = await req('POST', '/wallet/card/deposit', body: {
+      'cardId': 'id-invalido',
+      'amount': 1,
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 422) {
+      ok('POST /wallet/card/deposit (${r.status} — cardId inválido rejeitado)');
+    } else {
+      fail('POST /wallet/card/deposit', r.body);
+    }
+  }
+
+  // GET /wallet/balance-by-qr/:qrId — QR inválido → 404
+  {
+    final r = await req('GET', '/wallet/balance-by-qr/qr-invalido-teste');
+    if (r.status == 404 || r.status == 400) {
+      ok('GET /wallet/balance-by-qr/:qrId (${r.status} — QR inválido rejeitado)');
+    } else if (r.status == 200) {
+      warn('GET /wallet/balance-by-qr com QR inválido devolveu 200 — verificar');
+    } else {
+      fail('GET /wallet/balance-by-qr/:qrId', r.body);
+    }
+  }
 }
 
 Future<void> testVirtualCards() async {
@@ -319,6 +372,35 @@ Future<void> testVirtualCards() async {
         fail('PUT /virtual-cards/:id/limit', r.body);
       }
     }
+
+    // POST /wallet/card/withdraw — extrair saldo (PIN do cartão ≠ PIN conta → 400/401)
+    {
+      final r = await req('POST', '/wallet/card/withdraw', body: {
+        'cardId': _cardId,
+        'amount': 1,
+        'pin': '000000',
+      });
+      if (r.status == 400 || r.status == 401 || r.status == 200 || r.status == 201) {
+        ok('POST /wallet/card/withdraw (${r.status})');
+      } else {
+        fail('POST /wallet/card/withdraw', r.body);
+      }
+    }
+
+    // GET /wallet/balance-by-qr/:cardId — saldo do cartão por QR ID
+    {
+      final r = await req('GET', '/wallet/balance-by-qr/$_cardId');
+      if (r.status == 200 || r.status == 404) {
+        ok('GET /wallet/balance-by-qr/:cardId (${r.status})');
+        if (r.status == 200) {
+          final b = _asMap(r.body);
+          final data = b.containsKey('data') ? _asMap(b['data']) : b;
+          shapeItem('GET /wallet/balance-by-qr', data, ['balance']);
+        }
+      } else {
+        fail('GET /wallet/balance-by-qr/:cardId', r.body);
+      }
+    }
   } else {
     warn('Sem cartões — criando um de teste');
 
@@ -395,6 +477,7 @@ Future<void> testQrAndPayments() async {
       'origin': 'Teste',
       'destination': 'Teste',
       'paymentToken': 'token-invalido',
+      'seatsCount': 1,
     });
     if (r.status == 400 || r.status == 404 || r.status == 422) {
       ok('POST /payments/process (${r.status} — validação correcta)');
@@ -485,6 +568,32 @@ Future<void> testTransactions() async {
       }
     } else {
       fail('GET /transactions/history', r.body);
+    }
+  }
+
+  // POST /transactions/deposit — simular depósito (ex.: Multicaixa)
+  {
+    final r = await req('POST', '/transactions/deposit', body: {'amount': 100});
+    if (r.status == 200 || r.status == 201) {
+      ok('POST /transactions/deposit');
+      final b = _asMap(r.body);
+      final data = b.containsKey('data') ? _asMap(b['data']) : b;
+      shapeItem('POST /transactions/deposit', data, ['id', 'status']);
+    } else {
+      fail('POST /transactions/deposit', r.body);
+    }
+  }
+
+  // POST /transactions/transfer — P2P directa (destinatário inexistente → 400/404)
+  {
+    final r = await req('POST', '/transactions/transfer', body: {
+      'receiverPhone': '+244900000000',
+      'amount': 1,
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 200 || r.status == 201) {
+      ok('POST /transactions/transfer (${r.status})');
+    } else {
+      fail('POST /transactions/transfer', r.body);
     }
   }
 }
@@ -692,8 +801,79 @@ Future<void> testUpdateProfile() async {
   }
 }
 
+Future<void> testCheckout() async {
+  section('13. CHECKOUT (TROCO PAY)');
+
+  // POST /checkout/pay — referencia inválida → 400/404/422
+  // (criação de intenção requer API key de merchant — não testável aqui)
+  {
+    final r = await req('POST', '/checkout/pay', body: {
+      'referencia': 'TSPAY-0000-00000000',
+      'pin': _testPin,
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 422) {
+      ok('POST /checkout/pay (${r.status} — referencia inválida rejeitada)');
+    } else if (r.status == 200 || r.status == 201) {
+      warn('POST /checkout/pay aceitou referencia inválida — verificar validação');
+    } else {
+      fail('POST /checkout/pay', r.body);
+    }
+  }
+}
+
+Future<void> testInvoices() async {
+  section('14. FATURAS');
+
+  // GET /invoices — lista paginada
+  {
+    final r = await req('GET', '/invoices',
+        query: {'page': '1', 'limit': '10'});
+    if (r.status == 200) {
+      ok('GET /invoices');
+      final b = _asMap(r.body);
+      final list = _asList(b['data'] ?? b['invoices'] ?? (r.body is List ? r.body : []));
+      info('${list.length} fatura(s)');
+      if (list.isNotEmpty) {
+        shapeItem('GET /invoices item', _asMap(list.first), ['id', 'status', 'amount']);
+      }
+    } else {
+      fail('GET /invoices', r.body);
+    }
+  }
+
+  // GET /invoices?status=paid — filtro por estado
+  {
+    final r = await req('GET', '/invoices', query: {'status': 'paid'});
+    if (r.status == 200) {
+      ok('GET /invoices?status=paid');
+    } else if (r.status == 400) {
+      warn('GET /invoices?status=paid → 400 (filtro não suportado)');
+    } else {
+      fail('GET /invoices?status=paid', r.body);
+    }
+  }
+
+  // GET /invoices/export — download CSV
+  {
+    final r = await req('GET', '/invoices/export', query: {'format': 'json'});
+    if (r.status == 200) {
+      ok('GET /invoices/export?format=json');
+      final hasContent = r.body is List ||
+          (r.body is Map && (r.body as Map).isNotEmpty) ||
+          (r.body is String && (r.body as String).isNotEmpty);
+      if (hasContent) {
+        ok('  └─ conteúdo do export presente');
+      } else {
+        warn('  └─ export vazio');
+      }
+    } else {
+      fail('GET /invoices/export', r.body);
+    }
+  }
+}
+
 Future<void> testLogout() async {
-  section('13. LOGOUT');
+  section('15. LOGOUT');
   final r = await req('POST', '/auth/logout');
   if (r.status == 200 || r.status == 204) {
     ok('POST /auth/logout');
@@ -731,6 +911,8 @@ Future<void> main(List<String> args) async {
   await testComplaints();
   await testAuthForgotPassword(phone);
   await testUpdateProfile();
+  await testCheckout();
+  await testInvoices();
   await testLogout();
 
   // ── Shape errors ──────────────────────────────────────────────────────────

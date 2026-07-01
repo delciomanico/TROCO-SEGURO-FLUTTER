@@ -306,6 +306,36 @@ Future<void> testQrSession() async {
     return;
   }
 
+  // GET /qrcodes/my-static — QR estáticos do motorista
+  {
+    final r = await req('GET', '/qrcodes/my-static');
+    if (r.status == 200) {
+      ok('GET /qrcodes/my-static');
+      final b = _asMap(r.body);
+      final list = _asList(b['data'] ?? b['qrcodes'] ?? (r.body is List ? r.body : []));
+      info('${list.length} QR(s) estático(s)');
+    } else if (r.status == 403) {
+      warn('GET /qrcodes/my-static → 403 (role sem acesso?)');
+    } else {
+      fail('GET /qrcodes/my-static', r.body);
+    }
+  }
+
+  // GET /qrcodes/session/history — histórico de sessões
+  {
+    final r = await req('GET', '/qrcodes/session/history');
+    if (r.status == 200) {
+      ok('GET /qrcodes/session/history');
+      final b = _asMap(r.body);
+      final list = _asList(b['data'] ?? b['sessions'] ?? (r.body is List ? r.body : []));
+      info('${list.length} sessão(ões) no histórico');
+    } else if (r.status == 404) {
+      warn('GET /qrcodes/session/history → 404');
+    } else {
+      fail('GET /qrcodes/session/history', r.body);
+    }
+  }
+
   // Ficar online antes de iniciar sessão
   {
     final r = await req('PUT', '/users/me/status', body: {'isOnline': true});
@@ -421,6 +451,8 @@ Future<void> testQrSession() async {
       'type': 'PAYMENT_INTENT',
       'userId': 'invalid-user-id',
       'amount': 500,
+      'name': 'Passageiro Teste',
+      'phoneNumber': '+244900000000',
     });
     final r = await req('POST', '/payments/authorize-passenger-qr', body: {
       'qrData': qrPayload,
@@ -547,6 +579,74 @@ Future<void> testTransactions() async {
       warn('POST /transactions/withdraw aceitou IBAN inválido — verificar validação');
     } else {
       fail('POST /transactions/withdraw', r.body);
+    }
+  }
+
+  // GET /wallet/transfer/verify/:phone — pré-validação de destinatário P2P
+  {
+    final r = await req('GET', '/wallet/transfer/verify/%2B244900000000');
+    if (r.status == 200 || r.status == 404) {
+      ok('GET /wallet/transfer/verify/:phone (${r.status})');
+      if (r.status == 200) {
+        final b = _asMap(r.body);
+        final data = b.containsKey('data') ? _asMap(b['data']) : b;
+        shapeItem('GET /wallet/transfer/verify', data, ['id', 'name']);
+      }
+    } else {
+      fail('GET /wallet/transfer/verify/:phone', r.body);
+    }
+  }
+
+  // POST /wallet/transfer-to-user — P2P por phoneNumber (PIN errado → 400/401)
+  {
+    final r = await req('POST', '/wallet/transfer-to-user', body: {
+      'phoneNumber': '+244900000000',
+      'amount': 1,
+      'pin': '000000',
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 200 || r.status == 201) {
+      ok('POST /wallet/transfer-to-user (${r.status})');
+    } else {
+      fail('POST /wallet/transfer-to-user', r.body);
+    }
+  }
+
+  // POST /wallet/transfer-to-card — PAN inválido → 400/404/422
+  {
+    final r = await req('POST', '/wallet/transfer-to-card', body: {
+      'cardNumber': '0000000000000000',
+      'amount': 1,
+      'pin': '000000',
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 422) {
+      ok('POST /wallet/transfer-to-card (${r.status} — PAN inválido rejeitado)');
+    } else {
+      fail('POST /wallet/transfer-to-card', r.body);
+    }
+  }
+
+  // POST /wallet/card/deposit — carregar cartão virtual alheio (cardId inválido → 400/404)
+  {
+    final r = await req('POST', '/wallet/card/deposit', body: {
+      'cardId': 'id-invalido',
+      'amount': 1,
+    });
+    if (r.status == 400 || r.status == 404 || r.status == 422) {
+      ok('POST /wallet/card/deposit (${r.status} — cardId inválido rejeitado)');
+    } else {
+      fail('POST /wallet/card/deposit', r.body);
+    }
+  }
+
+  // GET /wallet/balance-by-qr/:qrId — QR inválido → 404
+  {
+    final r = await req('GET', '/wallet/balance-by-qr/qr-invalido-teste');
+    if (r.status == 404 || r.status == 400) {
+      ok('GET /wallet/balance-by-qr/:qrId (${r.status} — QR inválido rejeitado)');
+    } else if (r.status == 200) {
+      warn('GET /wallet/balance-by-qr com QR inválido devolveu 200 — verificar');
+    } else {
+      fail('GET /wallet/balance-by-qr/:qrId', r.body);
     }
   }
 }
@@ -750,10 +850,61 @@ Future<void> testUpdateProfile() async {
   }
 }
 
+Future<void> testInvoices() async {
+  section('12. FATURAS');
+
+  // GET /invoices — lista paginada (geradas automaticamente por transaction.completed)
+  {
+    final r = await req('GET', '/invoices',
+        query: {'page': '1', 'limit': '10'});
+    if (r.status == 200) {
+      ok('GET /invoices');
+      final b = _asMap(r.body);
+      final list = _asList(b['data'] ?? b['invoices'] ?? (r.body is List ? r.body : []));
+      info('${list.length} fatura(s)');
+      if (list.isNotEmpty) {
+        shapeItem('GET /invoices item', _asMap(list.first), ['id', 'status', 'amount']);
+      }
+    } else {
+      fail('GET /invoices', r.body);
+    }
+  }
+
+  // GET /invoices?status=paid — filtro por estado
+  {
+    final r = await req('GET', '/invoices', query: {'status': 'paid'});
+    if (r.status == 200) {
+      ok('GET /invoices?status=paid');
+    } else if (r.status == 400) {
+      warn('GET /invoices?status=paid → 400 (filtro não suportado)');
+    } else {
+      fail('GET /invoices?status=paid', r.body);
+    }
+  }
+
+  // GET /invoices/export — download CSV/JSON
+  {
+    final r = await req('GET', '/invoices/export', query: {'format': 'json'});
+    if (r.status == 200) {
+      ok('GET /invoices/export?format=json');
+      final hasContent = r.body is List ||
+          (r.body is Map && (r.body as Map).isNotEmpty) ||
+          (r.body is String && (r.body as String).isNotEmpty);
+      if (hasContent) {
+        ok('  └─ conteúdo do export presente');
+      } else {
+        warn('  └─ export vazio');
+      }
+    } else {
+      fail('GET /invoices/export', r.body);
+    }
+  }
+}
+
 // ─── LOGOUT ──────────────────────────────────────────────────────────────────
 
 Future<void> testLogout() async {
-  section('12. LOGOUT');
+  section('13. LOGOUT');
   final r = await req('POST', '/auth/logout');
   if (r.status == 200 || r.status == 204) {
     ok('POST /auth/logout');
@@ -790,6 +941,7 @@ Future<void> main(List<String> args) async {
   await testQrResolve();
   await testAuthForgotPassword(phone);
   await testUpdateProfile();
+  await testInvoices();
   await testLogout();
 
   // ── Resumo de shapes ──────────────────────────────────────────────────────
