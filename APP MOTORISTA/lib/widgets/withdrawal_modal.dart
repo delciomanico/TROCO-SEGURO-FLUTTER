@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:intl/intl.dart';
 
 class WithdrawalModal extends StatefulWidget {
@@ -118,8 +118,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
 
     final result = await _api.requestWithdrawal(
       amount: amount,
-      bankAccount: _accountController.text,
-      method: _withdrawalMethod,
+      iban: _accountController.text,
     );
 
     setState(() => _isLoading = false);
@@ -189,7 +188,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primaryGold.withOpacity(0.3),
+                                color: AppColors.primaryGold.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -258,7 +257,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.darkBackground.withOpacity(0.3),
+                      color: AppColors.darkBackground.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -464,10 +463,10 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                           padding: EdgeInsets.all(
                               responsive.responsivePadding() * 0.8),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border:
-                                Border.all(color: Colors.red.withOpacity(0.3)),
+                                Border.all(color: Colors.red.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -550,8 +549,8 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                           ),
                           decoration: BoxDecoration(
                             color: _withdrawalMethod == 'mcx_express'
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.blue.withOpacity(0.1),
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.blue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -623,7 +622,7 @@ class _MethodOption extends StatelessWidget {
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primaryGold.withOpacity(0.1)
+              ? AppColors.primaryGold.withValues(alpha: 0.1)
               : const Color(0xFFF5F7FA),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -637,7 +636,7 @@ class _MethodOption extends StatelessWidget {
               padding: EdgeInsets.all(responsive.scaledWidth(10)),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primaryGold.withOpacity(0.15)
+                    ? AppColors.primaryGold.withValues(alpha: 0.15)
                     : Colors.grey.shade200,
                 shape: BoxShape.circle,
               ),

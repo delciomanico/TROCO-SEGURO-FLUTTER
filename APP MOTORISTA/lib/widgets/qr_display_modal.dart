@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/widgets/custom_widgets.dart'
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/widgets/custom_widgets.dart'
     show CustomButton;
+import 'package:troco_seguro_pro/widgets/seat_qrs_modal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,9 +20,9 @@ class QrDisplayModal extends StatefulWidget {
   final String currency;
   final String driverName;
   final String? tripId;
-  final String? routeName;
+  final List<Map<String, dynamic>> childQrs;
   final VoidCallback? onClose;
-  final VoidCallback? onPaymentReceived;
+  final Future<bool> Function(int amount)? onUpdateAmount;
 
   const QrDisplayModal({
     super.key,
@@ -31,9 +32,9 @@ class QrDisplayModal extends StatefulWidget {
     this.currency = 'AOA',
     required this.driverName,
     this.tripId,
-    this.routeName,
+    this.childQrs = const [],
     this.onClose,
-    this.onPaymentReceived,
+    this.onUpdateAmount,
   });
 
   static Future<void> show(
@@ -44,9 +45,9 @@ class QrDisplayModal extends StatefulWidget {
     String currency = 'AOA',
     required String driverName,
     String? tripId,
-    String? routeName,
+    List<Map<String, dynamic>> childQrs = const [],
     VoidCallback? onClose,
-    VoidCallback? onPaymentReceived,
+    Future<bool> Function(int amount)? onUpdateAmount,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -59,9 +60,9 @@ class QrDisplayModal extends StatefulWidget {
         currency: currency,
         driverName: driverName,
         tripId: tripId,
-        routeName: routeName,
+        childQrs: childQrs,
         onClose: onClose,
-        onPaymentReceived: onPaymentReceived,
+        onUpdateAmount: onUpdateAmount,
       ),
     );
   }
@@ -75,11 +76,16 @@ class _QrDisplayModalState extends State<QrDisplayModal>
   final ScreenshotController _screenshotController = ScreenshotController();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _isWaitingPayment = false;
+  bool _isEditingAmount = false;
+  late TextEditingController _amountController;
+  late int _currentAmount;
+  bool _isUpdatingAmount = false;
 
   @override
   void initState() {
     super.initState();
+    _currentAmount = widget.amount ?? 0;
+    _amountController = TextEditingController(text: _currentAmount.toString());
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -93,7 +99,32 @@ class _QrDisplayModalState extends State<QrDisplayModal>
   @override
   void dispose() {
     _pulseController.dispose();
+    _amountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleUpdateAmount() async {
+    final newAmount = int.tryParse(_amountController.text) ?? 0;
+    if (newAmount <= 0) return;
+
+    if (widget.onUpdateAmount != null) {
+      setState(() => _isUpdatingAmount = true);
+      final success = await widget.onUpdateAmount!(newAmount);
+      if (mounted) {
+        setState(() {
+          _isUpdatingAmount = false;
+          if (success) {
+            _currentAmount = newAmount;
+            _isEditingAmount = false;
+          }
+        });
+      }
+    } else {
+      setState(() {
+        _currentAmount = newAmount;
+        _isEditingAmount = false;
+      });
+    }
   }
 
   String _formatCurrency(int amount) {
@@ -136,16 +167,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
     }
   }
 
-  void _startWaitingPayment() {
-    setState(() => _isWaitingPayment = true);
-    // Simular recebimento após 5 segundos (em produção, seria via WebSocket)
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _isWaitingPayment) {
-        setState(() => _isWaitingPayment = false);
-        widget.onPaymentReceived?.call();
-      }
-    });
-  }
+  // Método de simulação removido conforme solicitado
 
   @override
   Widget build(BuildContext context) {
@@ -157,9 +179,14 @@ class _QrDisplayModalState extends State<QrDisplayModal>
         color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
           // Handle bar
           Container(
             margin: EdgeInsets.only(top: responsive.scaledHeight(12)),
@@ -182,7 +209,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                     Container(
                       padding: EdgeInsets.all(responsive.scaledWidth(8)),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.1),
+                        color: AppColors.accent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -196,7 +223,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'QR Code de Pagamento',
+                          'QR Code (Configurável)',
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(16),
                             fontWeight: FontWeight.w800,
@@ -225,109 +252,108 @@ class _QrDisplayModalState extends State<QrDisplayModal>
             ),
           ),
 
-          // Route display (if specified)
-          if (widget.routeName != null)
+          // Amount display
+          if (true) // Always show to allow editing
             Container(
               margin: EdgeInsets.symmetric(
                 horizontal: responsive.responsivePadding(),
               ),
               padding: EdgeInsets.all(responsive.responsivePadding()),
               decoration: BoxDecoration(
-                color: AppColors.darkBlue,
-                borderRadius:
-                    BorderRadius.circular(responsive.responsiveBorderRadius()),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(responsive.scaledWidth(10)),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.route_rounded,
-                      color: AppColors.accent,
-                      size: responsive.scaledWidth(22),
-                    ),
-                  ),
-                  SizedBox(width: responsive.scaledWidth(12)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Rota',
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(10),
-                            color: Colors.white60,
-                          ),
-                        ),
-                        Text(
-                          widget.routeName!,
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(14),
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          if (widget.routeName != null)
-            SizedBox(height: responsive.scaledHeight(12)),
-
-          // Amount display (if specified)
-          if (widget.amount != null)
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: responsive.responsivePadding(),
-              ),
-              padding: EdgeInsets.all(responsive.responsivePadding()),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF6B415), Color(0xFFF9C846)],
+                gradient: LinearGradient(
+                  colors: _isEditingAmount
+                      ? [AppColors.darkBlue, AppColors.darkBlue.withValues(alpha: 0.8)]
+                      : [const Color(0xFFF6B415), const Color(0xFFF9C846)],
                 ),
                 borderRadius:
                     BorderRadius.circular(responsive.responsiveBorderRadius()),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.payments_rounded,
-                    color: Colors.white,
-                    size: responsive.scaledWidth(24),
-                  ),
-                  SizedBox(width: responsive.scaledWidth(12)),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Valor a receber',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(11),
-                          color: Colors.white70,
+              child: _isEditingAmount
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _amountController,
+                            keyboardType: TextInputType.number,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              hintStyle: TextStyle(color: Colors.white70),
+                              suffixText: 'Kz',
+                              suffixStyle: TextStyle(color: Colors.white),
+                              border: InputBorder.none,
+                            ),
+                            autofocus: true,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatCurrency(widget.amount!),
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(28),
-                          fontWeight: FontWeight.w900,
+                        if (_isUpdatingAmount)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        else ...[
+                          IconButton(
+                            icon: const Icon(Icons.check, color: Colors.white),
+                            onPressed: _handleUpdateAmount,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () =>
+                                setState(() => _isEditingAmount = false),
+                          ),
+                        ],
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.payments_rounded,
                           color: Colors.white,
+                          size: responsive.scaledWidth(24),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                        SizedBox(width: responsive.scaledWidth(12)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Valor a receber',
+                                style: TextStyle(
+                                  fontSize: responsive.responsiveFontSize(11),
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Text(
+                                _currentAmount > 0
+                                    ? _formatCurrency(_currentAmount)
+                                    : 'Definir Valor',
+                                style: TextStyle(
+                                  fontSize: responsive.responsiveFontSize(
+                                      _currentAmount > 0 ? 28 : 20),
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_note_rounded,
+                              color: Colors.white),
+                          onPressed: () =>
+                              setState(() => _isEditingAmount = true),
+                        ),
+                      ],
+                    ),
             ),
 
           SizedBox(height: responsive.scaledHeight(24)),
@@ -346,7 +372,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                     BorderRadius.circular(responsive.responsiveBorderRadius()),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accent.withOpacity(0.2),
+                    color: AppColors.accent.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -365,7 +391,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.accent.withOpacity(0.3),
+                              color: AppColors.accent.withValues(alpha: 0.3),
                               width: 3,
                             ),
                           ),
@@ -418,76 +444,74 @@ class _QrDisplayModalState extends State<QrDisplayModal>
 
           SizedBox(height: responsive.scaledHeight(24)),
 
-          // Status indicator
-          if (_isWaitingPayment)
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: responsive.responsivePadding(),
+          // Seat QRs button
+          if (widget.childQrs.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                responsive.responsivePadding(),
+                0,
+                responsive.responsivePadding(),
+                responsive.scaledHeight(12),
               ),
-              padding: EdgeInsets.all(responsive.responsivePadding()),
-              decoration: BoxDecoration(
-                color: AppColors.statusPending.withOpacity(0.1),
-                borderRadius:
-                    BorderRadius.circular(responsive.responsiveBorderRadius()),
-                border: Border.all(
-                  color: AppColors.statusPending.withOpacity(0.3),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  SeatQrsModal.show(
+                    context,
+                    childQrs: widget.childQrs,
+                    currentFare: widget.amount ?? 0,
+                    driverName: widget.driverName,
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    vertical: responsive.scaledHeight(14),
+                    horizontal: responsive.scaledWidth(16),
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkBlue,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.event_seat_rounded,
+                        color: AppColors.accent,
+                        size: responsive.scaledWidth(20),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(10)),
+                      Text(
+                        'GERIR QR DOS ASSENTOS (${widget.childQrs.length})',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(13),
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(8)),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        size: responsive.scaledWidth(14),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.statusPending,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: responsive.scaledWidth(12)),
-                  Text(
-                    'Aguardando pagamento...',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(14),
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.statusPending,
-                    ),
-                  ),
-                ],
-              ),
             ),
-
-          SizedBox(height: responsive.scaledHeight(16)),
 
           // Action buttons
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: responsive.responsivePadding(),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomButton(
-                    label: 'COMPARTILHAR',
-                    icon: Icons.share_rounded,
-                    isOutlined: true,
-                    onPressed: _shareQrCode,
-                  ),
-                ),
-                SizedBox(width: responsive.scaledWidth(12)),
-                Expanded(
-                  child: CustomButton(
-                    label: _isWaitingPayment ? 'AGUARDANDO...' : 'CONFIRMAR',
-                    icon: _isWaitingPayment
-                        ? Icons.hourglass_empty_rounded
-                        : Icons.check_circle_outline,
-                    isLoading: _isWaitingPayment,
-                    onPressed: _isWaitingPayment ? null : _startWaitingPayment,
-                  ),
-                ),
-              ],
+            child: CustomButton(
+              label: 'COMPARTILHAR QR CODE',
+              icon: Icons.share_rounded,
+              isOutlined: false,
+              onPressed: _shareQrCode,
             ),
           ),
 
@@ -526,7 +550,9 @@ class _QrDisplayModalState extends State<QrDisplayModal>
           ),
 
           SizedBox(height: responsive.scaledHeight(32)),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

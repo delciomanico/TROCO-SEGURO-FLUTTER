@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 
 /// Widget de cabeçalho com branding do motorista
 class DriverBrandingHeader extends StatelessWidget {
@@ -33,7 +33,7 @@ class DriverBrandingHeader extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(responsive.scaledWidth(12)),
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.2),
+                color: AppColors.accent.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -127,7 +127,7 @@ class CustomButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: buttonColor,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: buttonColor.withOpacity(0.5),
+          disabledBackgroundColor: buttonColor.withValues(alpha: 0.5),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -186,7 +186,7 @@ class CustomButton extends StatelessWidget {
 }
 
 /// Campo de entrada customizado
-class CustomInput extends StatelessWidget {
+class CustomInput extends StatefulWidget {
   final String label;
   final String? hint;
   final TextEditingController? controller;
@@ -229,70 +229,91 @@ class CustomInput extends StatelessWidget {
   });
 
   @override
+  State<CustomInput> createState() => _CustomInputState();
+}
+
+class _CustomInputState extends State<CustomInput> {
+  late bool _obscure;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscure = widget.obscureText;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
-    final effectiveTextColor = textColor ?? AppColors.text;
+    final effectiveTextColor = widget.textColor ?? AppColors.text;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label.isNotEmpty)
+        if (widget.label.isNotEmpty)
           Text(
-            label,
+            widget.label,
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(13),
               fontWeight: FontWeight.w600,
               color: effectiveTextColor,
             ),
           ),
-        if (label.isNotEmpty) SizedBox(height: responsive.scaledHeight(8)),
+        if (widget.label.isNotEmpty) SizedBox(height: responsive.scaledHeight(8)),
         TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          validator: validator,
-          onChanged: onChanged,
-          maxLength: maxLength,
-          enabled: enabled,
-          autofocus: autofocus,
-          focusNode: focusNode,
-          textInputAction: textInputAction,
-          onEditingComplete: onEditingComplete,
-          textCapitalization: textCapitalization,
+          controller: widget.controller,
+          keyboardType: widget.keyboardType,
+          obscureText: _obscure,
+          validator: widget.validator,
+          onChanged: widget.onChanged,
+          maxLength: widget.maxLength,
+          enabled: widget.enabled,
+          autofocus: widget.autofocus,
+          focusNode: widget.focusNode,
+          textInputAction: widget.textInputAction,
+          onEditingComplete: widget.onEditingComplete,
+          textCapitalization: widget.textCapitalization,
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(15),
             fontWeight: FontWeight.w500,
             color: effectiveTextColor,
           ),
           decoration: InputDecoration(
-            hintText: hint,
+            hintText: widget.hint,
             hintStyle: TextStyle(
-              color: (textColor ?? AppColors.textSecondary).withOpacity(0.6),
+              color: (widget.textColor ?? AppColors.textSecondary).withValues(alpha: 0.6),
             ),
-            prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, color: textColor ?? AppColors.textSecondary)
+            prefixIcon: widget.prefixIcon != null
+                ? Icon(widget.prefixIcon, color: widget.textColor ?? AppColors.textSecondary)
                 : null,
-            prefixText: prefixText,
+            prefixText: widget.prefixText,
             prefixStyle: TextStyle(
               color: effectiveTextColor,
               fontSize: responsive.responsiveFontSize(15),
               fontWeight: FontWeight.w500,
             ),
-            suffixIcon: suffixIcon,
+            suffixIcon: widget.obscureText
+                ? IconButton(
+                    icon: Icon(
+                      _obscure ? Icons.visibility_off : Icons.visibility,
+                      color: widget.textColor ?? AppColors.textSecondary,
+                    ),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  )
+                : widget.suffixIcon,
             counterText: '',
             filled: true,
-            fillColor: textColor != null
-                ? Colors.white.withOpacity(0.1)
+            fillColor: widget.textColor != null
+                ? Colors.white.withValues(alpha: 0.1)
                 : AppColors.background,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: textColor ?? AppColors.cardBorder),
+              borderSide: BorderSide(color: widget.textColor ?? AppColors.cardBorder),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: textColor != null
-                    ? Colors.white.withOpacity(0.3)
+                color: widget.textColor != null
+                    ? Colors.white.withValues(alpha: 0.3)
                     : AppColors.cardBorder,
               ),
             ),
@@ -344,10 +365,12 @@ class PinInput extends StatefulWidget {
 class _PinInputState extends State<PinInput> {
   late List<TextEditingController> _controllers;
   late List<FocusNode> _focusNodes;
+  late bool _obscure;
 
   @override
   void initState() {
     super.initState();
+    _obscure = widget.obscureText;
     _controllers = List.generate(widget.length, (_) => TextEditingController());
     _focusNodes = List.generate(widget.length, (_) => FocusNode());
     if (widget.autofocus) {
@@ -400,7 +423,7 @@ class _PinInputState extends State<PinInput> {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 maxLength: 1,
-                obscureText: widget.obscureText,
+                obscureText: _obscure,
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(24),
                   fontWeight: FontWeight.bold,
@@ -410,7 +433,7 @@ class _PinInputState extends State<PinInput> {
                   counterText: '',
                   filled: true,
                   fillColor: widget.errorText != null
-                      ? AppColors.error.withOpacity(0.1)
+                      ? AppColors.error.withValues(alpha: 0.1)
                       : AppColors.background,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -438,6 +461,22 @@ class _PinInputState extends State<PinInput> {
             );
           }),
         ),
+        if (widget.obscureText)
+          TextButton.icon(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(
+              _obscure ? Icons.visibility_off : Icons.visibility,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+            label: Text(
+              _obscure ? 'Ver PIN' : 'Ocultar PIN',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(11),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         if (widget.errorText != null) ...[
           SizedBox(height: responsive.scaledHeight(8)),
           Text(
@@ -484,7 +523,7 @@ class StatCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -496,7 +535,7 @@ class StatCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(responsive.scaledWidth(8)),
               decoration: BoxDecoration(
-                color: cardColor.withOpacity(0.1),
+                color: cardColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon,
@@ -564,7 +603,7 @@ class StatusBadge extends StatelessWidget {
             BoxShadow(
               color:
                   (isOnline ? AppColors.statusOnline : AppColors.statusOffline)
-                      .withOpacity(0.3),
+                      .withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -581,7 +620,7 @@ class StatusBadge extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     blurRadius: 4,
                   ),
                 ],
@@ -644,7 +683,7 @@ class TransactionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -655,7 +694,7 @@ class TransactionCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(responsive.scaledWidth(10)),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 20),
@@ -755,7 +794,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: Colors.grey.shade300.withOpacity(_animation.value),
+            color: Colors.grey.shade300.withValues(alpha: _animation.value),
             borderRadius: BorderRadius.circular(widget.borderRadius),
           ),
         );
@@ -792,7 +831,7 @@ class EmptyStateWidget extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(responsive.scaledWidth(24)),
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.1),
+                color: AppColors.accent.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -909,7 +948,7 @@ class CustomBottomSheet extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(responsive.scaledWidth(10)),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
+                    color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: AppColors.accent, size: 24),
@@ -984,7 +1023,7 @@ class GradientCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius ?? 24),
         boxShadow: [
           BoxShadow(
-            color: (colors?.first ?? AppColors.accent).withOpacity(0.3),
+            color: (colors?.first ?? AppColors.accent).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),

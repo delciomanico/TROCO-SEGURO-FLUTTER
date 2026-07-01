@@ -153,6 +153,9 @@ class PaymentService {
     required String origin,
     required String destination,
     required String paymentToken,
+    String? cardId,
+    double distanceKm = 0.0,
+    int durationMinutes = 0,
   }) async {
     try {
       FeedbackService.showInfo(
@@ -168,6 +171,9 @@ class PaymentService {
         origin: origin,
         destination: destination,
         paymentToken: paymentToken,
+        cardId: cardId,
+        distanceKm: distanceKm,
+        durationMinutes: durationMinutes,
       );
 
       if (response.isSuccess && response.data != null) {

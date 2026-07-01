@@ -4,6 +4,8 @@ class SecureStorageService {
   static const _pinKey = 'ts_driver_secure_pin';
   static const _deviceIdKey = 'ts_driver_device_id';
   static const _qrTokenKey = 'ts_driver_qr_token';
+  static const _accessTokenKey = 'ts_driver_access_token';
+  static const _refreshTokenKey = 'ts_driver_refresh_token';
 
   static final SecureStorageService _instance =
       SecureStorageService._internal();
@@ -49,6 +51,32 @@ class SecureStorageService {
 
   Future<void> deleteQRToken() async {
     await _storage.delete(key: _qrTokenKey);
+  }
+
+  // Access Token
+  Future<void> saveAccessToken(String token) async {
+    await _storage.write(key: _accessTokenKey, value: token);
+  }
+
+  Future<String?> readAccessToken() async {
+    return _storage.read(key: _accessTokenKey);
+  }
+
+  Future<void> deleteAccessToken() async {
+    await _storage.delete(key: _accessTokenKey);
+  }
+
+  // Refresh Token
+  Future<void> saveRefreshToken(String token) async {
+    await _storage.write(key: _refreshTokenKey, value: token);
+  }
+
+  Future<String?> readRefreshToken() async {
+    return _storage.read(key: _refreshTokenKey);
+  }
+
+  Future<void> deleteRefreshToken() async {
+    await _storage.delete(key: _refreshTokenKey);
   }
 
   // Clear all

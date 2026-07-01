@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -79,21 +79,65 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: EdgeInsets.all(responsive.responsivePadding()),
-                child: TextButton(
-                  onPressed: widget.onComplete,
-                  child: Text(
-                    'Pular',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: responsive.responsiveFontSize(14),
+            // App identity header
+            Padding(
+              padding: EdgeInsets.only(
+                top: responsive.scaledHeight(12),
+                left: responsive.responsivePadding(),
+                right: responsive.responsivePadding(),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: isDark ? 0.18 : 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.35),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_car_rounded,
+                            size: 14, color: AppColors.accent),
+                        const SizedBox(width: 6),
+                        Text(
+                          'APP DO MOTORISTA',
+                          style: TextStyle(
+                            fontSize: responsive.responsiveFontSize(10),
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.accent,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                  // Skip button — only shown when not on the last page
+                  if (_currentPage < _pages.length - 1)
+                    TextButton(
+                      onPressed: widget.onComplete,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Pular',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          fontSize: responsive.responsiveFontSize(14),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 48),
+                ],
               ),
             ),
             // Page content
@@ -115,7 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           width: responsive.scaledWidth(120),
                           height: responsive.scaledWidth(120),
                           decoration: BoxDecoration(
-                            color: AppColors.adaptiveAccent(context).withOpacity(0.2),
+                            color: AppColors.adaptiveAccent(context).withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -131,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(28),
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: isDark ? Colors.white : AppColors.textDark,
                           ),
                         ),
                         SizedBox(height: responsive.scaledHeight(16)),
@@ -140,7 +184,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(14),
-                            color: Colors.white70,
+                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                             height: 1.5,
                           ),
                         ),
@@ -162,7 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   decoration: BoxDecoration(
                     color: _currentPage == index
                         ? AppColors.adaptiveAccent(context)
-                        : Colors.white30,
+                        : (isDark ? Colors.white30 : AppColors.lightBorder),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -179,7 +223,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onPressed: _nextPage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.adaptiveAccent(context),
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.textDark,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                           responsive.responsiveBorderRadius()),

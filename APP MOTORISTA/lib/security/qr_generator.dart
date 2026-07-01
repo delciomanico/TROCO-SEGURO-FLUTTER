@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
-import 'package:troco_seguro_motorista/services/secure_storage_service.dart';
+import 'package:troco_seguro_pro/services/secure_storage_service.dart';
 
 /// Gerador de QR Codes seguros para pagamentos
 class QrGenerator {

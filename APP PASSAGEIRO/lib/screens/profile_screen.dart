@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro/utils/constants.dart';
-import 'package:local_auth/local_auth.dart';
+import 'package:troco_seguro/services/biometric_service.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/theme_controller.dart';
@@ -37,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = false;
   bool isChangingPassword = false;
   final ApiService _api = ApiService();
+  final BiometricService _biometricService = BiometricService();
 
   @override
   void initState() {
@@ -82,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 color:
                     (isDark ? Theme.of(context).cardColor : AppColors.lightCard)
-                        .withOpacity(0.3),
+                        .withValues(alpha: 0.3),
               ),
             ),
           // Content
@@ -129,7 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.primary,
+                      color: AppColors.accentOf(context),
                       width: 3,
                     ),
                   ),
@@ -152,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: responsive.scaledWidth(32),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.primary,
+                      color: AppColors.accentOf(context),
                       border: Border.all(
                         color: AppColors.lightBackground,
                         width: 2,
@@ -193,11 +194,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDefaultAvatar() {
     return Container(
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.accentOf(context).withValues(alpha: 0.1),
       child: Icon(
         Icons.person_outline,
         size: 50,
-        color: AppColors.primary,
+        color: AppColors.accentOf(context),
       ),
     );
   }
@@ -344,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 0.5,
         ),
       ),
@@ -353,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(
             icon,
             size: responsive.scaledWidth(22),
-            color: AppColors.primary,
+            color: AppColors.accentOf(context),
           ),
           SizedBox(width: responsive.scaledWidth(12)),
           Expanded(
@@ -383,8 +384,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: AppColors.primary,
-            activeTrackColor: AppColors.primary.withOpacity(0.3),
+            activeThumbColor: AppColors.accentOf(context),
+            activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -410,7 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
           ),
         ),
@@ -419,7 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(
               icon,
               size: responsive.scaledWidth(22),
-              color: AppColors.primary,
+              color: AppColors.accentOf(context),
             ),
             SizedBox(width: responsive.scaledWidth(12)),
             Expanded(
@@ -518,7 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
           ),
         ),
@@ -527,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(
               icon,
               size: responsive.scaledWidth(22),
-              color: AppColors.primary,
+              color: AppColors.accentOf(context),
             ),
             SizedBox(width: responsive.scaledWidth(12)),
             Expanded(
@@ -822,10 +823,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkBackground : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -857,33 +858,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _onToggleBiometrics(bool enable) async {
     final prefs = await SharedPreferences.getInstance();
-    final auth = LocalAuthentication();
 
     if (enable) {
-      final canCheck = await auth.canCheckBiometrics;
-      final isSupported = await auth.isDeviceSupported();
-      if (!canCheck || !isSupported) {
-        _showSnack('Biometria não disponível neste dispositivo');
-        return;
+      try {
+        // Verificar se biometria está disponível
+        final isBioAvailable = await _biometricService.isBiometricAvailable();
+        if (!isBioAvailable) {
+          if (mounted) {
+            _showSnack('Biometria não disponível neste dispositivo');
+          }
+          return;
+        }
+
+        // Tentar autenticar
+        debugPrint('🔐 Ativando biometria...');
+        final didAuth = await _biometricService.authenticate(
+          reason: 'Confirme para ativar a biometria',
+          useErrorDialogs: true,
+        );
+
+        if (!didAuth) {
+          if (mounted) {
+            _showSnack('Autenticação biométrica cancelada');
+          }
+          return;
+        }
+
+        // Salvar preferência apenas após autenticação bem-sucedida
+        await prefs.setBool('ts_bio_enabled', true);
+        if (mounted) {
+          setState(() => biometricsEnabled = true);
+          _showSnack('✅ Biometria ativada com sucesso');
+          debugPrint('✅ Biometria ativada');
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao ativar biometria: $e');
+        if (mounted) {
+          _showSnack('Erro ao ativar biometria: ${e.toString()}');
+        }
       }
-
-      final didAuth = await auth.authenticate(
-        localizedReason: 'Confirme para ativar a biometria',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-
-      if (!didAuth) {
-        _showSnack('Não foi possível ativar a biometria');
-        return;
-      }
-
-      await prefs.setBool('ts_bio_enabled', true);
-      setState(() => biometricsEnabled = true);
-      _showSnack('Biometria ativada');
     } else {
-      await prefs.setBool('ts_bio_enabled', false);
-      setState(() => biometricsEnabled = false);
-      _showSnack('Biometria desativada');
+      try {
+        await prefs.setBool('ts_bio_enabled', false);
+        if (mounted) {
+          setState(() => biometricsEnabled = false);
+          _showSnack('Biometria desativada');
+          debugPrint('✅ Biometria desativada');
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao desativar biometria: $e');
+        if (mounted) {
+          _showSnack('Erro ao desativar biometria');
+        }
+      }
     }
   }
 
@@ -1018,7 +1045,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     elevation: 0,
                     disabledBackgroundColor:
-                        Theme.of(ctx).colorScheme.primary.withOpacity(0.6),
+                        Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.6),
                   ),
                   child: isChangingPassword
                       ? SizedBox(
@@ -1188,7 +1215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Row(
                   children: [
                     Icon(icon,
-                        color: AppColors.primary,
+                        color: AppColors.accentOf(context),
                         size: responsive.scaledWidth(24)),
                     SizedBox(width: responsive.scaledWidth(10)),
                     Expanded(
@@ -1212,7 +1239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppColors.accentOf(context),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -1247,7 +1274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Fechar',
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (dialogContext, _, __) {
         final responsive = ResponsiveHelper(dialogContext);
@@ -1275,7 +1302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       Icon(
                         icon,
-                        color: AppColors.primary,
+                        color: AppColors.accentOf(context),
                         size: responsive.scaledWidth(24),
                       ),
                       SizedBox(width: responsive.scaledWidth(10)),
@@ -1319,7 +1346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: ElevatedButton(
                             onPressed: () => Navigator.pop(dialogContext),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
+                              backgroundColor: AppColors.accentOf(context),
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(

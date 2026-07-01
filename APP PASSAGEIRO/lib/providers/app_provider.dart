@@ -6,6 +6,11 @@ import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/models/trip.dart';
 import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/notification_service.dart';
+
+/// Domínios de dados gerenciados pelo AppProvider.
+/// Usado em [AppProvider.invalidate] para refrescar apenas o domínio afetado.
+enum AppDomain { user, cards, transactions, trips }
 
 /// Provider principal para gerenciar estado global da aplicação
 class AppProvider extends ChangeNotifier {
@@ -69,10 +74,16 @@ class AppProvider extends ChangeNotifier {
     await _api.loadTokens();
     await _loadFromCache();
 
+    // Manter token FCM actualizado no backend quando o Firebase o renovar
+    NotificationService().subscribeTokenRefresh((newToken) async {
+      if (_isAuthenticated) await _api.updateFcmToken(newToken);
+    });
+
     // Se temos dados no cache, carregar do servidor em background
     if (_user != null) {
       _isAuthenticated = _user!.isLoggedIn;
       _refreshAllDataInBackground();
+      _registerFcmToken();
     }
   }
 
@@ -123,6 +134,18 @@ class AppProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> _registerFcmToken() async {
+    try {
+      await NotificationService().initialize();
+      final token = await NotificationService().getToken();
+      if (token != null) {
+        await _api.updateFcmToken(token);
+      }
+    } catch (e) {
+      debugPrint('🔔 FCM TOKEN ERROR (PASSAGEIRO): $e');
+    }
   }
 
   /// Refresh de todos os dados em background (sem loading state)
@@ -282,6 +305,33 @@ class AppProvider extends ChangeNotifier {
     await _fetchTripsFromApi(showLoading: true);
   }
 
+  /// Invalida o cache de um domínio e dispara um fetch em background (sem
+  /// loading state visível). Chame isto após qualquer mutação que afete um
+  /// domínio específico para que a UI reaja automaticamente.
+  ///
+  /// Exemplo de uso:
+  /// ```dart
+  /// // Após um pagamento que afeta saldo, transações e viagens:
+  /// provider.invalidate(AppDomain.user);
+  /// provider.invalidate(AppDomain.transactions);
+  /// provider.invalidate(AppDomain.trips);
+  /// ```
+  void invalidate(AppDomain domain) {
+    switch (domain) {
+      case AppDomain.user:
+        _fetchUserFromApi(showLoading: false);
+      case AppDomain.cards:
+        _cardsLastFetch = null;
+        _fetchCardsFromApi(showLoading: false);
+      case AppDomain.transactions:
+        _transactionsLastFetch = null;
+        _fetchTransactionsFromApi(showLoading: false);
+      case AppDomain.trips:
+        _tripsLastFetch = null;
+        _fetchTripsFromApi(showLoading: false);
+    }
+  }
+
   /// Criar cartão virtual via API.
   /// Retorna [VirtualCardCreated] em caso de sucesso (PAN/CVV exibido 1x)
   /// ou lança uma String de erro.
@@ -374,72 +424,57 @@ class AppProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Transferir saldo entre cartões virtuais locais
+  /// Transferir saldo entre cartões virtuais
   Future<String?> transferBetweenVirtualCards({
     required String fromCardId,
     required String toCardId,
     required int amount,
+    required String pin,
   }) async {
-    _isLoadingCards = true;
-    notifyListeners();
+    if (fromCardId == toCardId) return 'Selecione cartões diferentes.';
+    if (amount <= 0) return 'O montante deve ser maior que zero.';
+
+    final fromIndex = _virtualCards.indexWhere((c) => c.id == fromCardId);
+    final toIndex = _virtualCards.indexWhere((c) => c.id == toCardId);
+    if (fromIndex == -1 || toIndex == -1) return 'Cartão não encontrado.';
+
+    final source = _virtualCards[fromIndex];
+    final destination = _virtualCards[toIndex];
+
+    if (source.isFrozen || source.isBlocked) return 'Cartão de origem indisponível.';
+    if (destination.isFrozen || destination.isBlocked) return 'Cartão de destino indisponível.';
+    if (source.balance < amount) return 'Saldo insuficiente no cartão de origem.';
 
     try {
-      if (fromCardId == toCardId) {
-        return 'Selecione cartões diferentes.';
-      }
+      final result = await _api.transferBetweenCards(
+        fromCardId: fromCardId,
+        toCardId: toCardId,
+        amount: amount,
+        pin: pin,
+      );
 
-      final fromIndex =
-          _virtualCards.indexWhere((card) => card.id == fromCardId);
-      final toIndex = _virtualCards.indexWhere((card) => card.id == toCardId);
+      if (!result.isSuccess) return result.error ?? 'Erro ao transferir entre cartões.';
 
-      if (fromIndex == -1 || toIndex == -1) {
-        return 'Cartão não encontrado.';
-      }
-
-      final sourceCard = _virtualCards[fromIndex];
-      final destinationCard = _virtualCards[toIndex];
-
-      if (sourceCard.isFrozen || sourceCard.isBlocked) {
-        return 'Cartão de origem indisponível.';
-      }
-
-      if (destinationCard.isFrozen || destinationCard.isBlocked) {
-        return 'Cartão de destino indisponível.';
-      }
-
-      if (amount <= 0) {
-        return 'O montante deve ser maior que zero.';
-      }
-
-      if (sourceCard.balance < amount) {
-        return 'Saldo insuficiente no cartão de origem.';
-      }
-
+      // Actualizar estado local optimistamente
       final timestamp = DateTime.now().toIso8601String();
-
-      _virtualCards[fromIndex] = sourceCard.copyWith(
-        balance: sourceCard.balance - amount,
+      _virtualCards[fromIndex] = source.copyWith(
+        balance: source.balance - amount,
         lastModified: timestamp,
       );
-
-      _virtualCards[toIndex] = destinationCard.copyWith(
-        balance: destinationCard.balance + amount,
+      _virtualCards[toIndex] = destination.copyWith(
+        balance: destination.balance + amount,
         lastModified: timestamp,
       );
-
       await _prefs?.setString(
         'ts_cards',
-        json.encode(_virtualCards.map((card) => card.toJson()).toList()),
+        json.encode(_virtualCards.map((c) => c.toJson()).toList()),
       );
-
       notifyListeners();
+      invalidate(AppDomain.cards);
       return null;
     } catch (e) {
       debugPrint('Erro ao transferir entre cartões: $e');
       return 'Erro ao transferir entre cartões.';
-    } finally {
-      _isLoadingCards = false;
-      notifyListeners();
     }
   }
 
@@ -499,6 +534,40 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Depositar da carteira para cartão virtual (usa API /wallet/card/deposit)
+  Future<String?> depositToVirtualCard({
+    required String cardId,
+    required int amount,
+  }) async {
+    try {
+      final result =
+          await _api.depositToVirtualCard(cardId: cardId, amount: amount);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1 && result.data != null) {
+          if (result.data!.newBalance != null) {
+            _virtualCards[idx] =
+                _virtualCards[idx].copyWith(balance: result.data!.newBalance!);
+          }
+          if (_user != null && result.data!.newBalance != null) {
+            _user = _user!.copyWith(balance: _user!.balance - amount);
+            await _prefs?.setString(
+                'ts_user', json.encode(_user!.toJson()));
+          }
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao depositar no cartão.';
+    } catch (e) {
+      return 'Erro ao depositar no cartão.';
+    }
+  }
+
   /// Atualizar perfil do usuário
   Future<bool> updateProfile({
     String? fullName,
@@ -544,8 +613,9 @@ class AppProvider extends ChangeNotifier {
     await _prefs?.setString('ts_user', json.encode(user.toJson()));
     notifyListeners();
 
-    // Carregar todos os dados após login
+    // Carregar todos os dados e registar FCM após login
     await _refreshAllDataInBackground();
+    _registerFcmToken();
   }
 
   /// Transferir para outro usuário (P2P)
@@ -584,7 +654,7 @@ class AppProvider extends ChangeNotifier {
         ));
 
         // Recarregar transações da API em background
-        _fetchTransactionsFromApi(showLoading: false);
+        invalidate(AppDomain.transactions);
 
         return true;
       } else {
@@ -624,6 +694,28 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteAccount({String? iban}) async {
+    final result = await _api.deleteAccount(iban: iban);
+    if (!result.isSuccess) return false;
+
+    _user = null;
+    _isAuthenticated = false;
+    _virtualCards = [];
+    _transactions = [];
+    _trips = [];
+    _cardsLastFetch = null;
+    _transactionsLastFetch = null;
+    _tripsLastFetch = null;
+
+    await _prefs?.remove('ts_user');
+    await _prefs?.remove('ts_cards');
+    await _prefs?.remove('ts_transactions');
+    await _prefs?.remove('ts_trips');
+
+    notifyListeners();
+    return true;
+  }
+
   /// Atualizar saldo local (após pagamento/transferência)
   void updateUserBalance(int newBalance) {
     if (_user != null) {
@@ -643,6 +735,147 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recarregar cartão virtual via API
+  Future<String?> topupVirtualCard({
+    required String cardId,
+    required int amount,
+  }) async {
+    try {
+      final result = await _api.topupVirtualCard(cardId: cardId, amount: amount);
+      if (result.isSuccess && result.data != null) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(balance: result.data!.cardBalance);
+          if (_user != null) {
+            _user = _user!.copyWith(balance: result.data!.walletBalance);
+            await _prefs?.setString('ts_user', json.encode(_user!.toJson()));
+          }
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao recarregar cartão';
+    } catch (e) {
+      return 'Erro ao recarregar cartão';
+    }
+  }
+
+  /// Congelar ou ativar cartão virtual
+  Future<String?> updateVirtualCardStatus({
+    required String cardId,
+    required String status,
+  }) async {
+    try {
+      final result =
+          await _api.updateCardStatus(cardId: cardId, status: status);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          final newStatus =
+              status == 'frozen' ? CardStatus.frozen : CardStatus.active;
+          _virtualCards[idx] = _virtualCards[idx].copyWith(status: newStatus);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao alterar status do cartão';
+    } catch (e) {
+      return 'Erro ao alterar status do cartão';
+    }
+  }
+
+  /// Alterar limite diário do cartão virtual
+  Future<String?> updateVirtualCardLimit({
+    required String cardId,
+    required int dailyLimit,
+  }) async {
+    try {
+      final result =
+          await _api.updateCardLimit(cardId: cardId, dailyLimit: dailyLimit);
+      if (result.isSuccess) {
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(dailyLimit: dailyLimit);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        return null;
+      }
+      return result.error ?? 'Erro ao alterar limite';
+    } catch (e) {
+      return 'Erro ao alterar limite';
+    }
+  }
+
+  /// Retirar saldo do cartão virtual para a carteira principal
+  Future<bool> withdrawFromCard({
+    required String cardId,
+    required int amount,
+    required String cardPin,
+  }) async {
+    try {
+      final result = await _api.withdrawFromVirtualCard(
+        cardId: cardId,
+        amount: amount,
+        pin: cardPin,
+      );
+      if (result.isSuccess) {
+        if (result.data?.newBalance != null) {
+          updateUserBalance(result.data!.newBalance!);
+        }
+        final idx = _virtualCards.indexWhere((c) => c.id == cardId);
+        if (idx != -1) {
+          _virtualCards[idx] =
+              _virtualCards[idx].copyWith(balance: _virtualCards[idx].balance - amount);
+          await _prefs?.setString(
+            'ts_cards',
+            json.encode(_virtualCards.map((c) => c.toJson()).toList()),
+          );
+          notifyListeners();
+        }
+        invalidate(AppDomain.user);
+        invalidate(AppDomain.cards);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Erro ao levantar do cartão: $e');
+      return false;
+    }
+  }
+
+  /// Solicitar levantamento para IBAN
+  Future<bool> requestWithdrawal({
+    required int amount,
+    required String iban,
+  }) async {
+    try {
+      final result = await _api.requestWithdrawal(amount: amount, iban: iban);
+      if (result.isSuccess) {
+        invalidate(AppDomain.user);
+        invalidate(AppDomain.transactions);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Erro ao solicitar levantamento: $e');
+      return false;
+    }
+  }
+
   /// Acionar botão de pânico
   Future<bool> triggerPanic({
     required double latitude,
@@ -651,24 +884,19 @@ class AppProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      debugPrint('🚨 Acionando pânico em: $latitude, $longitude');
-
       final result = await _api.triggerPanic(
         latitude: latitude,
         longitude: longitude,
       );
 
       if (result.isSuccess) {
-        debugPrint('✅ Alerta de pânico registrado com sucesso!');
         return true;
       } else {
         _error = result.error ?? 'Erro ao registrar alerta de pânico';
-        debugPrint('❌ Erro: ${result.error}');
         return false;
       }
     } catch (e) {
       _error = 'Erro ao acionar pânico: $e';
-      debugPrint('❌ Exceção: $e');
       return false;
     }
   }

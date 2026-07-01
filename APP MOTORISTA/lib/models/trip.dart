@@ -1,4 +1,4 @@
-import 'package:troco_seguro_motorista/models/passenger.dart';
+import 'package:troco_seguro_pro/models/passenger.dart';
 
 /// Modelo de viagem do motorista
 class Trip {
@@ -58,22 +58,56 @@ class Trip {
   }
 
   factory Trip.fromJson(Map<String, dynamic> json) {
+    // Extrair nome do passageiro: campo direto ou dentro do objeto 'passenger'
+    final passengerObj = json['passenger'] as Map<String, dynamic>?;
+    final passengerName = json['passengerName']?.toString() ??
+        passengerObj?['fullName']?.toString() ??
+        passengerObj?['name']?.toString() ??
+        'Passageiro';
+
+    final passengerPhone = json['passengerPhone']?.toString() ??
+        passengerObj?['phoneNumber']?.toString() ??
+        passengerObj?['phone']?.toString();
+
+    // amount pode vir como String "400.00" ou int
+    final rawAmount = json['amount'];
+    final amount =
+        double.tryParse(rawAmount?.toString() ?? '0')?.toInt() ?? 0;
+
+    // date e time podem vir separados ou dentro de 'createdAt'
+    String date = json['date']?.toString() ?? '';
+    String time = json['time']?.toString() ?? '';
+    if ((date.isEmpty || time.isEmpty) && json['createdAt'] != null) {
+      final createdAt = DateTime.tryParse(json['createdAt'].toString());
+      if (createdAt != null) {
+        final local = createdAt.toLocal();
+        if (date.isEmpty) {
+          date =
+              '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+        }
+        if (time.isEmpty) {
+          time =
+              '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+        }
+      }
+    }
+
     return Trip(
-      id: json['id'] ?? '',
-      passengerName: json['passengerName'] ?? json['passenger']?['name'] ?? '',
-      passengerPhone: json['passengerPhone'] ?? json['passenger']?['phone'],
-      origin: json['origin'] ?? '',
-      destination: json['destination'] ?? '',
-      date: json['date'] ?? '',
-      time: json['time'] ?? '',
-      amount: json['amount'] ?? 0,
-      rating: json['rating']?.toDouble(),
-      comment: json['comment'],
-      status: json['status'] ?? 'completed',
-      distance: json['distance']?.toDouble(),
-      duration: json['duration'],
-      passenger: json['passenger'] != null
-          ? Passenger.fromJson(json['passenger'])
+      id: json['id']?.toString() ?? '',
+      passengerName: passengerName,
+      passengerPhone: passengerPhone,
+      origin: json['origin']?.toString() ?? '',
+      destination: json['destination']?.toString() ?? '',
+      date: date,
+      time: time,
+      amount: amount,
+      rating: (json['rating'] as num?)?.toDouble(),
+      comment: json['comment']?.toString(),
+      status: json['status']?.toString() ?? 'completed',
+      distance: (json['distance'] as num?)?.toDouble(),
+      duration: (json['duration'] as num?)?.toInt(),
+      passenger: passengerObj != null
+          ? Passenger.fromJson(passengerObj)
           : null,
     );
   }

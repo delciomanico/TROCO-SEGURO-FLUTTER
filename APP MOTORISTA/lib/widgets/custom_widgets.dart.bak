@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 
 /// Widget de cabeçalho com branding do motorista
 class DriverBrandingHeader extends StatelessWidget {

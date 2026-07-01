@@ -22,7 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           'Pague suas corridas de táxi em Luanda de forma digital e esqueça a confusão com as notas.',
       icon: Icons.payments_outlined,
-      color: AppColors.accent,
+      color: AppColors.primaryOrange,
     ),
     OnboardingData(
       title: 'Rápido e seguro',
@@ -84,7 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(16),
                       fontWeight: FontWeight.w900,
-                      color: AppColors.darkBlue,
+                      color: AppColors.accentOf(context),
                     ),
                   ),
                   if (_currentPage < _pages.length - 1)
@@ -98,7 +98,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.6),
+                              .withValues(alpha: 0.6),
                         ),
                       ),
                     ),
@@ -154,7 +154,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: responsive.scaledWidth(200),
             height: responsive.scaledWidth(200),
             decoration: BoxDecoration(
-              color: data.color.withOpacity(0.1),
+              color: data.color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -181,7 +181,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(15),
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               height: 1.6,
             ),
           ),
@@ -199,7 +199,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       height: responsive.scaledWidth(8),
       decoration: BoxDecoration(
         color:
-            isActive ? AppColors.accent : Theme.of(context).colorScheme.outline,
+            isActive ? AppColors.accentOf(context) : Theme.of(context).colorScheme.outline,
         borderRadius: BorderRadius.circular(responsive.scaledWidth(4)),
       ),
     );

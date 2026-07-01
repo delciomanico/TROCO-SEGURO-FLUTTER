@@ -11,8 +11,7 @@ import 'package:troco_seguro/screens/auth_screen.dart';
 import 'package:troco_seguro/screens/home_screen.dart';
 import 'package:troco_seguro/screens/wallet_screen.dart';
 import 'package:troco_seguro/screens/trips_screen.dart';
-import 'package:troco_seguro/screens/profile_screen.dart';
-import 'package:troco_seguro/widgets/virtual_cards_fullscreen.dart';
+import 'package:troco_seguro/screens/cards_screen.dart';
 import 'package:troco_seguro/widgets/topup_modal.dart';
 import 'package:troco_seguro/widgets/transfer_modal.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
@@ -25,17 +24,29 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/payment_service.dart';
-import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/api_service.dart' show ApiService, EmergencyContact, QrValidationResult;
+import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/services/biometric_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize locale data for date formatting (pt_AO) before runApp
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
-  // Load saved theme preference
   await ThemeController.instance.load();
+  await dotenv.load();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -158,7 +169,6 @@ class _AppControllerState extends State<AppController>
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final provider = context.read<AppProvider>();
 
     setState(() {
       hasSeenOnboarding = prefs.getBool('ts_onboarding') ?? false;
@@ -206,9 +216,9 @@ class _AppControllerState extends State<AppController>
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.darkBlue,
-        body: Center(
+      return Scaffold(
+        backgroundColor: AppColors.accentOf(context),
+        body: const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
       );
@@ -334,19 +344,15 @@ class _MainScreenState extends State<MainScreen> {
             readExpectedPin: () => SecureStorageService().readPin(),
           );
         },
-        onSuccess: () {
-          final provider = context.read<AppProvider>();
-          if (provider.user != null) {
-            // Atualizar saldo
-            final newBalance = provider.user!.balance - 2500;
-            provider.updateUserBalance(newBalance);
-
-            // Mostrar sucesso
+        onSuccess: (_) {
+          // Saldo/transações/viagens já foram invalidados dentro do modal.
+          // Apenas mostrar feedback de sucesso.
+          if (mounted) {
             SuccessModal.show(
               context,
               title: 'Pagamento Realizado!',
               message:
-                  'Pagamento de 2500 Kz realizado com sucesso para ${driverInfo.driverName}.',
+                  'Pagamento realizado com sucesso para ${driverInfo.driverName}.',
               icon: Icons.check_circle,
             );
           }
@@ -391,59 +397,21 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showVirtualCardsFullscreen() {
-    final provider = context.read<AppProvider>();
-    final cardHolderName = provider.user?.fullName.trim().isNotEmpty == true
-        ? provider.user!.fullName
-        : 'Utilizador';
-
-    showVirtualCardsFullscreen(
-      context,
-      cards: provider.virtualCards,
-      cardHolderName: cardHolderName,
-      onCreateCard: ({
-        required String name,
-        required int initialBalance,
-        required int dailyLimit,
-        required String userPin,
-        required String cardPin,
-      }) async {
-        return provider.createVirtualCard(
-          name: name,
-          initialBalance: initialBalance,
-          dailyLimit: dailyLimit,
-          userPin: userPin,
-          cardPin: cardPin,
-        );
-      },
-      onDeleteCard: (cardId) async {
-        await provider.deleteVirtualCard(cardId);
-      },
-      onClose: () {},
-    );
-  }
-
   void _showProfileModal() {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (ctx, animation, secondaryAnimation) {
-        return Align(
-          alignment: Alignment.centerRight,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(1, 0),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-            ),
-            child: _MenuDrawer(
-              onLogout: _handleLogout,
-            ),
-          ),
+      pageBuilder: (ctx, animation, _) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: _MenuModal(onLogout: _handleLogout),
         );
       },
     );
@@ -465,7 +433,6 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           HomeScreen(
             onOpenScanner: _showPaymentModal,
-            onOpenVirtualCards: _showVirtualCardsFullscreen,
             onOpenTopup: _showTopupModal,
             onPanic: _handlePanic,
             onOpenProfile: _showProfileModal,
@@ -475,6 +442,7 @@ class _MainScreenState extends State<MainScreen> {
             onOpenTopup: _showTopupModal,
             onOpenTransfer: _showTransferModal,
           ),
+          const CardsScreen(),
           const TripsScreen(),
         ],
       ),
@@ -483,102 +451,286 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildBottomNavigationBar() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final items = [
+      (icon: Icons.home_rounded, label: 'Início'),
+      (icon: Icons.account_balance_wallet_rounded, label: 'Carteira'),
+      (icon: Icons.credit_card_rounded, label: 'Cartões'),
+      (icon: Icons.route_rounded, label: 'Viagens'),
+    ];
 
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (index) => setState(() => _currentIndex = index),
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: theme.colorScheme.surface,
-      selectedItemColor: theme.colorScheme.primary,
-      unselectedItemColor: theme.colorScheme.onSurface.withOpacity(0.65),
-      selectedLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
+    return Container(
+      color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: items.asMap().entries.map((entry) {
+              final i = entry.key;
+              final item = entry.value;
+              final isSelected = _currentIndex == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          item.icon,
+                          color: isSelected
+                              ? AppColors.accentOf(context)
+                              : isDark
+                                  ? Colors.white.withValues(alpha: 0.55)
+                                  : AppColors.textDark.withValues(alpha: 0.6),
+                          size: 22,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.accentOf(context)
+                                : isDark
+                                    ? Colors.white.withValues(alpha: 0.55)
+                                    : AppColors.textDark.withValues(alpha: 0.6),
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
-      unselectedLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
-      elevation: isDark ? 10 : 6,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_rounded),
-          label: 'Início',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.account_balance_wallet_rounded),
-          label: 'Carteira',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.route_rounded),
-          label: 'Viagens',
-        ),
-      ],
     );
   }
 }
 
-/// Menu Drawer com todas as funcionalidades do perfil
-class _MenuDrawer extends StatefulWidget {
-  final VoidCallback? onLogout;
-
-  const _MenuDrawer({this.onLogout});
-
-  @override
-  State<_MenuDrawer> createState() => _MenuDrawerState();
+// ─── Shared sub-modal header ──────────────────────────────────────────────────
+Widget _subModalHeader(
+    BuildContext context, String title, bool isDark, VoidCallback onClose) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 16, 12),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : AppColors.textDark,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: onClose,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.05),
+                ),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.75)
+                      : AppColors.textDark.withValues(alpha: 0.65),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      Container(
+        height: 1,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.07)
+            : Colors.black.withValues(alpha: 0.06),
+      ),
+    ],
+  );
 }
 
-class _MenuDrawerState extends State<_MenuDrawer> {
-  bool notificationsEnabled = true;
-  bool biometricsEnabled = false;
-  bool darkModeEnabled = false;
-  final ApiService _api = ApiService();
+// ─── Menu Modal (fullscreen) ──────────────────────────────────────────────────
+class _MenuModal extends StatefulWidget {
+  final VoidCallback? onLogout;
+  const _MenuModal({this.onLogout});
+  @override
+  State<_MenuModal> createState() => _MenuModalState();
+}
+
+class _MenuModalState extends State<_MenuModal> {
+  void _openSubModal(Widget modal) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (ctx, animation, _) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: modal,
+        );
+      },
+    );
+  }
 
   @override
-  void initState() {
-    super.initState();
-    _loadSettings();
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = context.watch<AppProvider>().user;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46, height: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                      border: Border.all(color: AppColors.accentOf(context), width: 1.5),
+                    ),
+                    child: user?.photo != null && user!.photo!.isNotEmpty
+                        ? ClipOval(child: Image.network(user.photo!, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 22, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65))))
+                        : Icon(Icons.person_rounded, size: 22, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(user?.fullName ?? '—',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(user?.phoneNumber ?? '—',
+                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+                    ]),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            const SizedBox(height: 8),
+            _navTile(isDark, Icons.person_outline_rounded, 'Perfil', 'Dados pessoais e métodos de pagamento', () => _openSubModal(const _ProfileModal())),
+            _navTile(isDark, Icons.shield_outlined, 'Segurança', 'PIN, biometria e privacidade', () => _openSubModal(const _SecurityModal())),
+            _navTile(isDark, Icons.settings_outlined, 'Configurações', 'Tema, notificações e informações', () => _openSubModal(const _SettingsModal())),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                widget.onLogout?.call();
+              },
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.22), width: 1.0),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout_rounded, color: Colors.red, size: 18),
+                    SizedBox(width: 8),
+                    Text('Sair', style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Future<void> _loadSettings() async {
-    await _api.loadTokens();
-    final prefs = await SharedPreferences.getInstance();
-    final bioPref = prefs.getBool('ts_bio_enabled') ?? false;
-    final themePref = prefs.getString('ts_theme_mode');
-
-    if (mounted) {
-      setState(() {
-        biometricsEnabled = bioPref;
-        darkModeEnabled = themePref == 'dark';
-      });
-    }
+  Widget _navTile(bool isDark, IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+            ])),
+            Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2)),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  void _showEditProfileSheet() {
+
+// ─── Profile Modal ────────────────────────────────────────────────────────────
+class _ProfileModal extends StatefulWidget {
+  const _ProfileModal();
+  @override
+  State<_ProfileModal> createState() => _ProfileModalState();
+}
+
+class _ProfileModalState extends State<_ProfileModal> {
+  void _showEditSheet() {
     final provider = context.read<AppProvider>();
     final user = provider.user;
     if (user == null) return;
-
-    final nameController = TextEditingController(text: user.fullName);
+    final nameCtrl = TextEditingController(text: user.fullName);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
+      builder: (ctx) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -590,114 +742,72 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withAlpha((0.25 * 255).round()),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Colors.black.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                'Editar Perfil',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Nome completo',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withAlpha((0.7 * 255).round()),
-                ),
-              ),
-              const SizedBox(height: 8),
+              Text('Editar Perfil',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppColors.textDark)),
+              const SizedBox(height: 20),
               TextField(
-                controller: nameController,
+                controller: nameCtrl,
                 decoration: InputDecoration(
-                  hintText: 'Digite seu nome',
+                  labelText: 'Nome completo',
                   prefixIcon: Icon(Icons.person_outline,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: AppColors.accentOf(context)),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha((0.20 * 255).round()),
-                    ),
-                  ),
+                      borderRadius: BorderRadius.circular(12)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha((0.20 * 255).round()),
-                    ),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.15)
+                            : Colors.black.withValues(alpha: 0.15)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
+                        color: AppColors.accentOf(context), width: 1.5),
                   ),
                   filled: true,
                   fillColor: isDark
-                      ? Theme.of(context).colorScheme.surface
-                      : Colors.white,
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.black.withValues(alpha: 0.03),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final provider = context.read<AppProvider>();
-                    Navigator.pop(context);
-
-                    final result = await _api.updateProfile(
-                      fullName: nameController.text,
-                    );
-
-                    if (result.isSuccess && result.data != null) {
-                      await provider.refreshUserData();
-                      if (mounted) {
-                        FeedbackService.showSuccess(
-                          this.context,
-                          message: 'Perfil atualizado com sucesso',
-                        );
-                      }
+                    Navigator.pop(ctx);
+                    final ok = await provider.updateProfile(
+                        fullName: nameCtrl.text.trim());
+                    if (ok && mounted) {
+                      FeedbackService.showSuccess(context,
+                          message: 'Perfil atualizado');
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: AppColors.accentOf(context),
+                    foregroundColor: isDark ? Colors.black : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                        borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Salvar Alterações',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: const Text('Guardar',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
                 ),
               ),
-              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -705,29 +815,185 @@ class _MenuDrawerState extends State<_MenuDrawer> {
     );
   }
 
-  Future<void> _showChangePinSheet() async {
-    final currentController = TextEditingController();
-    final newController = TextEditingController();
-    final confirmController = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isChanging = false;
+    final user = context.watch<AppProvider>().user;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(
+                context, 'Perfil', isDark, () => Navigator.pop(context)),
+            const SizedBox(height: 24),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04),
+                border: Border.all(color: AppColors.accentOf(context), width: 1.5),
+              ),
+              child: user?.photo != null && user!.photo!.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(user.photo!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                              Icons.person_rounded,
+                              size: 36,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.75)
+                                  : AppColors.textDark.withValues(alpha: 0.65))))
+                  : Icon(Icons.person_rounded,
+                      size: 36,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.75)
+                          : AppColors.textDark.withValues(alpha: 0.65)),
+            ),
+            const SizedBox(height: 10),
+            Text(user?.fullName ?? '—',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : AppColors.textDark)),
+            const SizedBox(height: 3),
+            Text(user?.phoneNumber ?? '—',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : Colors.black.withValues(alpha: 0.45))),
+            const SizedBox(height: 28),
+            _tile(isDark, Icons.edit_outlined, 'Editar perfil',
+                'Nome e informações pessoais', _showEditSheet),
+            _tile(isDark, Icons.payment_outlined, 'Métodos de pagamento',
+                'Cartões e contas vinculadas', () {}),
+            _tile(isDark, Icons.location_on_outlined, 'Endereço',
+                'Morada e localização', () {}),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tile(bool isDark, IconData icon, String title, String subtitle,
+      VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon,
+                size: 20,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.55)
+                    : Colors.black.withValues(alpha: 0.45)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : AppColors.textDark)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.4)
+                              : Colors.black.withValues(alpha: 0.38))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                size: 18,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : Colors.black.withValues(alpha: 0.2)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Security Modal ───────────────────────────────────────────────────────────
+class _SecurityModal extends StatefulWidget {
+  const _SecurityModal();
+  @override
+  State<_SecurityModal> createState() => _SecurityModalState();
+}
+
+class _SecurityModalState extends State<_SecurityModal> {
+  bool _bio = false;
+  final ApiService _api = ApiService();
+  final BiometricService _bio$ = BiometricService();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await _api.loadTokens();
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _bio = prefs.getBool('ts_bio_enabled') ?? false);
+  }
+
+  Future<void> _toggleBio(bool enable) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (enable) {
+      try {
+        final ok = await _bio$.authenticate(
+          reason: 'Confirme para ativar a biometria',
+          useErrorDialogs: true,
+          stickyAuth: true,
+        );
+        if (!ok) {
+          if (mounted) FeedbackService.showInfo(context, message: 'Cancelado');
+          return;
+        }
+        await prefs.setBool('ts_bio_enabled', true);
+        if (mounted) setState(() => _bio = true);
+        if (mounted) FeedbackService.showSuccess(context, message: 'Biometria ativada');
+      } catch (_) {
+        if (mounted) FeedbackService.showError(context, message: 'Biometria indisponível');
+      }
+    } else {
+      await prefs.setBool('ts_bio_enabled', false);
+      if (mounted) setState(() => _bio = false);
+      if (mounted) FeedbackService.showInfo(context, message: 'Biometria desativada');
+    }
+  }
+
+  Future<void> _changePin() async {
+    final curCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final cfmCtrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool busy = false;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
+        builder: (ctx, setSheet) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -739,124 +1005,83 @@ class _MenuDrawerState extends State<_MenuDrawer> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha((0.25 * 255).round()),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  'Alterar PIN',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(ctx).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Digite seu PIN atual e crie um novo PIN de 6 dígitos',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .onSurface
-                        .withAlpha((0.7 * 255).round()),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildPinField('PIN atual', currentController, ctx, isDark),
-                const SizedBox(height: 16),
-                _buildPinField('Novo PIN', newController, ctx, isDark),
-                const SizedBox(height: 16),
-                _buildPinField(
-                    'Confirmar novo PIN', confirmController, ctx, isDark),
-                const SizedBox(height: 24),
+                Text('Alterar PIN',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : AppColors.textDark)),
+                const SizedBox(height: 4),
+                Text('Novo PIN de 6 dígitos numéricos',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.5)
+                            : Colors.black.withValues(alpha: 0.45))),
+                const SizedBox(height: 20),
+                _pinField('PIN actual', curCtrl, isDark),
+                const SizedBox(height: 12),
+                _pinField('Novo PIN', newCtrl, isDark),
+                const SizedBox(height: 12),
+                _pinField('Confirmar PIN', cfmCtrl, isDark),
+                const SizedBox(height: 22),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: isChanging
+                    onPressed: busy
                         ? null
                         : () async {
-                            final currentPin = currentController.text.trim();
-                            final newPin = newController.text.trim();
-                            final confirmPin = confirmController.text.trim();
-
-                            if (!_isValidPin(newPin) ||
-                                !_isValidPin(confirmPin)) {
-                              FeedbackService.showError(
-                                this.context,
-                                message: 'PIN deve ter 6 dígitos numéricos',
-                              );
+                            final cur = curCtrl.text.trim();
+                            final nw = newCtrl.text.trim();
+                            final cf = cfmCtrl.text.trim();
+                            if (!_validPin(nw)) {
+                              FeedbackService.showError(context, message: 'PIN deve ter 6 dígitos');
                               return;
                             }
-                            if (newPin != confirmPin) {
-                              FeedbackService.showError(
-                                this.context,
-                                message: 'Novo PIN e confirmação não coincidem',
-                              );
+                            if (nw != cf) {
+                              FeedbackService.showError(context, message: 'PINs não coincidem');
                               return;
                             }
-
-                            setModalState(() => isChanging = true);
-
-                            final result = await _api.changePassword(
-                              currentPassword: currentPin,
-                              newPassword: newPin,
-                            );
-
-                            setModalState(() => isChanging = false);
-
-                            if (result.isSuccess) {
-                              await SecureStorageService().savePin(newPin);
+                            setSheet(() => busy = true);
+                            final res = await _api.changePassword(
+                                currentPassword: cur, newPassword: nw);
+                            setSheet(() => busy = false);
+                            if (res.isSuccess) {
+                              await SecureStorageService().savePin(nw);
                               await PinGuard.resetFailures('global');
-                              if (mounted) Navigator.pop(ctx);
-                              FeedbackService.showSuccess(
-                                this.context,
-                                message: 'PIN alterado com sucesso',
-                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (mounted) FeedbackService.showSuccess(context, message: 'PIN alterado');
                             } else {
-                              FeedbackService.showError(
-                                this.context,
-                                message:
-                                    'Erro: ${result.error ?? "PIN atual incorreto"}',
-                              );
+                              if (mounted) FeedbackService.showError(context, message: res.error ?? 'PIN actual incorreto');
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(ctx).colorScheme.primary,
-                      foregroundColor: Theme.of(ctx).colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: AppColors.accentOf(context),
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
-                      disabledBackgroundColor:
-                          Theme.of(ctx).colorScheme.primary.withOpacity(0.6),
                     ),
-                    child: isChanging
+                    child: busy
                         ? const SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Alterar PIN',
+                                strokeWidth: 2, color: Colors.black))
+                        : const Text('Alterar PIN',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                                fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -865,555 +1090,281 @@ class _MenuDrawerState extends State<_MenuDrawer> {
     );
   }
 
-  Widget _buildPinField(
-    String label,
-    TextEditingController controller,
-    BuildContext ctx,
-    bool isDark,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(ctx)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.7 * 255).round()),
-          ),
+  Widget _pinField(String label, TextEditingController ctrl, bool isDark) {
+    return TextField(
+      controller: ctrl,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: 6,
+      decoration: InputDecoration(
+        labelText: label,
+        counterText: '',
+        prefixIcon: Icon(Icons.lock_outline, color: AppColors.accentOf(context)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.15)),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: true,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          decoration: InputDecoration(
-            counterText: '',
-            hintText: '••••••',
-            prefixIcon: Icon(Icons.lock_outline,
-                color: Theme.of(ctx).colorScheme.primary),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Theme.of(ctx)
-                    .colorScheme
-                    .onSurface
-                    .withAlpha((0.20 * 255).round()),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Theme.of(ctx)
-                    .colorScheme
-                    .onSurface
-                    .withAlpha((0.20 * 255).round()),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Theme.of(ctx).colorScheme.primary,
-                width: 2,
-              ),
-            ),
-            filled: true,
-            fillColor:
-                isDark ? Theme.of(ctx).colorScheme.surface : Colors.white,
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              BorderSide(color: AppColors.accentOf(context), width: 1.5),
         ),
-      ],
-    );
-  }
-
-  bool _isValidPin(String pin) => RegExp(r'^\d{6}$').hasMatch(pin);
-
-  void _showAboutModal() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(
-              Icons.info_outline_rounded,
-              color: Theme.of(ctx).colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Sobre',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.textLight : AppColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Troco Seguro',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.textLight : AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Versão 1.0.0',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Sua plataforma segura para gerenciar e realizar transações de forma rápida e protegida.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.6,
-                  color: isDark ? AppColors.textLight : AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(ctx).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Theme.of(ctx).colorScheme.primary.withOpacity(0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Desenvolvido com ❤️',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(ctx).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Para proporcionar a melhor experiência de segurança nas transações.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Fechar',
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.03),
       ),
     );
   }
 
-  void _showTermsModal() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  bool _validPin(String p) => RegExp(r'^\d{6}$').hasMatch(p);
 
-    showDialog(
+  void _openEmergencyContacts() {
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(
-              Icons.description_outlined,
-              color: Theme.of(ctx).colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Termos e Condições',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.textLight : AppColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTermSection(
-                'Aceitação dos Termos',
-                'Ao usar este aplicativo, você concorda com estes termos e condições. Se você não concorda, não use o aplicativo.',
-                isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildTermSection(
-                'Privacidade e Segurança',
-                'Seus dados são protegidos com criptografia de ponta. Nunca compartilhamos suas informações com terceiros sem consentimento.',
-                isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildTermSection(
-                'Responsabilidades do Usuário',
-                'Você é responsável por manter a confidencialidade de sua conta e PIN. O Troco Seguro não se responsabiliza por uso indevido.',
-                isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildTermSection(
-                'Limitações de Responsabilidade',
-                'O Troco Seguro é fornecido "como está". Não garantimos disponibilidade ininterrupta do serviço.',
-                isDark,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Aceitar',
-              style: TextStyle(
-                color: Theme.of(ctx).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: const _EmergencyContactsPage(),
       ),
-    );
-  }
-
-  Widget _buildTermSection(String title, String content, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          content,
-          style: TextStyle(
-            fontSize: 11,
-            height: 1.5,
-            color: isDark ? AppColors.textLight : AppColors.textDark,
-          ),
-        ),
-      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final provider = context.read<AppProvider>();
-    final user = provider.user;
-
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.75,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark ? theme.cardColor : AppColors.lightCard,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header com botão de fechar
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    color: isDark ? AppColors.textLight : AppColors.textDark,
-                    iconSize: 28,
-                  ),
-                ),
-              ),
-              Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: isDark
-                    ? Colors.white.withAlpha((0.15 * 255).round())
-                    : theme.colorScheme.onSurface
-                        .withAlpha((0.12 * 255).round()),
-              ),
-              // Informações do usuário
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: theme.colorScheme.primary.withOpacity(0.2),
-                      ),
-                      child: user?.photo != null && user!.photo!.isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                user.photo!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(
-                                    Icons.person_rounded,
-                                    color: theme.colorScheme.primary,
-                                  );
-                                },
-                              ),
-                            )
-                          : Icon(
-                              Icons.person_rounded,
-                              color: theme.colorScheme.primary,
-                              size: 26,
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?.fullName ?? 'Usuário',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textLight
-                                  : AppColors.textDark,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            user?.phoneNumber ?? 'Sem telefone',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color:
-                                  isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: isDark
-                    ? Colors.white.withAlpha((0.15 * 255).round())
-                    : theme.colorScheme.onSurface
-                        .withAlpha((0.12 * 255).round()),
-              ),
-              // Menu scrollável
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    // Informações da Conta
-                    _buildSectionTitle('Conta', isDark),
-                    _buildMenuOption(
-                      'Editar Perfil',
-                      Icons.person_outline,
-                      isDark,
-                      onTap: _showEditProfileSheet,
-                    ),
-                    _buildMenuOption(
-                      'Métodos de Pagamento',
-                      Icons.payment_outlined,
-                      isDark,
-                      onTap: () {},
-                    ),
-                    _buildMenuOption(
-                      'Endereço',
-                      Icons.location_on_outlined,
-                      isDark,
-                      onTap: () {},
-                    ),
-                    const SizedBox(height: 12),
-                    // Segurança
-                    _buildSectionTitle('Segurança', isDark),
-                    _buildToggleOption(
-                      'Biometria',
-                      Icons.fingerprint,
-                      biometricsEnabled,
-                      isDark,
-                      onChanged: (value) {
-                        setState(() => biometricsEnabled = value);
-                      },
-                    ),
-                    _buildMenuOption(
-                      'Alterar PIN',
-                      Icons.key_outlined,
-                      isDark,
-                      onTap: _showChangePinSheet,
-                    ),
-                    const SizedBox(height: 12),
-                    // Aplicativo
-                    _buildSectionTitle('Aplicativo', isDark),
-                    _buildToggleOption(
-                      'Tema Escuro',
-                      Icons.dark_mode_outlined,
-                      darkModeEnabled,
-                      isDark,
-                      onChanged: (value) async {
-                        await ThemeController.instance.setDark(value);
-                        setState(() => darkModeEnabled = value);
-                      },
-                    ),
-                    _buildToggleOption(
-                      'Notificações',
-                      Icons.notifications_outlined,
-                      notificationsEnabled,
-                      isDark,
-                      onChanged: (value) {
-                        setState(() => notificationsEnabled = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    // Informações
-                    _buildSectionTitle('Informações', isDark),
-                    _buildMenuOption(
-                      'Sobre',
-                      Icons.info_outline_rounded,
-                      isDark,
-                      onTap: _showAboutModal,
-                    ),
-                    _buildMenuOption(
-                      'Termos e Condições',
-                      Icons.description_outlined,
-                      isDark,
-                      onTap: _showTermsModal,
-                    ),
-                  ],
-                ),
-              ),
-              Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: isDark
-                    ? Colors.white.withAlpha((0.15 * 255).round())
-                    : theme.colorScheme.onSurface
-                        .withAlpha((0.12 * 255).round()),
-              ),
-              // Botão de sair
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: _buildMenuOption(
-                  'Sair',
-                  Icons.logout_rounded,
-                  isDark,
-                  isLogout: true,
-                  onTap: () {
-                    Navigator.pop(context);
-                    widget.onLogout?.call();
-                  },
-                ),
-              ),
-            ],
-          ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Segurança', isDark,
+                () => Navigator.pop(context)),
+            const SizedBox(height: 8),
+            _toggleTile(isDark, Icons.fingerprint_rounded, 'Biometria',
+                'Desbloquear com impressão digital ou Face ID', _bio, _toggleBio),
+            _actionTile(isDark, Icons.key_outlined, 'Alterar PIN',
+                'Mudar o PIN de acesso à conta', _changePin),
+            _actionTile(isDark, Icons.people_outline_rounded, 'Contactos de emergência',
+                'Gerir contactos a notificar em caso de pânico', _openEmergencyContacts),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isDark) {
+  Widget _toggleTile(bool isDark, IconData icon, String title, String subtitle,
+      bool value, ValueChanged<bool> onChanged) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 16, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: isDark ? Colors.grey[400] : Colors.grey[600],
-          letterSpacing: 0.5,
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+            ]),
+          ),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.accentOf(context), activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        ],
       ),
     );
   }
 
-  Widget _buildMenuOption(
-    String label,
-    IconData icon,
-    bool isDark, {
-    VoidCallback? onTap,
-    bool isLogout = false,
-  }) {
+  Widget _actionTile(bool isDark, IconData icon, String title, String subtitle, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isLogout
-                  ? Colors.red
-                  : (isDark
-                      ? AppColors.textLight.withOpacity(0.7)
-                      : AppColors.textDark.withOpacity(0.7)),
-            ),
+            Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: isLogout
-                      ? Colors.red
-                      : (isDark ? AppColors.textLight : AppColors.textDark),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+                Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+              ]),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Settings Modal ───────────────────────────────────────────────────────────
+class _SettingsModal extends StatefulWidget {
+  const _SettingsModal();
+  @override
+  State<_SettingsModal> createState() => _SettingsModalState();
+}
+
+class _SettingsModalState extends State<_SettingsModal> {
+  bool _darkMode = false;
+  bool _notifications = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _darkMode = prefs.getString('ts_theme_mode') == 'dark');
+  }
+
+  void _openFullscreen(Widget page) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (ctx, animation, _) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: page,
+      ),
+    );
+  }
+
+  void _showAbout() => _openFullscreen(const _AboutPage());
+  void _showTerms() => _openFullscreen(const _TermsPage());
+
+  Future<void> _showDeleteAccountDialog(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final provider = context.read<AppProvider>();
+    final navigator = Navigator.of(context);
+    final balance = provider.user?.balance ?? 0;
+
+    final ibanCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+          title: Text('Encerrar Conta',
+              style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A sua conta entrará num período de carência de 30 dias. Se voltar a iniciar sessão nesse período, a conta será reactivada automaticamente.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+              ),
+              if (balance > 0) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Tem ${balance} Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
+                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ibanCtrl,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'AO06.0040.0000.XXXX.XXXX.X',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (balance > 0 && ibanCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Encerrar Conta'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final iban = balance > 0 ? ibanCtrl.text.trim() : null;
+    final success = await provider.deleteAccount(iban: iban);
+
+    if (!context.mounted) return;
+
+    if (success) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppController()),
+        (route) => false,
+      );
+    } else {
+      FeedbackService.showError(context, message: 'Não foi possível encerrar a conta. Contacte suporte@trocoseguro.ao');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Configurações', isDark, () => Navigator.pop(context)),
+            const SizedBox(height: 8),
+            _toggleTile(isDark, Icons.dark_mode_outlined, 'Tema escuro', 'Alternar entre modo claro e escuro', _darkMode, (v) async {
+              await ThemeController.instance.setDark(v);
+              if (mounted) setState(() => _darkMode = v);
+            }),
+            _toggleTile(isDark, Icons.notifications_outlined, 'Notificações', 'Receber alertas e novidades', _notifications, (v) => setState(() => _notifications = v)),
+            Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            _actionTile(isDark, Icons.report_problem_outlined, 'Reclamações', 'Reportar um problema ou incidente', () => ComplaintModal.show(context)),
+            _actionTile(isDark, Icons.info_outline_rounded, 'Sobre', 'Versão e informações do aplicativo', _showAbout),
+            _actionTile(isDark, Icons.description_outlined, 'Termos e Condições', 'Política de uso e privacidade', _showTerms),
+            _actionTile(isDark, Icons.privacy_tip_outlined, 'Política de Privacidade', 'Como tratamos os seus dados pessoais', () async {
+              Navigator.pop(context);
+              final uri = Uri.parse('https://trocoseguro.wemof.tech/termos');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            }),
+            Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            InkWell(
+              onTap: () => _showDeleteAccountDialog(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_forever_outlined, size: 20, color: Colors.red),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Encerrar Conta', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red)),
+                        Text('Período de carência de 30 dias — pode reactivar', style: TextStyle(fontSize: 11, color: Colors.red.withValues(alpha: 0.6))),
+                      ]),
+                    ),
+                    Icon(Icons.chevron_right_rounded, size: 18, color: Colors.red.withValues(alpha: 0.4)),
+                  ],
                 ),
               ),
             ),
@@ -1423,50 +1374,445 @@ class _MenuDrawerState extends State<_MenuDrawer> {
     );
   }
 
-  Widget _buildToggleOption(
-    String label,
-    IconData icon,
-    bool value,
-    bool isDark, {
-    required ValueChanged<bool> onChanged,
-  }) {
+  Widget _toggleTile(bool isDark, IconData icon, String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isDark
-                ? AppColors.textLight.withOpacity(0.7)
-                : AppColors.textDark.withOpacity(0.7),
-          ),
+          Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
           const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textLight : AppColors.textDark,
-              ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+          ])),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.accentOf(context), activeTrackColor: AppColors.accentOf(context).withValues(alpha: 0.3), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionTile(bool isDark, IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.45)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.38))),
+            ])),
+            Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Emergency Contacts Page ─────────────────────────────────────────────────
+class _EmergencyContactsPage extends StatefulWidget {
+  const _EmergencyContactsPage();
+  @override
+  State<_EmergencyContactsPage> createState() => _EmergencyContactsPageState();
+}
+
+class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
+  final ApiService _api = ApiService();
+  List<EmergencyContact> _contacts = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await _api.loadTokens();
+    final res = await _api.getEmergencyContacts();
+    if (!mounted) return;
+    setState(() { _contacts = res.data ?? []; _loading = false; });
+    if (!res.isSuccess) {
+      FeedbackService.showError(context, message: res.error ?? 'Erro ao carregar contactos');
+    }
+  }
+
+  Future<void> _delete(EmergencyContact c) async {
+    final res = await _api.deleteEmergencyContact(c.id);
+    if (res.isSuccess && mounted) {
+      setState(() => _contacts.removeWhere((x) => x.id == c.id));
+      FeedbackService.showSuccess(context, message: '${c.name} removido');
+    } else if (mounted) {
+      FeedbackService.showError(context, message: res.error ?? 'Erro ao remover');
+    }
+  }
+
+  void _showAddSheet(bool isDark) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    bool busy = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4,
+                    decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 20),
+                Text('Adicionar contacto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textDark)),
+                const SizedBox(height: 4),
+                Text('Será notificado quando acionar o botão de pânico', style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.45))),
+                const SizedBox(height: 20),
+                _field('Nome', nameCtrl, isDark, Icons.person_outline),
+                const SizedBox(height: 12),
+                _field('Telefone (+244...)', phoneCtrl, isDark, Icons.phone_outlined, type: TextInputType.phone),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: busy ? null : () async {
+                      final name = nameCtrl.text.trim();
+                      final phone = phoneCtrl.text.trim();
+                      if (name.isEmpty || phone.isEmpty) {
+                        FeedbackService.showError(context, message: 'Preencha todos os campos');
+                        return;
+                      }
+                      setSheet(() => busy = true);
+                      final res = await _api.addEmergencyContact(name: name, phoneNumber: phone);
+                      setSheet(() => busy = false);
+                      if (res.isSuccess && res.data != null) {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) setState(() => _contacts.add(res.data!));
+                        if (mounted) FeedbackService.showSuccess(context, message: '$name adicionado');
+                      } else {
+                        if (mounted) FeedbackService.showError(context, message: res.error ?? 'Erro ao adicionar');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentOf(context), foregroundColor: isDark ? Colors.black : Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: busy
+                        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? Colors.black : Colors.white))
+                        : const Text('Adicionar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 45,
-            child: Switch(
-              value: value,
-              onChanged: onChanged,
-              activeThumbColor: AppColors.primary,
-              activeTrackColor: AppColors.primary.withOpacity(0.3),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl, bool isDark, IconData icon, {TextInputType type = TextInputType.text}) {
+    return TextField(
+      controller: ctrl, keyboardType: type,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.accentOf(context)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5)),
+        filled: true,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canAdd = _contacts.length < 3;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Contactos de Emergência', isDark, () => Navigator.pop(context)),
+            // limit badge
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Row(
+                children: [
+                  Expanded(child: Text('${_contacts.length}/3 contactos',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4)))),
+                  if (canAdd)
+                    GestureDetector(
+                      onTap: () => _showAddSheet(isDark),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentOf(context),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.add_rounded, size: 15, color: isDark ? Colors.black : Colors.white),
+                          const SizedBox(width: 4),
+                          Text('Adicionar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.black : Colors.white)),
+                        ]),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text('Limite atingido', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.orange)),
+                    ),
+                ],
+              ),
+            ),
+            Container(height: 1, margin: const EdgeInsets.only(top: 12),
+                color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
+            Expanded(
+              child: _loading
+                  ? Center(child: CircularProgressIndicator(color: AppColors.accentOf(context)))
+                  : _contacts.isEmpty
+                      ? _buildEmpty(isDark)
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: _contacts.length,
+                          separatorBuilder: (_, __) => Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20),
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05)),
+                          itemBuilder: (_, i) => _contactTile(_contacts[i], isDark),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _contactTile(EmergencyContact c, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+              border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4), width: 1.2),
+            ),
+            child: Center(child: Text(c.name[0].toUpperCase(),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.accentOf(context)))),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(c.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : AppColors.textDark)),
+            const SizedBox(height: 2),
+            Text(c.phoneNumber, style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+          ])),
+          GestureDetector(
+            onTap: () => _delete(c),
+            child: Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.red.withValues(alpha: 0.08)),
+              child: const Icon(Icons.delete_outline_rounded, size: 17, color: Colors.red),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmpty(bool isDark) {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 72, height: 72,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4), width: 1.5)),
+            child: Icon(Icons.people_outline_rounded, size: 32,
+                color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.3))),
+        const SizedBox(height: 16),
+        Text('Nenhum contacto', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppColors.textDark)),
+        const SizedBox(height: 6),
+        Text('Adicione até 3 pessoas a notificar\nem caso de emergência.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.5,
+                color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+      ]),
+    );
+  }
+}
+
+// ─── About Page ───────────────────────────────────────────────────────────────
+class _AboutPage extends StatelessWidget {
+  const _AboutPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Sobre', isDark, () => Navigator.pop(context)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 72, height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                          border: Border.all(color: AppColors.accentOf(context), width: 1.5),
+                        ),
+                        child: Icon(Icons.security_rounded, size: 34,
+                            color: isDark ? Colors.white.withValues(alpha: 0.75) : AppColors.textDark.withValues(alpha: 0.65)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Text('Troco Seguro',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : AppColors.textDark)),
+                    ),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: Text('Versão 1.0.4',
+                          style: TextStyle(fontSize: 12,
+                              color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.4))),
+                    ),
+                    const SizedBox(height: 32),
+                    _section('O que é o Troco Seguro?', isDark),
+                    const SizedBox(height: 8),
+                    _body('Plataforma digital que elimina a necessidade de troco físico nas viagens de táxi em Luanda. Passageiros e motoristas fazem pagamentos via QR code de forma rápida, simples e segura.', isDark),
+                    const SizedBox(height: 24),
+                    _section('Como funciona?', isDark),
+                    const SizedBox(height: 8),
+                    _step('1', 'Carregue a sua carteira com o saldo desejado.', isDark, context),
+                    const SizedBox(height: 10),
+                    _step('2', 'No final da viagem, escaneie o QR code do motorista.', isDark, context),
+                    const SizedBox(height: 10),
+                    _step('3', 'Confirme o pagamento com o seu PIN de 6 dígitos.', isDark, context),
+                    const SizedBox(height: 24),
+                    _section('Segurança', isDark),
+                    const SizedBox(height: 8),
+                    _body('Todos os pagamentos são protegidos por PIN e opcionalmente por biometria. Os tokens de sessão expiram automaticamente e os dados sensíveis nunca são armazenados em texto simples.', isDark),
+                    const SizedBox(height: 24),
+                    _section('Contacto', isDark),
+                    const SizedBox(height: 8),
+                    _body('Para suporte ou esclarecimentos, contacte-nos em suporte@trocoseguro.ao', isDark),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _section(String text, bool isDark) => Text(text,
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+          color: isDark ? Colors.white : AppColors.textDark));
+
+  Widget _body(String text, bool isDark) => Text(text,
+      style: TextStyle(fontSize: 13, height: 1.65,
+          color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55)));
+
+  Widget _step(String num, String text, bool isDark, BuildContext context) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        width: 22, height: 22,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accentOf(context)),
+        child: Center(child: Text(num, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.black))),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Text(text,
+          style: TextStyle(fontSize: 13, height: 1.55,
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55)))),
+    ]);
+  }
+}
+
+// ─── Terms Page ───────────────────────────────────────────────────────────────
+class _TermsPage extends StatelessWidget {
+  const _TermsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _subModalHeader(context, 'Termos e Condições', isDark, () => Navigator.pop(context)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _clause('1. Aceitação dos Termos', 'Ao registar-se e utilizar o Troco Seguro, concorda expressamente com estes Termos e Condições. Caso não concorde, deverá cessar imediatamente a utilização da aplicação.', isDark, context),
+                    _clause('2. Descrição do Serviço', 'O Troco Seguro é uma plataforma de pagamentos digitais destinada a facilitar transações entre passageiros e motoristas de táxi em Angola. O serviço inclui carteira digital, pagamentos via QR code e histórico de transações.', isDark, context),
+                    _clause('3. Conta e Segurança', 'É da sua exclusiva responsabilidade manter a confidencialidade do PIN e das credenciais de acesso à conta. Qualquer atividade realizada com as suas credenciais é da sua responsabilidade. Em caso de suspeita de acesso não autorizado, contacte-nos imediatamente.', isDark, context),
+                    _clause('4. Pagamentos e Saldo', 'O saldo da carteira é expresso em Kwanzas (Kz) e não é convertível em dinheiro físico exceto mediante solicitação formal. Todos os pagamentos são definitivos e não reversíveis, salvo em casos de erro técnico comprovado.', isDark, context),
+                    _clause('5. Privacidade dos Dados', 'Os seus dados pessoais são tratados de acordo com a legislação angolana de proteção de dados. Não partilhamos informações pessoais com terceiros sem o seu consentimento, exceto quando exigido por lei.', isDark, context),
+                    _clause('6. Limitação de Responsabilidade', 'O Troco Seguro não se responsabiliza por falhas causadas por problemas de conectividade, interrupções de serviço de terceiros ou utilização indevida da aplicação pelo utilizador.', isDark, context),
+                    _clause('7. Alterações aos Termos', 'Reservamo-nos o direito de atualizar estes termos a qualquer momento. Será notificado de alterações significativas através da aplicação. O uso continuado após as alterações implica aceitação dos novos termos.', isDark, context),
+                    _clause('8. Contacto', 'Para questões relacionadas com estes termos, contacte: termos@trocoseguro.ao', isDark, context),
+                    const SizedBox(height: 8),
+                    Text('Última atualização: Junho 2026',
+                        style: TextStyle(fontSize: 11,
+                            color: isDark ? Colors.white.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.3))),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _clause(String title, String body, bool isDark, BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accentOf(context))),
+        const SizedBox(height: 6),
+        Text(body,
+            style: TextStyle(fontSize: 13, height: 1.65,
+                color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.55))),
+      ]),
     );
   }
 }
@@ -1615,7 +1961,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                 child: Container(
-                  color: const Color(0xFF121212).withOpacity(0.3),
+                  color: const Color(0xFF121212).withValues(alpha: 0.3),
                 ),
               ),
             SafeArea(
@@ -1638,7 +1984,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                               'Bem-vindo',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: AppColors.primaryGold,
+                                color: AppColors.accentOf(context),
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 1.2,
@@ -1677,13 +2023,28 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                         border: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          borderSide: BorderSide.none,
+                                          borderSide: BorderSide(
+                                            color: isDark
+                                                ? Colors.grey.shade800
+                                                : Colors.grey.shade400,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: BorderSide(
+                                            color: isDark
+                                                ? Colors.grey.shade800
+                                                : Colors.grey.shade400,
+                                            width: 1,
+                                          ),
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          borderSide: const BorderSide(
-                                            color: AppColors.accent,
+                                          borderSide: BorderSide(
+                                            color: AppColors.accentOf(context),
                                             width: 2,
                                           ),
                                         ),
@@ -1734,7 +2095,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accent,
+                                    backgroundColor: AppColors.accentOf(context),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
@@ -1750,7 +2111,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _verifyPin,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.accent,
+                                  backgroundColor: AppColors.accentOf(context),
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -1785,9 +2146,9 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                         await widget.onSwitchAccount();
                                       },
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.accent,
+                                  foregroundColor: AppColors.accentOf(context),
                                   side:
-                                      const BorderSide(color: AppColors.accent),
+                                      BorderSide(color: AppColors.accentOf(context)),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),

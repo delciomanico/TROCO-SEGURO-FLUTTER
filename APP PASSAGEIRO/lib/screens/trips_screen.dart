@@ -6,6 +6,8 @@ import 'package:troco_seguro/utils/constants.dart';
 
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/api_service.dart' show ApiService, TripStats;
+import 'package:troco_seguro/widgets/ratings_history_modal.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -15,20 +17,46 @@ class TripsScreen extends StatefulWidget {
 }
 
 class _TripsScreenState extends State<TripsScreen> {
+  bool _showSearch = false;
+  String _searchQuery = '';
+  final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
+  TripStats? _apiStats;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().refreshTrips();
-    });
+    _loadStats();
   }
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)}kzs';
+  Future<void> _loadStats() async {
+    final result = await ApiService().getTripStats();
+    if (result.isSuccess && result.data != null && mounted) {
+      setState(() => _apiStats = result.data);
+    }
   }
 
-  Color _getStatusColor(String status) {
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  List<Trip> _filtered(List<Trip> trips) {
+    if (_searchQuery.isEmpty) return trips;
+    final q = _searchQuery.toLowerCase();
+    return trips.where((t) {
+      return t.origin.toLowerCase().contains(q) ||
+          t.destination.toLowerCase().contains(q) ||
+          t.driverName.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  String _fmt(int amount) =>
+      '${NumberFormat('#,##0', 'pt_AO').format(amount)} Kz';
+
+  Color _statusColor(String status) {
     switch (status) {
       case 'completed':
         return Colors.green;
@@ -41,7 +69,7 @@ class _TripsScreenState extends State<TripsScreen> {
     }
   }
 
-  String _getStatusLabel(String status) {
+  String _statusLabel(String status) {
     switch (status) {
       case 'completed':
         return 'Concluída';
@@ -62,139 +90,275 @@ class _TripsScreenState extends State<TripsScreen> {
     final isLoading = provider.isLoadingTrips;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final statsCompleted = trips.where((t) => t.status == 'completed').length;
-    final statsTotal = trips.fold<int>(0, (s, t) => s + t.amount);
+    final filtered = _filtered(trips);
+    final completed = _apiStats?.totalTrips ?? trips.where((t) => t.status == 'completed').length;
+    final totalSpent = _apiStats?.totalSpentMonth ?? trips.fold<int>(0, (s, t) => s + t.amount);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async =>
-                  await context.read<AppProvider>().refreshTrips(),
-              child: SafeArea(
-                child: ListView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: responsive.scaledWidth(20),
-                    vertical: responsive.scaledHeight(20),
-                  ),
-                  children: [
-                    _buildHeader(responsive, statsCompleted, statsTotal),
-                    SizedBox(height: responsive.scaledHeight(20)),
-                    _buildTimelineHeader(responsive),
-                    SizedBox(height: responsive.scaledHeight(12)),
-                    _buildTripsList(responsive, trips),
-                  ],
-                ),
-              ),
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _buildHeader(isDark, responsive),
+            Expanded(
+              child: isLoading
+                  ? Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.accentOf(context)))
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        await context.read<AppProvider>().refreshTrips();
+                        await _loadStats();
+                      },
+                      color: AppColors.accentOf(context),
+                      child: ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          responsive.scaledWidth(20),
+                          responsive.scaledHeight(4),
+                          responsive.scaledWidth(20),
+                          responsive.scaledHeight(100),
+                        ),
+                        children: [
+                          _buildStatsRow(isDark, responsive, completed,
+                              totalSpent),
+                          SizedBox(height: responsive.scaledHeight(24)),
+                          _buildSectionLabel(isDark, responsive),
+                          SizedBox(height: responsive.scaledHeight(12)),
+                          filtered.isEmpty
+                              ? _buildEmptyState(isDark, responsive)
+                              : _buildTripsList(isDark, responsive, filtered),
+                        ],
+                      ),
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildHeader(
-      ResponsiveHelper responsive, int completed, int totalSpent) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  // ── Fixed header ────────────────────────────────────────────────────────────
+  Widget _buildHeader(bool isDark, ResponsiveHelper responsive) {
     return Container(
-      padding: EdgeInsets.all(responsive.scaledWidth(20)),
-      decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Theme.of(context)
-              .colorScheme
-              .onSurface
-              .withAlpha((0.10 * 255).round()),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.06 * 255).round()),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(10),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(responsive.scaledWidth(12)),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.route_rounded,
-                  color: AppColors.primaryGold,
-                  size: responsive.scaledWidth(28),
-                ),
-              ),
-              SizedBox(width: responsive.scaledWidth(12)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Histórico de Viagens',
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.04, 0),
+              end: Offset.zero,
+            ).animate(anim),
+            child: child,
+          ),
+        ),
+        child: _showSearch
+            ? Row(
+                key: const ValueKey('search'),
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      focusNode: _searchFocus,
+                      autofocus: true,
+                      onChanged: (v) => setState(() => _searchQuery = v),
                       style: TextStyle(
-                        fontSize: responsive.responsiveFontSize(20),
-                        fontWeight: FontWeight.w900,
                         color: isDark ? Colors.white : AppColors.textDark,
+                        fontSize: responsive.responsiveFontSize(14),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar viagens...',
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.38)
+                              : Colors.black.withValues(alpha: 0.32),
+                          fontSize: responsive.responsiveFontSize(14),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: AppColors.accentOf(context),
+                          size: responsive.scaledWidth(20),
+                        ),
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.04),
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color:
+                                AppColors.accentOf(context).withValues(alpha: 0.7),
+                            width: 1.2,
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                    SizedBox(height: responsive.scaledHeight(4)),
-                    Text(
-                      'Suas jornadas registradas',
-                      style: TextStyle(
-                        fontSize: responsive.responsiveFontSize(12),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(8)),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showSearch = false;
+                        _searchQuery = '';
+                      });
+                      _searchCtrl.clear();
+                      _searchFocus.unfocus();
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: isDark
-                            ? Colors.white.withOpacity(0.7)
-                            : AppColors.textDark.withOpacity(0.6),
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: responsive.scaledWidth(18),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : AppColors.textDark.withValues(alpha: 0.7),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              )
+            : Row(
+                key: const ValueKey('title'),
+                children: [
+                  Text(
+                    'Viagens',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(22),
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : AppColors.textDark,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Botão: histórico de avaliações
+                  GestureDetector(
+                    onTap: () {
+                      final userId =
+                          context.read<AppProvider>().user?.id;
+                      if (userId != null) {
+                        RatingsHistoryModal.show(context, userId: userId);
+                      }
+                    },
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.star_outline_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : AppColors.textDark.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(8)),
+                  GestureDetector(
+                    onTap: () => setState(() => _showSearch = true),
+                    child: Container(
+                      width: responsive.scaledWidth(38),
+                      height: responsive.scaledWidth(38),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(
+                        Icons.search_rounded,
+                        size: responsive.scaledWidth(20),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : AppColors.textDark.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+      ),
+    );
+  }
+
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  Widget _buildStatsRow(bool isDark, ResponsiveHelper responsive, int completed,
+      int totalSpent) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(4),
+        vertical: responsive.scaledHeight(16),
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatItem(
+              isDark,
+              responsive,
+              Icons.check_circle_outline_rounded,
+              _apiStats != null ? 'Total viagens' : 'Concluídas',
+              '$completed',
+              Colors.green,
+            ),
           ),
-          SizedBox(height: responsive.scaledHeight(16)),
-          Divider(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.10 * 255).round()),
-            thickness: 1,
+          Container(
+            width: 1,
+            height: responsive.scaledHeight(36),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.07),
           ),
-          SizedBox(height: responsive.scaledHeight(12)),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  responsive,
-                  Icons.check_circle_rounded,
-                  'Concluídas',
-                  '$completed',
-                  Colors.green,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: responsive.scaledHeight(40),
-                color: AppColors.primaryGold.withOpacity(0.2),
-              ),
-              Expanded(
-                child: _buildStatItem(
-                  responsive,
-                  Icons.payments_rounded,
-                  'Total Gasto',
-                  _formatCurrency(totalSpent),
-                  AppColors.primaryGold,
-                ),
-              ),
-            ],
+          Expanded(
+            child: _buildStatItem(
+              isDark,
+              responsive,
+              Icons.payments_outlined,
+              _apiStats != null ? 'Kz este mês' : 'Total gasto',
+              _fmt(totalSpent),
+              AppColors.accentOf(context),
+            ),
           ),
         ],
       ),
@@ -202,33 +366,35 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Widget _buildStatItem(
+    bool isDark,
     ResponsiveHelper responsive,
     IconData icon,
     String label,
     String value,
-    Color color,
+    Color iconColor,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: responsive.scaledWidth(24)),
-        SizedBox(height: responsive.scaledHeight(8)),
+        Icon(icon,
+            color: iconColor, size: responsive.scaledWidth(22)),
+        SizedBox(height: responsive.scaledHeight(6)),
         Text(
           label,
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(11),
-            color: isDark
-                ? Colors.white.withOpacity(0.6)
-                : AppColors.textDark.withOpacity(0.6),
             fontWeight: FontWeight.w500,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.45),
           ),
         ),
-        SizedBox(height: responsive.scaledHeight(4)),
+        SizedBox(height: responsive.scaledHeight(3)),
         Text(
           value,
           style: TextStyle(
-            fontSize: responsive.responsiveFontSize(16),
-            fontWeight: FontWeight.w900,
+            fontSize: responsive.responsiveFontSize(15),
+            fontWeight: FontWeight.w800,
             color: isDark ? Colors.white : AppColors.textDark,
           ),
         ),
@@ -236,80 +402,66 @@ class _TripsScreenState extends State<TripsScreen> {
     );
   }
 
-  Widget _buildTimelineHeader(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.45 * 255).round()),
-            shape: BoxShape.circle,
-          ),
-        ),
-        SizedBox(width: responsive.scaledWidth(12)),
-        Text(
-          'Viagens recentes',
-          style: TextStyle(
-            fontSize: responsive.responsiveFontSize(16),
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white : AppColors.textDark,
-          ),
-        ),
-      ],
+  // ── Section label ───────────────────────────────────────────────────────────
+  Widget _buildSectionLabel(bool isDark, ResponsiveHelper responsive) {
+    return Text(
+      'RECENTES',
+      style: TextStyle(
+        fontSize: responsive.responsiveFontSize(11),
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.4)
+            : Colors.black.withValues(alpha: 0.35),
+      ),
     );
   }
 
-  Widget _buildTripsList(ResponsiveHelper responsive, List<Trip> trips) {
-    if (trips.isEmpty) return _buildEmptyState(responsive);
-    return Column(
-      children: trips.asMap().entries.map((entry) {
-        final index = entry.key;
-        final trip = entry.value;
-        final isLast = index == trips.length - 1;
-        return _buildTripItem(responsive, trip, isLast);
-      }).toList(),
-    );
-  }
-
-  Widget _buildEmptyState(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+  // ── Empty state ─────────────────────────────────────────────────────────────
+  Widget _buildEmptyState(bool isDark, ResponsiveHelper responsive) {
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(60)),
       child: Center(
         child: Column(
           children: [
             Container(
-              padding: EdgeInsets.all(responsive.scaledWidth(20)),
+              width: responsive.scaledWidth(72),
+              height: responsive.scaledWidth(72),
               decoration: BoxDecoration(
-                color: AppColors.primaryGold.withOpacity(0.1),
                 shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04),
+                border: Border.all(
+                  color: AppColors.accentOf(context).withValues(alpha: 0.4),
+                  width: 1.2,
+                ),
               ),
               child: Icon(
                 Icons.route_outlined,
-                size: responsive.scaledWidth(48),
-                color: AppColors.primaryGold.withOpacity(0.5),
+                size: responsive.scaledWidth(32),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.45)
+                    : Colors.black.withValues(alpha: 0.35),
               ),
             ),
             SizedBox(height: responsive.scaledHeight(16)),
             Text(
-              'Nenhuma viagem registrada',
+              'Nenhuma viagem',
               style: TextStyle(
                 fontSize: responsive.responsiveFontSize(16),
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.textDark,
               ),
             ),
-            SizedBox(height: responsive.scaledHeight(8)),
+            SizedBox(height: responsive.scaledHeight(6)),
             Text(
-              'Suas viagens aparecerão aqui',
+              'As suas viagens aparecerão aqui',
               style: TextStyle(
                 fontSize: responsive.responsiveFontSize(12),
-                color: isDark ? Colors.grey[500] : Colors.grey[500],
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : Colors.black.withValues(alpha: 0.38),
               ),
             ),
           ],
@@ -318,57 +470,69 @@ class _TripsScreenState extends State<TripsScreen> {
     );
   }
 
-  Widget _buildTripItem(ResponsiveHelper responsive, Trip trip, bool isLast) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? AppColors.textLight : AppColors.textDark;
-    final statusColor = _getStatusColor(trip.status);
+  // ── Trips list ──────────────────────────────────────────────────────────────
+  Widget _buildTripsList(
+      bool isDark, ResponsiveHelper responsive, List<Trip> trips) {
+    return Column(
+      children: trips.asMap().entries.map((e) {
+        return _buildTripItem(isDark, responsive, e.value,
+            isLast: e.key == trips.length - 1);
+      }).toList(),
+    );
+  }
+
+  Widget _buildTripItem(
+    bool isDark,
+    ResponsiveHelper responsive,
+    Trip trip, {
+    required bool isLast,
+  }) {
+    final statusColor = _statusColor(trip.status);
+    final textPrimary = isDark ? Colors.white : AppColors.textDark;
+    final textSecondary = isDark
+        ? Colors.white.withValues(alpha: 0.55)
+        : Colors.black.withValues(alpha: 0.5);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Timeline column
         Column(
           children: [
             Container(
-              width: responsive.scaledWidth(10),
-              height: responsive.scaledWidth(10),
+              width: responsive.scaledWidth(9),
+              height: responsive.scaledWidth(9),
               decoration: BoxDecoration(
-                color: statusColor.withAlpha((0.85 * 255).round()),
+                color: statusColor.withValues(alpha: 0.85),
                 shape: BoxShape.circle,
               ),
             ),
             if (!isLast)
               Container(
                 width: 1.5,
-                height: responsive.scaledHeight(72),
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withAlpha((0.14 * 255).round()),
+                height: responsive.scaledHeight(74),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : Colors.black.withValues(alpha: 0.08),
               ),
           ],
         ),
         SizedBox(width: responsive.scaledWidth(12)),
+        // Card
         Expanded(
           child: Container(
-            margin: EdgeInsets.only(bottom: responsive.scaledHeight(14)),
+            margin:
+                EdgeInsets.only(bottom: responsive.scaledHeight(12)),
             padding: EdgeInsets.all(responsive.scaledWidth(14)),
             decoration: BoxDecoration(
-              color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
+              color: isDark ? AppColors.darkCard : Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withAlpha((0.08 * 255).round()),
-                width: 1,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06),
+                width: 1.0,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha((0.05 * 255).round()),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,39 +543,40 @@ class _TripsScreenState extends State<TripsScreen> {
                       child: Text(
                         '${trip.origin} → ${trip.destination}',
                         style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
+                          fontSize: responsive.responsiveFontSize(13),
                           fontWeight: FontWeight.w700,
-                          color: primaryText,
+                          color: textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    SizedBox(width: responsive.scaledWidth(8)),
                     Text(
-                      _formatCurrency(trip.amount),
+                      _fmt(trip.amount),
                       style: TextStyle(
-                        fontSize: responsive.responsiveFontSize(14),
+                        fontSize: responsive.responsiveFontSize(13),
                         fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
+                        color: AppColors.accentOf(context),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: responsive.scaledHeight(8)),
+                SizedBox(height: responsive.scaledHeight(7)),
                 Row(
                   children: [
                     Icon(
                       Icons.person_outline_rounded,
-                      size: responsive.scaledWidth(14),
-                      color: primaryText.withAlpha((0.65 * 255).round()),
+                      size: responsive.scaledWidth(13),
+                      color: textSecondary,
                     ),
-                    SizedBox(width: responsive.scaledWidth(6)),
+                    SizedBox(width: responsive.scaledWidth(5)),
                     Expanded(
                       child: Text(
-                        trip.driverName ?? 'Motorista',
+                        trip.driverName,
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(11),
-                          color: primaryText.withAlpha((0.72 * 255).round()),
+                          color: textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -424,28 +589,51 @@ class _TripsScreenState extends State<TripsScreen> {
                         vertical: responsive.scaledHeight(3),
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withAlpha((0.12 * 255).round()),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _getStatusLabel(trip.status),
+                        _statusLabel(trip.status),
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(10),
-                          color: statusColor.withAlpha((0.9 * 255).round()),
-                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: responsive.scaledHeight(6)),
-                Text(
-                  '${trip.date} • ${trip.time}',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(10),
-                    color: primaryText.withAlpha((0.6 * 255).round()),
-                    fontWeight: FontWeight.w500,
-                  ),
+                SizedBox(height: responsive.scaledHeight(5)),
+                Row(
+                  children: [
+                    Text(
+                      '${trip.date} • ${trip.time}',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(10),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.35),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (trip.rating != null) ...[
+                      SizedBox(width: responsive.scaledWidth(10)),
+                      Icon(
+                        Icons.star_rounded,
+                        size: responsive.scaledWidth(12),
+                        color: AppColors.accentOf(context),
+                      ),
+                      SizedBox(width: responsive.scaledWidth(2)),
+                      Text(
+                        trip.rating!.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(10),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accentOf(context),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

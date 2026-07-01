@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Configuração do QR Code do Motorista
-/// O QR Code em si é único e estático (baseado no token do motorista)
-/// Mas as informações associadas (rota e valor) podem ser alteradas
 class QrConfig {
-  final String driverToken; // Token único do motorista (não muda)
+  final String driverToken;
   final String? activeRouteId;
   final String? activeRouteName;
-  final int currentFare; // Valor cobrado em Kz
+  final int currentFare;
   final DateTime? lastUpdate;
+  final String? parentQrImage;      // base64 da imagem do QR pai (vindo de /qrcodes/setup)
+  final String? sessionPublicToken; // publicToken da sessão activa (de /qrcodes/session/seats)
+  final List<Map<String, dynamic>> childQrs; // QRs de assentos individuais
 
   QrConfig({
     required this.driverToken,
@@ -17,15 +17,20 @@ class QrConfig {
     this.activeRouteName,
     this.currentFare = 0,
     this.lastUpdate,
+    this.parentQrImage,
+    this.sessionPublicToken,
+    this.childQrs = const [],
   });
 
-  /// Cria uma cópia com novos valores
   QrConfig copyWith({
     String? driverToken,
     String? activeRouteId,
     String? activeRouteName,
     int? currentFare,
     DateTime? lastUpdate,
+    String? parentQrImage,
+    String? sessionPublicToken,
+    List<Map<String, dynamic>>? childQrs,
   }) {
     return QrConfig(
       driverToken: driverToken ?? this.driverToken,
@@ -33,10 +38,12 @@ class QrConfig {
       activeRouteName: activeRouteName ?? this.activeRouteName,
       currentFare: currentFare ?? this.currentFare,
       lastUpdate: lastUpdate ?? this.lastUpdate,
+      parentQrImage: parentQrImage ?? this.parentQrImage,
+      sessionPublicToken: sessionPublicToken ?? this.sessionPublicToken,
+      childQrs: childQrs ?? this.childQrs,
     );
   }
 
-  /// Converte para JSON
   Map<String, dynamic> toJson() {
     return {
       'driverToken': driverToken,
@@ -44,10 +51,12 @@ class QrConfig {
       'activeRouteName': activeRouteName,
       'currentFare': currentFare,
       'lastUpdate': lastUpdate?.toIso8601String(),
+      'parentQrImage': parentQrImage,
+      'sessionPublicToken': sessionPublicToken,
+      'childQrs': childQrs,
     };
   }
 
-  /// Cria a partir de JSON
   factory QrConfig.fromJson(Map<String, dynamic> json) {
     return QrConfig(
       driverToken: json['driverToken'] ?? '',
@@ -55,46 +64,42 @@ class QrConfig {
       activeRouteName: json['activeRouteName'],
       currentFare: json['currentFare'] ?? 0,
       lastUpdate: json['lastUpdate'] != null
-          ? DateTime.parse(json['lastUpdate'])
+          ? DateTime.tryParse(json['lastUpdate'])
           : null,
+      parentQrImage: json['parentQrImage'],
+      sessionPublicToken: json['sessionPublicToken'],
+      childQrs: json['childQrs'] is List
+          ? (json['childQrs'] as List)
+              .whereType<Map>()
+              .map((m) => m.cast<String, dynamic>())
+              .toList()
+          : [],
     );
   }
 
-  /// Gera os dados que serão codificados no QR Code
-  /// O token é único e estático, mas inclui as informações atuais
-  String generateQrData() {
-    final data = {
-      'token': driverToken,
-      'route': activeRouteName,
-      'fare': currentFare,
-      'ts': DateTime.now().millisecondsSinceEpoch,
-    };
-    return 'troco_seguro_driver:${base64Encode(utf8.encode(json.encode(data)))}';
-  }
-
-  /// Salva a configuração no SharedPreferences
   Future<void> save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('qr_config', json.encode(toJson()));
   }
 
-  /// Carrega a configuração do SharedPreferences
   static Future<QrConfig?> load() async {
     final prefs = await SharedPreferences.getInstance();
     final configStr = prefs.getString('qr_config');
     if (configStr != null) {
-      return QrConfig.fromJson(json.decode(configStr));
+      try {
+        return QrConfig.fromJson(jsonDecode(configStr));
+      } catch (_) {
+        return null;
+      }
     }
     return null;
   }
 
-  /// Gera um token único para o motorista (chamado apenas uma vez)
   static Future<String> generateDriverToken(String driverId) async {
     final prefs = await SharedPreferences.getInstance();
     String? existingToken = prefs.getString('driver_token');
 
     if (existingToken == null || existingToken.isEmpty) {
-      // Gerar novo token único baseado no ID do motorista e timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final tokenData = '$driverId:$timestamp';
       existingToken = base64Encode(utf8.encode(tokenData));

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 
 class BiometricService {
@@ -9,7 +10,7 @@ class BiometricService {
 
   Future<bool> isBiometricAvailable() async {
     try {
-      return await _auth.canCheckBiometrics;
+      return await _auth.isDeviceSupported();
     } catch (e) {
       return false;
     }
@@ -29,21 +30,19 @@ class BiometricService {
     bool stickyAuth = false,
   }) async {
     try {
-      final canAuth =
-          await _auth.canCheckBiometrics || await _auth.isDeviceSupported();
-      if (!canAuth) {
-        return false;
-      }
+      final isSupported = await _auth.isDeviceSupported();
+      if (!isSupported) return false;
 
       return await _auth.authenticate(
         localizedReason: reason,
         options: AuthenticationOptions(
           stickyAuth: stickyAuth,
-          biometricOnly: true,
+          biometricOnly: false,
           useErrorDialogs: useErrorDialogs,
         ),
       );
     } catch (e) {
+      debugPrint('❌ Biometric Auth Error: $e');
       return false;
     }
   }

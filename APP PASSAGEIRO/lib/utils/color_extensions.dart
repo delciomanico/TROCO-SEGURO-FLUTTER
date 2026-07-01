@@ -5,7 +5,7 @@ extension ColorWithValues on Color {
   /// If `opacity` is provided it maps to alpha (0-255).
   Color withValues({double? opacity, int? alpha}) {
     if (opacity != null) {
-      final int a = (opacity * 255).round().clamp(0, 255) as int;
+      final int a = (opacity * 255).round().clamp(0, 255);
       return withAlpha(a);
     }
     if (alpha != null) {

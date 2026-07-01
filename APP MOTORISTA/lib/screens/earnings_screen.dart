@@ -1,10 +1,10 @@
-﻿import 'package:flutter/material.dart';
-import 'package:troco_seguro_motorista/models/driver_user.dart';
-import 'package:troco_seguro_motorista/models/earnings.dart';
-import 'package:troco_seguro_motorista/utils/constants.dart';
-import 'package:troco_seguro_motorista/utils/responsive_helper.dart';
-import 'package:troco_seguro_motorista/services/api_service.dart';
-import 'package:troco_seguro_motorista/widgets/driver_bottom_dock.dart';
+import 'package:flutter/material.dart';
+import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/models/earnings.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
+import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 import 'package:intl/intl.dart';
 
 class EarningsScreen extends StatefulWidget {
@@ -27,7 +27,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
   bool isLoading = true;
   final ApiService _api = ApiService();
 
-  static const bool useMockData = false; // ✅ INTEGRADO COM API REAL
 
   @override
   void initState() {
@@ -38,37 +37,36 @@ class _EarningsScreenState extends State<EarningsScreen> {
   Future<void> _loadEarnings() async {
     setState(() => isLoading = true);
 
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      setState(() {
-        earnings = Earnings(
-          todayAmount: 12500,
-          todayTrips: 5,
-          weekAmount: 78500,
-          weekTrips: 32,
-          monthAmount: 320000,
-          monthTrips: 128,
-          totalAmount: 1250000,
-          totalTrips: 520,
-          averageRating: 4.8,
-          dailyHistory: [
-            DailyEarning(date: 'Seg', amount: 15000, trips: 6),
-            DailyEarning(date: 'Ter', amount: 18500, trips: 7),
-            DailyEarning(date: 'Qua', amount: 12000, trips: 5),
-            DailyEarning(date: 'Qui', amount: 22000, trips: 9),
-            DailyEarning(date: 'Sex', amount: 19500, trips: 8),
-            DailyEarning(date: 'Sáb', amount: 25000, trips: 10),
-            DailyEarning(date: 'Dom', amount: 8000, trips: 3),
-          ],
-        );
-        isLoading = false;
-      });
-      return;
+    await _api.loadTokens();
+
+    // Tenta obter estatísticas do endpoint dedicado
+    final statsResult = await _api.getTripStats();
+    if (statsResult.isSuccess && statsResult.data != null) {
+      final s = statsResult.data!;
+      final earningsResult = await _api.getEarnings();
+      if (earningsResult.isSuccess && earningsResult.data != null) {
+        final base = earningsResult.data!;
+        setState(() {
+          earnings = Earnings(
+            todayAmount: _parseInt(s['todayEarnings']) ?? base.todayAmount,
+            weekAmount: _parseInt(s['weekEarnings']) ?? base.weekAmount,
+            monthAmount: _parseInt(s['monthEarnings']) ?? base.monthAmount,
+            totalAmount: _parseInt(s['totalEarnings']) ?? base.totalAmount,
+            todayTrips: _parseInt(s['todayTrips']) ?? base.todayTrips,
+            weekTrips: _parseInt(s['weekTrips']) ?? base.weekTrips,
+            monthTrips: _parseInt(s['monthTrips']) ?? base.monthTrips,
+            totalTrips: _parseInt(s['totalTrips']) ?? base.totalTrips,
+            averageRating: _parseDouble(s['averageRating']) ??
+                base.averageRating,
+            dailyHistory: base.dailyHistory,
+          );
+          isLoading = false;
+        });
+        return;
+      }
     }
 
-    await _api.loadTokens();
     final result = await _api.getEarnings();
-
     if (result.isSuccess && result.data != null) {
       setState(() {
         earnings = result.data!;
@@ -76,22 +74,25 @@ class _EarningsScreenState extends State<EarningsScreen> {
       });
     } else {
       setState(() {
-        earnings = Earnings(
-          todayAmount: 12500,
-          todayTrips: 5,
-          weekAmount: 78500,
-          weekTrips: 32,
-          monthAmount: 320000,
-          monthTrips: 128,
-          totalAmount: 1250000,
-          totalTrips: 520,
-          averageRating: 4.8,
-          dailyHistory: [],
-        );
+        earnings = Earnings.empty();
         isLoading = false;
       });
+      if (mounted && result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar ganhos: ${result.error}'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
+
+  int? _parseInt(dynamic v) =>
+      v == null ? null : double.tryParse(v.toString())?.toInt();
+  double? _parseDouble(dynamic v) =>
+      v == null ? null : double.tryParse(v.toString());
 
   String _formatCurrency(int amount) {
     final format = NumberFormat('#,##0', 'pt_AO');
@@ -147,44 +148,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageGradient = isDark
-        ? AppColors.darkScreenGradient
-        : const LinearGradient(
-            colors: [AppColors.lightBackground, AppColors.lightSurface],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          );
-
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Ganhos'),
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        foregroundColor: isDark ? Colors.white : AppColors.textDark,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Row(
-                children: [
-                  Icon(Icons.star, color: AppColors.adaptiveAccent(context), size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    earnings.averageRating.toStringAsFixed(1),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-        backgroundColor:
+      backgroundColor:
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
       bottomNavigationBar: widget.showBottomDock
           ? DriverBottomDock(
@@ -192,74 +157,103 @@ class _EarningsScreenState extends State<EarningsScreen> {
               driver: widget.driver,
             )
           : null,
-      body: Container(
-        decoration: BoxDecoration(gradient: pageGradient),
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: _loadEarnings,
-            child: isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.adaptiveAccent(context),
-                    ),
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: responsive.scaledHeight(20),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  children: [
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: responsive.scaledWidth(20),
-                                      ),
-                                      child: _buildEarningsCard(responsive),
-                                    ),
-                                    SizedBox(
-                                        height: responsive.scaledHeight(20)),
-                                    _buildPeriodSelector(responsive),
-                                  ],
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: responsive.scaledHeight(24),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      _buildStatsGrid(responsive),
-                                      SizedBox(
-                                          height: responsive.scaledHeight(24)),
-                                      _buildWeeklyChart(responsive),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  children: [
-                                    _buildPerformanceTips(responsive),
-                                    SizedBox(
-                                        height: responsive.scaledHeight(16)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadEarnings,
+          child: isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryGold,
                   ),
-          ),
+                )
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildFlatHeader(responsive, isDark)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(20),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildEarningsCard(responsive),
+                            SizedBox(height: responsive.scaledHeight(20)),
+                            _buildPeriodSelector(responsive),
+                            SizedBox(height: responsive.scaledHeight(24)),
+                            _buildStatsGrid(responsive),
+                            SizedBox(height: responsive.scaledHeight(24)),
+                            _buildWeeklyChart(responsive),
+                            SizedBox(height: responsive.scaledHeight(24)),
+                            _buildPerformanceTips(responsive),
+                            SizedBox(height: responsive.scaledHeight(110)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFlatHeader(ResponsiveHelper responsive, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(20),
+        vertical: responsive.scaledHeight(14),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: responsive.scaledWidth(38)),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Ganhos',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(17),
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {},
+            child: Container(
+              width: responsive.scaledWidth(38),
+              height: responsive.scaledWidth(38),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    size: responsive.scaledWidth(12),
+                    color: AppColors.primaryGold,
+                  ),
+                  Text(
+                    earnings.averageRating.toStringAsFixed(1),
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(10),
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -293,12 +287,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isDark
-                        ? Colors.white.withOpacity(0.1)
-                        : AppColors.textDark.withOpacity(0.1),
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : AppColors.textDark.withValues(alpha: 0.1),
                   ),
                   child: Icon(
                     Icons.trending_up_rounded,
-                    color: isDark ? AppColors.adaptiveAccent(context) : AppColors.textDark,
+                    color: isDark ? AppColors.primaryGold : AppColors.textDark,
                     size: responsive.scaledWidth(24),
                   ),
                 ),
@@ -315,7 +309,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 ),
                 Row(
                   children: [
-                    Icon(Icons.star, color: AppColors.adaptiveAccent(context), size: 18),
+                    Icon(Icons.star, color: AppColors.primaryGold, size: 18),
                     SizedBox(width: responsive.scaledWidth(4)),
                     Text(
                       earnings.averageRating.toStringAsFixed(1),
@@ -341,7 +335,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
   Widget _buildEarningsCard(ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -349,46 +342,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
         vertical: responsive.scaledHeight(28),
       ),
       decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).cardColor : null,
-        gradient: isDark
-            ? null
-            : const LinearGradient(
-                colors: [Color(0xFFF7F8FA), Color(0xFFEFEFF2)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        // Removed texture image to reduce overdraw/jank on low-end devices.
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: colorScheme.primary.withAlpha((0.9 * 255).round()),
-          width: 1.2,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withAlpha(153)
-                : Colors.black.withAlpha(51),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: isDark
-                ? Colors.white.withAlpha(13)
-                : Colors.white.withAlpha(230),
-            blurRadius: 6,
-            offset: const Offset(0, -3),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withAlpha(102)
-                : Colors.black.withAlpha(31),
-            blurRadius: 8,
-            offset: const Offset(3, 3),
-            spreadRadius: -1,
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -397,9 +357,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             children: [
               Icon(
                 Icons.monetization_on_rounded,
-                color: isDark
-                    ? Colors.white.withOpacity(0.8)
-                    : colorScheme.primary.withOpacity(0.7),
+                color: AppColors.primaryGold,
                 size: responsive.scaledWidth(20),
               ),
               SizedBox(width: responsive.scaledWidth(8)),
@@ -408,8 +366,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(14),
                   color: isDark
-                      ? Colors.white.withOpacity(0.85)
-                      : colorScheme.onSurface.withAlpha(199),
+                      ? Colors.white.withValues(alpha: 0.6)
+                      : Colors.black.withValues(alpha: 0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -421,7 +379,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(40),
               fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : colorScheme.primary,
+              color: isDark ? Colors.white : AppColors.textDark,
             ),
           ),
           SizedBox(height: responsive.scaledHeight(12)),
@@ -431,24 +389,21 @@ class _EarningsScreenState extends State<EarningsScreen> {
               vertical: responsive.scaledHeight(8),
             ),
             decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : colorScheme.primary.withOpacity(0.07),
+              color: AppColors.primaryGold.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.local_taxi,
-                    color: isDark ? Colors.white : colorScheme.primary,
-                    size: 16),
+                Icon(Icons.local_taxi_rounded,
+                    color: AppColors.primaryGold, size: 16),
                 SizedBox(width: responsive.scaledWidth(6)),
                 Text(
                   '$currentTrips viagens',
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(12),
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : colorScheme.primary,
+                    color: AppColors.primaryGold,
                   ),
                 ),
               ],
@@ -477,7 +432,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -496,7 +451,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        isSelected ? AppColors.adaptiveAccent(context) : Colors.transparent,
+                        isSelected ? AppColors.primaryGold : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -507,7 +462,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                       fontWeight: FontWeight.w700,
                       color: isSelected
                           ? AppColors.textDark
-                          : (isDark ? Colors.white70 : Colors.grey.shade600),
+                          : (isDark ? Colors.white.withValues(alpha: 0.7) : Colors.grey),
                     ),
                   ),
                 ),
@@ -532,7 +487,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   ? _formatCurrency(currentAmount ~/ currentTrips)
                   : '0 Kz',
               Icons.speed,
-              AppColors.adaptiveAccent(context),
+              AppColors.primaryGold,
             ),
           ),
           SizedBox(width: responsive.scaledWidth(12)),
@@ -542,7 +497,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
               'Avaliação',
               widget.driver.rating?.toStringAsFixed(1) ?? '5.0',
               Icons.star_rounded,
-              AppColors.adaptiveAccent(context),
+              AppColors.primaryGold,
             ),
           ),
           SizedBox(width: responsive.scaledWidth(12)),
@@ -575,7 +530,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -586,7 +541,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
           Container(
             padding: EdgeInsets.all(responsive.scaledWidth(8)),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -607,7 +562,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             label,
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(10),
-              color: Colors.grey.shade600,
+              color: Colors.grey,
             ),
             textAlign: TextAlign.center,
           ),
@@ -633,7 +588,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -646,7 +601,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
               children: [
                 Icon(
                   Icons.bar_chart_rounded,
-                  color: isDark ? AppColors.adaptiveAccent(context) : AppColors.textDark,
+                  color: isDark ? AppColors.primaryGold : AppColors.textDark,
                   size: responsive.scaledWidth(20),
                 ),
                 SizedBox(width: responsive.scaledWidth(8)),
@@ -676,12 +631,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         width: responsive.scaledWidth(28),
                         height: responsive.scaledHeight(80) * heightPercent,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             colors: [
-                              AppColors.adaptiveAccent(context),
-                              isDark
-                                  ? AppColors.secondaryGold
-                                  : AppColors.secondaryOrange
+                              AppColors.primaryGold,
+                              AppColors.secondaryGold,
                             ],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
@@ -694,7 +647,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         day.date,
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(10),
-                          color: Colors.grey.shade600,
+                          color: Colors.grey,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -716,9 +669,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
       child: Container(
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
-          color: AppColors.adaptiveAccent(context).withOpacity(0.1),
+          color: AppColors.primaryGold.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.adaptiveAccent(context).withOpacity(0.3)),
+          border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -727,7 +680,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
               children: [
                 Icon(
                   Icons.lightbulb_outline_rounded,
-                  color: AppColors.adaptiveAccent(context),
+                  color: AppColors.primaryGold,
                   size: responsive.scaledWidth(20),
                 ),
                 SizedBox(width: responsive.scaledWidth(8)),
@@ -736,7 +689,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(14),
                     fontWeight: FontWeight.w700,
-                    color: AppColors.adaptiveAccent(context),
+                    color: AppColors.primaryGold,
                   ),
                 ),
               ],
@@ -747,7 +700,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
               'seus ganhos. Mantenha uma boa avaliação para receber mais passageiros!',
               style: TextStyle(
                 fontSize: responsive.responsiveFontSize(12),
-                color: isDark ? Colors.white70 : AppColors.textDark,
+                color: isDark ? Colors.white.withValues(alpha: 0.7) : AppColors.textDark,
                 height: 1.5,
               ),
             ),

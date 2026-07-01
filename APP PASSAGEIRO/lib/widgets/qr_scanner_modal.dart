@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro/utils/color_extensions.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
@@ -287,7 +286,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                         color: Theme.of(context)
                             .colorScheme
                             .onSurface
-                            .withOpacity(0.6),
+                            .withValues(alpha: 0.6),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -352,7 +351,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   scannerController.toggleTorch();
                 },
                 tooltip: 'Flash',
-                backgroundColor: Colors.black.withOpacity(0.5),
+                backgroundColor: Colors.black.withValues(alpha: 0.5),
                 child: const Icon(Icons.flash_on, color: Colors.white),
               ),
               FloatingActionButton.small(
@@ -360,13 +359,13 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   () => showManualInput = true,
                 ),
                 tooltip: 'Digite Manualmente',
-                backgroundColor: Colors.black.withOpacity(0.5),
+                backgroundColor: Colors.black.withValues(alpha: 0.5),
                 child: const Icon(Icons.keyboard, color: Colors.white),
               ),
               FloatingActionButton.small(
                 onPressed: _closeModalSafely,
                 tooltip: 'Cancelar',
-                backgroundColor: Colors.red.withOpacity(0.5),
+                backgroundColor: Colors.red.withValues(alpha: 0.5),
                 child: const Icon(Icons.close, color: Colors.white),
               ),
             ],
