@@ -656,7 +656,7 @@ class ApiService {
         'destination': destination,
         if (distanceKm > 0) 'distanceKm': distanceKm,
         if (durationMinutes > 0) 'durationMinutes': durationMinutes,
-        if (seatsCount > 1) 'seatsCount': seatsCount,
+        'seatsCount': seatsCount,
         if (parentQrToken != null && parentQrToken.isNotEmpty)
           'parentQrToken': parentQrToken,
       };
@@ -820,17 +820,6 @@ class ApiService {
     }
   }
 
-  // ============ CARTÃO VIRTUAL ============
-
-  Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(String qrData) async {
-    try {
-      final response = await _dio.post('virtual-cards/resolve-qr', data: {'qrData': qrData});
-      return ApiResponse.success(VirtualCardQrResult.fromJson(response.data));
-    } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
-    }
-  }
-
   // API extrai amount do paymentToken JWT — não enviar amount no body
   Future<ApiResponse<PaymentResult>> processPayment({
     required String driverId,
@@ -857,24 +846,6 @@ class ApiService {
       };
       if (cardId.isNotEmpty) body['cardId'] = cardId;
       final response = await _dio.post('payments/process', data: body);
-      return ApiResponse.success(PaymentResult.fromJson(response.data));
-    } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
-    }
-  }
-
-  /// Cobrar cartão virtual do passageiro (POS terminal flow)
-  Future<ApiResponse<PaymentResult>> chargeVirtualCard({
-    required String cardId,
-    required int amount,
-    required String cardPin,
-  }) async {
-    try {
-      final response = await _dio.post('wallet/card/withdraw', data: {
-        'cardId': cardId,
-        'amount': amount,
-        'pin': cardPin,
-      });
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -1388,23 +1359,6 @@ class PassengerQrPaymentResult {
       newBalance: int.tryParse(
               (json['newBalance'] ?? json['balance'] ?? 0).toString()) ??
           0,
-    );
-  }
-}
-
-class VirtualCardQrResult {
-  final String? cardId;
-  final String? cardNumber;
-  final String? ownerName;
-
-  VirtualCardQrResult({this.cardId, this.cardNumber, this.ownerName});
-
-  factory VirtualCardQrResult.fromJson(Map<String, dynamic> json) {
-    final card = json['card'] as Map<String, dynamic>?;
-    return VirtualCardQrResult(
-      cardId: card?['id']?.toString() ?? json['id']?.toString() ?? json['cardId']?.toString(),
-      cardNumber: card?['cardNumber']?.toString() ?? json['cardNumber']?.toString() ?? json['number']?.toString(),
-      ownerName: card?['ownerName']?.toString() ?? json['ownerName']?.toString() ?? json['name']?.toString(),
     );
   }
 }

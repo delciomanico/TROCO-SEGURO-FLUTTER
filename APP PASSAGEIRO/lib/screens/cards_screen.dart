@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -11,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
@@ -763,9 +765,21 @@ class _CardsScreenState extends State<CardsScreen> {
   }
 
   // ── QR details sheet ───────────────────────────────────────────────────────
-  void _showCardDetails(VirtualCard card) {
+  Future<void> _showCardDetails(VirtualCard card) async {
+    // Busca o QR oficial do servidor — a geração local não é válida para pagamento.
+    final qrResult = await ApiService().getVirtualCardQr(card.id);
+    if (!mounted) return;
+
+    if (!qrResult.isSuccess || qrResult.data == null || qrResult.data!.isEmpty) {
+      FeedbackService.showError(
+        context,
+        message: qrResult.error ?? 'Não foi possível gerar o QR code. Tente novamente.',
+      );
+      return;
+    }
+
+    final payload = qrResult.data!;
     final service = VirtualCardService();
-    final payload = service.getQRPayload(card);
     final remaining =
         card.dailyLimit > 0 ? service.getRemainingDailyLimit(card) : null;
     final previewKey = GlobalKey();
@@ -805,7 +819,7 @@ class _CardsScreenState extends State<CardsScreen> {
                         '',
                     virtualNumber: virtualNumber,
                     expiry: expiry,
-                    payload: payload.toString(),
+                    payload: payload,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1968,11 +1982,18 @@ class _CardVisual extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8 * scale),
                         ),
-                        child: QrImageView(
-                          data: payload,
-                          size: 100 * scale,
-                          backgroundColor: Colors.white,
-                        ),
+                        child: payload.startsWith('data:image')
+                            ? Image.memory(
+                                base64Decode(payload.split(',').last),
+                                width: 100 * scale,
+                                height: 100 * scale,
+                                fit: BoxFit.contain,
+                              )
+                            : QrImageView(
+                                data: payload,
+                                size: 100 * scale,
+                                backgroundColor: Colors.white,
+                              ),
                       ),
                     ],
                   ),

@@ -495,19 +495,6 @@ class ApiService {
     }
   }
 
-  /// Gerar QR Code de cobrança (para taxistas)
-  Future<ApiResponse<String>> generatePaymentQr(int amount) async {
-    try {
-      final response = await _dio.post('qr-code/payment-request', data: {
-        'amount': amount,
-      });
-      return ApiResponse.success(
-          response.data['qrCode'] ?? response.data['image']);
-    } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
-    }
-  }
-
   /// Validar QR Code escaneado
   /// NOTE: The legacy `/payments/validate-qr` endpoint was removed from usage.
   /// Use [resolveQrToken] which calls `GET /qrcodes/resolve?token=` instead.

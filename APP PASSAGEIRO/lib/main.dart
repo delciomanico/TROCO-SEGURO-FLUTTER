@@ -238,6 +238,7 @@ class _AppControllerState extends State<AppController>
     // Se app está bloqueado, mostrar tela de reautenticação
     if (_isLocked) {
       return ReauthScreen(
+        phoneNumber: user.phoneNumber,
         onUnlock: _unlockWithPin,
         onBiometricUnlock: _tryBiometricUnlock,
         onSwitchAccount: _handleSwitchAccount,
@@ -434,6 +435,7 @@ class _MainScreenState extends State<MainScreen> {
           HomeScreen(
             onOpenScanner: _showPaymentModal,
             onOpenTopup: _showTopupModal,
+            onOpenCards: () => setState(() => _currentIndex = 2),
             onPanic: _handlePanic,
             onOpenProfile: _showProfileModal,
             onTerminateSession: _handleLogout,
@@ -1819,12 +1821,14 @@ class _TermsPage extends StatelessWidget {
 
 /// Tela de reautenticação quando o app é bloqueado
 class ReauthScreen extends StatefulWidget {
+  final String phoneNumber;
   final Future<bool> Function(String pin) onUnlock;
   final Future<bool> Function() onBiometricUnlock;
   final Future<void> Function() onSwitchAccount;
 
   const ReauthScreen({
     super.key,
+    required this.phoneNumber,
     required this.onUnlock,
     required this.onBiometricUnlock,
     required this.onSwitchAccount,
@@ -1843,6 +1847,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
   bool _isLoading = false;
   bool _biometricsAvailable = false;
   String? _errorMessage;
+  bool _obscurePin = true;
 
   @override
   void initState() {
@@ -1852,6 +1857,11 @@ class _ReauthScreenState extends State<ReauthScreen> {
 
   Future<void> _checkBiometrics() async {
     try {
+      // Verificar se o utilizador activou a biometria nas definições
+      final prefs = await SharedPreferences.getInstance();
+      final bioEnabled = prefs.getBool('ts_bio_enabled') ?? false;
+      if (!bioEnabled) return;
+
       final localAuth = LocalAuthentication();
       final canCheck = await localAuth.canCheckBiometrics;
       final isSupported = await localAuth.isDeviceSupported();
@@ -1860,6 +1870,10 @@ class _ReauthScreenState extends State<ReauthScreen> {
         setState(() {
           _biometricsAvailable = canCheck && isSupported;
         });
+      }
+
+      if (_biometricsAvailable) {
+        _tryBiometric();
       }
     } catch (e) {
       debugPrint('Erro ao verificar biometria: $e');
@@ -1920,257 +1934,306 @@ class _ReauthScreenState extends State<ReauthScreen> {
     super.dispose();
   }
 
+  String _maskPhoneNumber(String phone) {
+    if (phone.length < 4) return phone;
+    final visible = phone.substring(phone.length - 4);
+    return '****$visible';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = AppColors.accentOf(context);
+    final bg = isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final labelColor = isDark ? Colors.white70 : const Color(0xFF6C6C70);
+
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
-      resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF0F1115),
-                    Color(0xFF1A1D24),
-                    Color(0xFF2A2416),
-                    Color(0xFF13151A),
-                  ],
-                  stops: [0.0, 0.42, 0.72, 1.0],
-                )
-              : const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.white, Color(0xFFFFFCF6), Colors.white],
-                  stops: [0.0, 0.55, 1.0],
-                ),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (isDark)
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              // Logo
               Image.asset(
-                'assets/images/card_fundo.jpg',
-                fit: BoxFit.cover,
+                'assets/images/logo.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.contain,
               ),
-            if (isDark)
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
-                child: Container(
-                  color: const Color(0xFF121212).withValues(alpha: 0.3),
+              const SizedBox(height: 20),
+
+              // Título
+              Text(
+                'Verificar identidade',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                  letterSpacing: -0.5,
                 ),
               ),
-            SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - 32,
+              const SizedBox(height: 6),
+              Text(
+                _maskPhoneNumber(widget.phoneNumber),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: labelColor,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+
+              const Spacer(flex: 2),
+
+              // Campos PIN
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'PIN de 6 dígitos',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: labelColor,
+                        letterSpacing: 0.2,
                       ),
-                      child: IntrinsicHeight(
-                        child: Column(
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: List.generate(6, (index) {
+                        return Expanded(
+                          child: Container(
+                          height: 52,
+                          margin: EdgeInsets.only(
+                            left: index == 0 ? 0 : 3,
+                            right: index == 5 ? 0 : 3,
+                          ),
+                          child: TextField(
+                            controller: _pinControllers[index],
+                            focusNode: _focusNodes[index],
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            maxLength: 1,
+                            obscureText: _obscurePin,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                            ),
+                            decoration: InputDecoration(
+                              counterText: '',
+                              filled: true,
+                              fillColor: isDark
+                                  ? const Color(0xFF2C2C2E)
+                                  : const Color(0xFFF2F2F7),
+                              contentPadding: EdgeInsets.zero,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF3A3A3C)
+                                      : const Color(0xFFD1D1D6),
+                                  width: 1.5,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF3A3A3C)
+                                      : const Color(0xFFD1D1D6),
+                                  width: 1.5,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: accent,
+                                  width: 2.5,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFFF3B30),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              if (value.isNotEmpty && index < 5) {
+                                _focusNodes[index + 1].requestFocus();
+                              } else if (value.isEmpty && index > 0) {
+                                _focusNodes[index - 1].requestFocus();
+                              }
+                              final pin = _pinControllers.map((c) => c.text).join();
+                              if (pin.length == 6) _verifyPin();
+                            },
+                          ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => setState(() => _obscurePin = !_obscurePin),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _obscurePin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            size: 14,
+                            color: labelColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _obscurePin ? 'Mostrar PIN' : 'Ocultar PIN',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: labelColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Erro
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                child: _errorMessage != null
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            const Icon(Icons.info_outline_rounded,
+                                size: 14, color: Color(0xFFFF3B30)),
+                            const SizedBox(width: 5),
                             Text(
-                              'Bem-vindo',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppColors.accentOf(context),
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: List.generate(6, (index) {
-                                return Expanded(
-                                  child: Container(
-                                    height: 55,
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 3),
-                                    child: TextField(
-                                      controller: _pinControllers[index],
-                                      focusNode: _focusNodes[index],
-                                      textAlign: TextAlign.center,
-                                      keyboardType: TextInputType.number,
-                                      maxLength: 1,
-                                      obscureText: true,
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF121212),
-                                      ),
-                                      decoration: InputDecoration(
-                                        counterText: '',
-                                        filled: true,
-                                        fillColor: isDark
-                                            ? AppColors.darkBlueSurface
-                                            : Colors.grey.shade100,
-                                        contentPadding: EdgeInsets.zero,
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          borderSide: BorderSide(
-                                            color: isDark
-                                                ? Colors.grey.shade800
-                                                : Colors.grey.shade400,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          borderSide: BorderSide(
-                                            color: isDark
-                                                ? Colors.grey.shade800
-                                                : Colors.grey.shade400,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          borderSide: BorderSide(
-                                            color: AppColors.accentOf(context),
-                                            width: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      onChanged: (value) {
-                                        if (value.isNotEmpty && index < 5) {
-                                          _focusNodes[index + 1].requestFocus();
-                                        } else if (value.isEmpty && index > 0) {
-                                          _focusNodes[index - 1].requestFocus();
-                                        }
-
-                                        final pin = _pinControllers
-                                            .map((c) => c.text)
-                                            .join();
-                                        if (pin.length == 6) {
-                                          _verifyPin();
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 16),
-                            if (_errorMessage != null) ...[
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 24),
-                            if (_biometricsAvailable) ...[
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton.icon(
-                                  onPressed: _isLoading ? null : _tryBiometric,
-                                  icon: const Icon(Icons.fingerprint, size: 28),
-                                  label: const Text(
-                                    'Usar Biometria',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accentOf(context),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _verifyPin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.accentOf(context),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Entrar',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: _isLoading
-                                    ? null
-                                    : () async {
-                                        await widget.onSwitchAccount();
-                                      },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.accentOf(context),
-                                  side:
-                                      BorderSide(color: AppColors.accentOf(context)),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Trocar de conta',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                              _errorMessage!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFFFF3B30),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+
+              const Spacer(flex: 2),
+
+              // Acções
+              if (_isLoading)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: CircularProgressIndicator(
+                    color: accent,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              else ...[
+                if (_biometricsAvailable)
+                  GestureDetector(
+                    onTap: _tryBiometric,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.fingerprint_rounded,
+                              color: Colors.white, size: 22),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Usar biometria',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                if (_biometricsAvailable) const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _verifyPin,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF3A3A3C)
+                            : const Color(0xFFD1D1D6),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      'Confirmar PIN',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () async {
+                    await widget.onSwitchAccount();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Trocar de conta',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: accent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              const Spacer(flex: 1),
+            ],
+          ),
         ),
       ),
     );

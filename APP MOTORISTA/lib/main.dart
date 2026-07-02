@@ -439,6 +439,7 @@ class _AppControllerState extends State<AppController>
         phoneNumber: driver!.phone,
         onUnlock: _unlockWithPin,
         onBiometricUnlock: _tryBiometricUnlock,
+        onSwitchAccount: _handleLogout,
       );
     }
 
@@ -478,12 +479,14 @@ class ReauthScreen extends StatefulWidget {
   final String phoneNumber;
   final Future<bool> Function(String pin) onUnlock;
   final Future<bool> Function() onBiometricUnlock;
+  final Future<void> Function() onSwitchAccount;
 
   const ReauthScreen({
     super.key,
     required this.phoneNumber,
     required this.onUnlock,
     required this.onBiometricUnlock,
+    required this.onSwitchAccount,
   });
 
   @override
@@ -859,6 +862,24 @@ class _ReauthScreenState extends State<ReauthScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () async {
+                    await widget.onSwitchAccount();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Trocar de conta',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: accent,
                       ),
                     ),
                   ),
