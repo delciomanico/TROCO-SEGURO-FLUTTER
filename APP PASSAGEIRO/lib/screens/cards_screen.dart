@@ -728,167 +728,25 @@ class _CardsScreenState extends State<CardsScreen> {
     );
   }
 
-  // ── Card share/download ────────────────────────────────────────────────────
-  Future<Uint8List?> _captureImage(GlobalKey key) async {
-    try {
-      final ro = key.currentContext?.findRenderObject();
-      if (ro is! RenderRepaintBoundary) return null;
-      final image = await ro.toImage(pixelRatio: 3.0);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      return data?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _shareCard(GlobalKey key, VirtualCard card) async {
-    final bytes = await _captureImage(key);
-    if (bytes == null || !mounted) return;
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/card_${card.id}.png');
-    await file.writeAsBytes(bytes);
-    await Share.shareXFiles([XFile(file.path)], text: 'Cartão ${card.name}');
-  }
-
-  Future<void> _downloadCard(GlobalKey key, VirtualCard card) async {
-    final bytes = await _captureImage(key);
-    if (bytes == null || !mounted) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final cardsDir = Directory('${dir.path}/virtual_cards');
-    if (!await cardsDir.exists()) await cardsDir.create(recursive: true);
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final file = File('${cardsDir.path}/card_${card.id}_$ts.png');
-    await file.writeAsBytes(bytes);
-    if (!mounted) return;
-    FeedbackService.showSuccess(context,
-        message: 'Cartão guardado em: ${file.path}');
-  }
-
-  // ── QR details sheet ───────────────────────────────────────────────────────
-  Future<void> _showCardDetails(VirtualCard card) async {
-    // Busca o QR oficial do servidor — a geração local não é válida para pagamento.
-    final qrResult = await ApiService().getVirtualCardQr(card.id);
-    if (!mounted) return;
-
-    if (!qrResult.isSuccess || qrResult.data == null || qrResult.data!.isEmpty) {
-      FeedbackService.showError(
-        context,
-        message: qrResult.error ?? 'Não foi possível gerar o QR code. Tente novamente.',
-      );
-      return;
-    }
-
-    final payload = qrResult.data!;
-    final service = VirtualCardService();
-    final remaining =
-        card.dailyLimit > 0 ? service.getRemainingDailyLimit(card) : null;
-    final previewKey = GlobalKey();
-    final virtualNumber = _virtualCardNumber(card.id);
-    final expiry = _virtualExpiry(card.createdAt);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      backgroundColor: isDark
-          ? Theme.of(context).cardColor
-          : AppColors.lightCard,
-      builder: (ctx) {
-        bool isSharing = false;
-        bool isSaving = false;
-        return StatefulBuilder(
-          builder: (ctx, setSheet) => SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-                20, 8, 20, 24 + MediaQuery.of(ctx).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(card.name,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
-                RepaintBoundary(
-                  key: previewKey,
-                  child: _CardVisual(
-                    card: card,
-                    cardHolderName: context
-                            .read<AppProvider>()
-                            .user
-                            ?.fullName ??
-                        '',
-                    virtualNumber: virtualNumber,
-                    expiry: expiry,
-                    payload: payload,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text('Saldo: ${_fmt(card.balance)} Kz',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text(
-                  remaining == null
-                      ? 'Sem limite diário'
-                      : 'Limite restante hoje: ${_fmt(remaining)} Kz',
-                  style: TextStyle(
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: isSaving
-                            ? null
-                            : () async {
-                                setSheet(() => isSaving = true);
-                                await _downloadCard(previewKey, card);
-                                if (!ctx.mounted) return;
-                                setSheet(() => isSaving = false);
-                              },
-                        icon: isSaving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2))
-                            : const Icon(Icons.download_rounded),
-                        label: const Text('Baixar'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: isSharing
-                            ? null
-                            : () async {
-                                setSheet(() => isSharing = true);
-                                await _shareCard(previewKey, card);
-                                if (!ctx.mounted) return;
-                                setSheet(() => isSharing = false);
-                              },
-                        icon: isSharing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.share_rounded),
-                        label: const Text('Partilhar'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  // ── QR fullscreen carousel ──────────────────────────────────────────────────
+  void _openQrCarousel(int initialIndex) {
+    final provider = context.read<AppProvider>();
+    final cards = provider.virtualCards;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _QrCarouselScreen(
+          cards: cards,
+          initialCardIndex: initialIndex,
+          cardHolderName: provider.user?.fullName ?? '',
+          virtualNumbers: [for (final c in cards) _virtualCardNumber(c.id)],
+          expiries: [for (final c in cards) _virtualExpiry(c.createdAt)],
+        ),
+      ),
     );
   }
 
-  // ── Create card sheet ──────────────────────────────────────────────────────
+  // ── Create card sheet (lista agrupada, estilo Apple) ────────────────────────
   void _showCreateCardSheet() {
     final provider = context.read<AppProvider>();
     final nameCtrl = TextEditingController();
@@ -907,229 +765,284 @@ class _CardsScreenState extends State<CardsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
+        builder: (ctx, setSheet) {
+          final onSurface = Theme.of(ctx).colorScheme.onSurface;
+          final muted = onSurface.withValues(alpha: 0.5);
+          final groupColor = isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04);
+          final dividerColor = onSurface.withValues(alpha: 0.08);
+
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: onSurface.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Criar Cartão Virtual',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: groupColor,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildField(
+                              ctx,
+                              controller: nameCtrl,
+                              label: 'Nome do cartão',
+                              hint: 'Ex: Cartão Netflix',
+                              icon: Icons.badge_outlined,
+                              muted: muted,
+                              onSurface: onSurface,
+                              validator: (v) => v?.trim().isEmpty == true
+                                  ? 'Informe um nome'
+                                  : null,
+                            ),
+                            _divider(dividerColor),
+                            _buildField(
+                              ctx,
+                              controller: balanceCtrl,
+                              label: 'Saldo inicial',
+                              hint: 'Valor em Kz',
+                              icon: Icons.account_balance_wallet_outlined,
+                              muted: muted,
+                              onSurface: onSurface,
+                              suffix: 'Kz',
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                final n = int.tryParse((v ?? '').trim());
+                                return (n == null || n <= 0)
+                                    ? 'Saldo deve ser maior que 0'
+                                    : null;
+                              },
+                            ),
+                            _divider(dividerColor),
+                            _buildField(
+                              ctx,
+                              controller: limitCtrl,
+                              label: 'Limite diário (opcional)',
+                              hint: '0 = sem limite',
+                              icon: Icons.speed_outlined,
+                              muted: muted,
+                              onSurface: onSurface,
+                              suffix: 'Kz',
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return null;
+                                }
+                                final n = int.tryParse(v.trim());
+                                return (n == null || n < 0)
+                                    ? 'Limite inválido'
+                                    : null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Theme.of(ctx)
                               .colorScheme
-                              .onSurface
-                              .withAlpha((0.25 * 255).round()),
-                          borderRadius: BorderRadius.circular(2),
+                              .primary
+                              .withAlpha((0.08 * 255).round()),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Criar Cartão Virtual',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(ctx).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildField(
-                      ctx,
-                      controller: nameCtrl,
-                      label: 'Nome do cartão',
-                      hint: 'Ex: Cartão Netflix',
-                      icon: Icons.badge_outlined,
-                      isDark: isDark,
-                      validator: (v) => v?.trim().isEmpty == true
-                          ? 'Informe um nome'
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildField(
-                      ctx,
-                      controller: balanceCtrl,
-                      label: 'Saldo inicial',
-                      hint: 'Valor em Kz',
-                      icon: Icons.account_balance_wallet_outlined,
-                      isDark: isDark,
-                      suffix: 'Kz',
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        final n = int.tryParse((v ?? '').trim());
-                        return (n == null || n <= 0)
-                            ? 'Saldo deve ser maior que 0'
-                            : null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    _buildField(
-                      ctx,
-                      controller: limitCtrl,
-                      label: 'Limite diário (opcional)',
-                      hint: '0 = sem limite',
-                      icon: Icons.speed_outlined,
-                      isDark: isDark,
-                      suffix: 'Kz',
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null;
-                        final n = int.tryParse(v.trim());
-                        return (n == null || n < 0) ? 'Limite inválido' : null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(ctx)
-                            .colorScheme
-                            .primary
-                            .withAlpha((0.08 * 255).round()),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        'Precisas de dois PINs: o PIN da tua conta (6 dígitos) para confirmar identidade, e um PIN do cartão (4 dígitos) para pagamentos.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(ctx).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildPinField(
-                      ctx,
-                      controller: userPinCtrl,
-                      label: 'PIN da conta (6 dígitos)',
-                      isDark: isDark,
-                      maxLen: 6,
-                      obscure: !showUserPin,
-                      trailing: IconButton(
-                        icon: Icon(showUserPin
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined),
-                        onPressed: () =>
-                            setSheet(() => showUserPin = !showUserPin),
-                      ),
-                      validator: (v) {
-                        final p = (v ?? '').trim();
-                        if (p.length != 6) return 'PIN deve ter 6 dígitos';
-                        if (int.tryParse(p) == null) {
-                          return 'Apenas dígitos';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    _buildPinField(
-                      ctx,
-                      controller: cardPinCtrl,
-                      label: 'PIN do cartão (4 dígitos)',
-                      isDark: isDark,
-                      maxLen: 4,
-                      obscure: !showCardPin,
-                      trailing: IconButton(
-                        icon: Icon(showCardPin
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined),
-                        onPressed: () =>
-                            setSheet(() => showCardPin = !showCardPin),
-                      ),
-                      validator: (v) {
-                        final p = (v ?? '').trim();
-                        if (p.length != 4) return 'PIN deve ter 4 dígitos';
-                        if (int.tryParse(p) == null) {
-                          return 'Apenas dígitos';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: isCreating
-                            ? null
-                            : () async {
-                                FocusScope.of(ctx).unfocus();
-                                if (!formKey.currentState!.validate()) return;
-                                setSheet(() => isCreating = true);
-
-                                final balance = int.parse(
-                                    balanceCtrl.text.trim());
-                                final limitTxt = limitCtrl.text.trim();
-                                final limit = limitTxt.isEmpty
-                                    ? 0
-                                    : int.parse(limitTxt);
-
-                                try {
-                                  await provider.createVirtualCard(
-                                    name: nameCtrl.text.trim(),
-                                    initialBalance: balance,
-                                    dailyLimit: limit,
-                                    userPin: userPinCtrl.text.trim(),
-                                    cardPin: cardPinCtrl.text.trim(),
-                                  );
-                                  if (!ctx.mounted) return;
-                                  Navigator.pop(ctx);
-                                  FeedbackService.showSuccess(context,
-                                      message: 'Cartão criado com sucesso!');
-                                } catch (e) {
-                                  if (!ctx.mounted) return;
-                                  setSheet(() => isCreating = false);
-                                  FeedbackService.showError(context,
-                                      message: e.toString());
-                                }
-                              },
-                        icon: isCreating
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.add_card_outlined),
-                        label: Text(isCreating ? 'A criar...' : 'Criar cartão',
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w700)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(ctx).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(ctx).colorScheme.onPrimary,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        child: Text(
+                          'Precisas de dois PINs: o PIN da tua conta (6 dígitos) para confirmar identidade, e um PIN do cartão (4 dígitos) para pagamentos.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: Theme.of(ctx).colorScheme.primary,
                           ),
-                          elevation: 0,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: groupColor,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildPinField(
+                              ctx,
+                              controller: userPinCtrl,
+                              label: 'PIN da conta (6 dígitos)',
+                              muted: muted,
+                              onSurface: onSurface,
+                              maxLen: 6,
+                              obscure: !showUserPin,
+                              trailing: IconButton(
+                                icon: Icon(
+                                  showUserPin
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                                onPressed: () =>
+                                    setSheet(() => showUserPin = !showUserPin),
+                              ),
+                              validator: (v) {
+                                final p = (v ?? '').trim();
+                                if (p.length != 6) {
+                                  return 'PIN deve ter 6 dígitos';
+                                }
+                                if (int.tryParse(p) == null) {
+                                  return 'Apenas dígitos';
+                                }
+                                return null;
+                              },
+                            ),
+                            _divider(dividerColor),
+                            _buildPinField(
+                              ctx,
+                              controller: cardPinCtrl,
+                              label: 'PIN do cartão (4 dígitos)',
+                              muted: muted,
+                              onSurface: onSurface,
+                              maxLen: 4,
+                              obscure: !showCardPin,
+                              trailing: IconButton(
+                                icon: Icon(
+                                  showCardPin
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                                onPressed: () =>
+                                    setSheet(() => showCardPin = !showCardPin),
+                              ),
+                              validator: (v) {
+                                final p = (v ?? '').trim();
+                                if (p.length != 4) {
+                                  return 'PIN deve ter 4 dígitos';
+                                }
+                                if (int.tryParse(p) == null) {
+                                  return 'Apenas dígitos';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: isCreating
+                              ? null
+                              : () async {
+                                  FocusScope.of(ctx).unfocus();
+                                  if (!formKey.currentState!.validate()) {
+                                    return;
+                                  }
+                                  setSheet(() => isCreating = true);
+
+                                  final balance =
+                                      int.parse(balanceCtrl.text.trim());
+                                  final limitTxt = limitCtrl.text.trim();
+                                  final limit = limitTxt.isEmpty
+                                      ? 0
+                                      : int.parse(limitTxt);
+
+                                  try {
+                                    await provider.createVirtualCard(
+                                      name: nameCtrl.text.trim(),
+                                      initialBalance: balance,
+                                      dailyLimit: limit,
+                                      userPin: userPinCtrl.text.trim(),
+                                      cardPin: cardPinCtrl.text.trim(),
+                                    );
+                                    if (!ctx.mounted) return;
+                                    Navigator.pop(ctx);
+                                    FeedbackService.showSuccess(context,
+                                        message: 'Cartão criado com sucesso!');
+                                  } catch (e) {
+                                    if (!ctx.mounted) return;
+                                    setSheet(() => isCreating = false);
+                                    FeedbackService.showError(context,
+                                        message: e.toString());
+                                  }
+                                },
+                          icon: isCreating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.add_card_outlined, size: 20),
+                          label: Text(
+                              isCreating ? 'A criar...' : 'Criar cartão',
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(ctx).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(ctx).colorScheme.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
+
+  Widget _divider(Color color) => Padding(
+        padding: const EdgeInsets.only(left: 48),
+        child: Container(height: 0.6, color: color),
+      );
 
   Widget _buildField(
     BuildContext ctx, {
@@ -1137,39 +1050,46 @@ class _CardsScreenState extends State<CardsScreen> {
     required String label,
     required String hint,
     required IconData icon,
-    required bool isDark,
+    required Color muted,
+    required Color onSurface,
     String? suffix,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon),
-        suffixText: suffix,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Theme.of(ctx)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.2 * 255).round()),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              keyboardType: keyboardType,
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w500, color: onSurface),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                labelText: label,
+                hintText: hint,
+                suffixText: suffix,
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                labelStyle: TextStyle(
+                    fontSize: 12.5, color: muted, fontWeight: FontWeight.w500),
+                hintStyle: TextStyle(fontSize: 15, color: muted),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              validator: validator,
+            ),
           ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
-        ),
-        filled: true,
-        fillColor:
-            isDark ? Theme.of(ctx).colorScheme.surface : Colors.white,
+        ],
       ),
-      validator: validator,
     );
   }
 
@@ -1177,43 +1097,49 @@ class _CardsScreenState extends State<CardsScreen> {
     BuildContext ctx, {
     required TextEditingController controller,
     required String label,
-    required bool isDark,
+    required Color muted,
+    required Color onSurface,
     required int maxLen,
     required bool obscure,
     required Widget trailing,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      maxLength: maxLen,
-      obscureText: obscure,
-      obscuringCharacter: '●',
-      decoration: InputDecoration(
-        labelText: label,
-        counterText: '',
-        prefixIcon: const Icon(Icons.lock_outline),
-        suffixIcon: trailing,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Theme.of(ctx)
-                .colorScheme
-                .onSurface
-                .withAlpha((0.2 * 255).round()),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, size: 20, color: muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              maxLength: maxLen,
+              obscureText: obscure,
+              obscuringCharacter: '●',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w500, color: onSurface),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                counterText: '',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                labelText: label,
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                labelStyle: TextStyle(
+                    fontSize: 12.5, color: muted, fontWeight: FontWeight.w500),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              validator: validator,
+            ),
           ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
-        ),
-        filled: true,
-        fillColor:
-            isDark ? Theme.of(ctx).colorScheme.surface : Colors.white,
+          trailing,
+        ],
       ),
-      validator: validator,
     );
   }
 
@@ -1430,7 +1356,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                 expiry: _virtualExpiry(card.createdAt),
                                 cardHolderName:
                                     provider.user?.fullName ?? '',
-                                onTap: () => _showCardDetails(card),
+                                onTap: () => _openQrCarousel(i),
                               ),
                             ),
                           );
@@ -1839,24 +1765,155 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-// ── Card visual for QR details ─────────────────────────────────────────────────
-class _CardVisual extends StatelessWidget {
-  final VirtualCard card;
+// ── QR fullscreen carousel screen ───────────────────────────────────────────────
+// Cada cartão ocupa 2 páginas no carrossel: QR sozinho e QR embutido no cartão.
+class _QrCarouselScreen extends StatefulWidget {
+  final List<VirtualCard> cards;
+  final int initialCardIndex;
   final String cardHolderName;
-  final String virtualNumber;
-  final String expiry;
-  final String payload;
+  final List<String> virtualNumbers;
+  final List<String> expiries;
 
-  const _CardVisual({
-    required this.card,
+  const _QrCarouselScreen({
+    required this.cards,
+    required this.initialCardIndex,
     required this.cardHolderName,
-    required this.virtualNumber,
-    required this.expiry,
-    required this.payload,
+    required this.virtualNumbers,
+    required this.expiries,
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<_QrCarouselScreen> createState() => _QrCarouselScreenState();
+}
+
+class _QrCarouselScreenState extends State<_QrCarouselScreen> {
+  static const _viewsPerCard = 2;
+
+  late final PageController _pageController;
+  late int _currentPage;
+  late final List<GlobalKey> _previewKeys;
+  late List<String?> _qrPayloads;
+  bool _loading = true;
+  bool _isSharing = false;
+  bool _isSaving = false;
+
+  int get _pageCount => widget.cards.length * _viewsPerCard;
+  int _cardIndexOf(int page) => page ~/ _viewsPerCard;
+  bool _isEmbedded(int page) => page.isOdd;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialCardIndex * _viewsPerCard;
+    _pageController = PageController(initialPage: _currentPage);
+    _previewKeys = List.generate(_pageCount, (_) => GlobalKey());
+    _qrPayloads = List<String?>.filled(widget.cards.length, null);
+    _loadQrCodes();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  String _fmt(int amount) => NumberFormat('#,##0', 'pt_AO').format(amount);
+
+  Future<void> _loadQrCodes() async {
+    final results = await Future.wait(
+      widget.cards.map((c) => ApiService().getVirtualCardQr(c.id)),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < results.length; i++) {
+        _qrPayloads[i] = results[i].isSuccess ? results[i].data : null;
+      }
+      _loading = false;
+    });
+  }
+
+  Future<Uint8List?> _captureImage(GlobalKey key) async {
+    try {
+      final ro = key.currentContext?.findRenderObject();
+      if (ro is! RenderRepaintBoundary) return null;
+      final image = await ro.toImage(pixelRatio: 3.0);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _share(VirtualCard card, GlobalKey key) async {
+    setState(() => _isSharing = true);
+    final bytes = await _captureImage(key);
+    if (bytes != null) {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/card_qr_${card.id}.png');
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles([XFile(file.path)], text: 'Cartão ${card.name}');
+    }
+    if (!mounted) return;
+    setState(() => _isSharing = false);
+  }
+
+  Future<void> _save(VirtualCard card, GlobalKey key) async {
+    setState(() => _isSaving = true);
+    final bytes = await _captureImage(key);
+    if (bytes != null) {
+      final dir = await getApplicationDocumentsDirectory();
+      final cardsDir = Directory('${dir.path}/virtual_cards');
+      if (!await cardsDir.exists()) await cardsDir.create(recursive: true);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${cardsDir.path}/card_qr_${card.id}_$ts.png');
+      await file.writeAsBytes(bytes);
+      if (mounted) {
+        FeedbackService.showSuccess(context,
+            message: 'QR guardado em: ${file.path}');
+      }
+    }
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+  }
+
+  Widget _buildQrAlone(String? qrData) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: qrData == null
+          ? const SizedBox(
+              width: 240,
+              height: 240,
+              child: Icon(Icons.qr_code_2_rounded,
+                  size: 120, color: Colors.black26),
+            )
+          : qrData.startsWith('data:image')
+              ? Image.memory(
+                  base64Decode(qrData.split(',').last),
+                  width: 240,
+                  height: 240,
+                  fit: BoxFit.contain,
+                )
+              : QrImageView(
+                  data: qrData,
+                  size: 240,
+                  backgroundColor: Colors.white,
+                ),
+    );
+  }
+
+  Widget _buildEmbeddedCard(
+      VirtualCard card, String virtualNumber, String expiry, String? qrData) {
     return AspectRatio(
       aspectRatio: 1.58,
       child: Container(
@@ -1865,45 +1922,45 @@ class _CardVisual extends StatelessWidget {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: AppColors.accentOf(context).withAlpha((0.9 * 255).round()),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha((0.24 * 255).round()),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: Colors.black.withAlpha((0.28 * 255).round()),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
                 Colors.black.withAlpha((0.28 * 255).round()),
-                Colors.black.withAlpha((0.58 * 255).round()),
+                Colors.black.withAlpha((0.60 * 255).round()),
               ],
             ),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: LayoutBuilder(
             builder: (ctx, constraints) {
-              final scale = (constraints.maxWidth / 410).clamp(0.72, 1.0);
+              final scale = (constraints.maxWidth / 410).clamp(0.72, 1.3);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Image.asset('assets/images/logo.png',
-                          height: 42 * scale,
-                          width: 42 * scale,
+                          height: 38 * scale,
+                          width: 38 * scale,
                           fit: BoxFit.contain),
-                      SizedBox(width: 12 * scale),
+                      SizedBox(width: 10 * scale),
                       Expanded(
                         child: Text(
                           card.name.toUpperCase(),
@@ -1922,10 +1979,10 @@ class _CardVisual extends StatelessWidget {
                   ),
                   SizedBox(height: 8 * scale),
                   Container(
-                    width: 44 * scale,
-                    height: 32 * scale,
+                    width: 40 * scale,
+                    height: 28 * scale,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8 * scale),
+                      borderRadius: BorderRadius.circular(6 * scale),
                       gradient: const LinearGradient(
                           colors: [Color(0xFFE7C97A), Color(0xFFC39A45)]),
                     ),
@@ -1937,12 +1994,12 @@ class _CardVisual extends StatelessWidget {
                     child: Text(virtualNumber,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22 * scale,
-                          letterSpacing: 1.8,
+                          fontSize: 18 * scale,
+                          letterSpacing: 2,
                           fontWeight: FontWeight.w700,
                         )),
                   ),
-                  const Spacer(),
+                  SizedBox(height: 10 * scale),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -1953,24 +2010,23 @@ class _CardVisual extends StatelessWidget {
                           children: [
                             Text('TITULAR',
                                 style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 9 * scale,
-                                    letterSpacing: 1.0,
-                                    fontWeight: FontWeight.w600)),
+                                    color: Colors.white60,
+                                    fontSize: 8 * scale,
+                                    letterSpacing: 1)),
                             Text(
-                              cardHolderName.toUpperCase(),
+                              widget.cardHolderName.toUpperCase(),
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 12 * scale,
+                                fontSize: 11 * scale,
                                 fontWeight: FontWeight.w700,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 4 * scale),
+                            SizedBox(height: 2 * scale),
                             Text('Validade $expiry',
                                 style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 10 * scale,
+                                    color: Colors.white60,
+                                    fontSize: 9 * scale,
                                     fontWeight: FontWeight.w600)),
                           ],
                         ),
@@ -1982,18 +2038,25 @@ class _CardVisual extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8 * scale),
                         ),
-                        child: payload.startsWith('data:image')
-                            ? Image.memory(
-                                base64Decode(payload.split(',').last),
-                                width: 100 * scale,
-                                height: 100 * scale,
-                                fit: BoxFit.contain,
+                        child: qrData == null
+                            ? SizedBox(
+                                width: 64 * scale,
+                                height: 64 * scale,
+                                child: Icon(Icons.qr_code_2_rounded,
+                                    size: 40 * scale, color: Colors.black26),
                               )
-                            : QrImageView(
-                                data: payload,
-                                size: 100 * scale,
-                                backgroundColor: Colors.white,
-                              ),
+                            : qrData.startsWith('data:image')
+                                ? Image.memory(
+                                    base64Decode(qrData.split(',').last),
+                                    width: 64 * scale,
+                                    height: 64 * scale,
+                                    fit: BoxFit.contain,
+                                  )
+                                : QrImageView(
+                                    data: qrData,
+                                    size: 64 * scale,
+                                    backgroundColor: Colors.white,
+                                  ),
                       ),
                     ],
                   ),
@@ -2001,6 +2064,199 @@ class _CardVisual extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final accent = AppColors.accentOf(context);
+    final service = VirtualCardService();
+    final cardIndex = _cardIndexOf(_currentPage);
+    final isEmbedded = _isEmbedded(_currentPage);
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 20, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close_rounded, color: onSurface),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.cards.length > 1
+                              ? 'Cartão ${cardIndex + 1} de ${widget.cards.length}'
+                              : 'Cartão Virtual',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isEmbedded ? 'Vista do cartão' : 'QR Code',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? Center(child: CircularProgressIndicator(color: accent))
+                  : PageView.builder(
+                      controller: _pageController,
+                      itemCount: _pageCount,
+                      onPageChanged: (i) => setState(() => _currentPage = i),
+                      itemBuilder: (ctx, i) {
+                        final ci = _cardIndexOf(i);
+                        final card = widget.cards[ci];
+                        final qrData = _qrPayloads[ci];
+                        final remaining = card.dailyLimit > 0
+                            ? service.getRemainingDailyLimit(card)
+                            : null;
+
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 28, vertical: 12),
+                          child: Column(
+                            children: [
+                              Text(
+                                card.name,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.cardHolderName.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.6,
+                                  color: onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              const SizedBox(height: 28),
+                              RepaintBoundary(
+                                key: _previewKeys[i],
+                                child: _isEmbedded(i)
+                                    ? _buildEmbeddedCard(
+                                        card,
+                                        widget.virtualNumbers[ci],
+                                        widget.expiries[ci],
+                                        qrData,
+                                      )
+                                    : _buildQrAlone(qrData),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Saldo: ${_fmt(card.balance)} Kz',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    color: onSurface),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                remaining == null
+                                    ? 'Sem limite diário'
+                                    : 'Limite restante hoje: ${_fmt(remaining)} Kz',
+                                style: TextStyle(
+                                    color: onSurface.withValues(alpha: 0.5),
+                                    fontSize: 13),
+                              ),
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isSaving
+                                          ? null
+                                          : () =>
+                                              _save(card, _previewKeys[i]),
+                                      icon: _isSaving
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2))
+                                          : const Icon(Icons.download_rounded),
+                                      label: const Text('Baixar'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: _isSharing
+                                          ? null
+                                          : () =>
+                                              _share(card, _previewKeys[i]),
+                                      icon: _isSharing
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white))
+                                          : const Icon(Icons.share_rounded),
+                                      label: const Text('Partilhar'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            if (!_loading)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20, top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_pageCount, (i) {
+                    final active = i == _currentPage;
+                    final startsNewGroup = i.isEven && i != 0;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: active ? 20 : 7,
+                      height: 7,
+                      margin: EdgeInsets.only(
+                          left: startsNewGroup ? 10 : 3, right: 3),
+                      decoration: BoxDecoration(
+                        color: active ? accent : accent.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+          ],
         ),
       ),
     );
