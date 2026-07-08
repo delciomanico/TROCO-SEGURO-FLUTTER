@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
 import 'package:troco_seguro/utils/constants.dart';
@@ -68,78 +70,103 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final overlayGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: isDark
+          ? [
+              Colors.black.withValues(alpha: 0.35),
+              AppColors.darkBackground.withValues(alpha: 0.94),
+            ]
+          : [
+              Colors.white.withValues(alpha: 0.55),
+              AppColors.lightBackground.withValues(alpha: 0.96),
+            ],
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.all(responsive.responsivePadding()),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Troco Seguro',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(16),
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.accentOf(context),
-                    ),
-                  ),
-                  if (_currentPage < _pages.length - 1)
-                    TextButton(
-                      onPressed: _skip,
-                      child: Text(
-                        'Pular',
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/images/card_fundo.jpg', fit: BoxFit.cover),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
+            child:
+                Container(decoration: BoxDecoration(gradient: overlayGradient)),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(responsive.responsivePadding()),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Troco Seguro',
                         style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
+                          fontSize: responsive.responsiveFontSize(16),
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.accentOf(context),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                itemCount: _pages.length,
-                itemBuilder: (context, index) {
-                  return _buildPage(_pages[index], responsive);
-                },
-              ),
-            ),
-            Padding(
-              padding: responsive.responsiveAllPadding(),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _pages.length,
-                      (index) => _buildIndicator(index, responsive),
-                    ),
+                      if (_currentPage < _pages.length - 1)
+                        TextButton(
+                          onPressed: _skip,
+                          child: Text(
+                            'Pular',
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(14),
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  SizedBox(height: responsive.scaledHeight(32)),
-                  CustomButton(
-                    text: _currentPage == _pages.length - 1
-                        ? 'COMEÇAR'
-                        : 'PRÓXIMO',
-                    onPressed: _next,
-                    fullWidth: true,
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: _onPageChanged,
+                    itemCount: _pages.length,
+                    itemBuilder: (context, index) {
+                      return _buildPage(_pages[index], responsive);
+                    },
                   ),
-                  SizedBox(height: responsive.scaledHeight(20)),
-                ],
-              ),
+                ),
+                Padding(
+                  padding: responsive.responsiveAllPadding(),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          _pages.length,
+                          (index) => _buildIndicator(index, responsive),
+                        ),
+                      ),
+                      SizedBox(height: responsive.scaledHeight(32)),
+                      CustomButton(
+                        text: _currentPage == _pages.length - 1
+                            ? 'COMEÇAR'
+                            : 'PRÓXIMO',
+                        onPressed: _next,
+                        fullWidth: true,
+                      ),
+                      SizedBox(height: responsive.scaledHeight(20)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -181,7 +208,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(15),
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
               height: 1.6,
             ),
           ),
@@ -198,8 +228,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       width: isActive ? responsive.scaledWidth(32) : responsive.scaledWidth(8),
       height: responsive.scaledWidth(8),
       decoration: BoxDecoration(
-        color:
-            isActive ? AppColors.accentOf(context) : Theme.of(context).colorScheme.outline,
+        color: isActive
+            ? AppColors.accentOf(context)
+            : Theme.of(context).colorScheme.outline,
         borderRadius: BorderRadius.circular(responsive.scaledWidth(4)),
       ),
     );

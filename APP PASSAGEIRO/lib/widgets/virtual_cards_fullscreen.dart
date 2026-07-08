@@ -617,7 +617,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
           ),
         ),
         body: Container(
-          decoration: const BoxDecoration(color: Color(0xFF1E1E1E)),
+          decoration: const BoxDecoration(color: Color(0xFF1C1B1B)),
           child: SafeArea(
             child: TabBarView(
               controller: _tabController,
