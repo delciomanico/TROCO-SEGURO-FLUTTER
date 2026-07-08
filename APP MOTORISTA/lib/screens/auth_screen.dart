@@ -162,9 +162,11 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_pendingPhone == null) return;
     await _api.resendOtp(_pendingPhone!);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Código reenviado por SMS'),
-        backgroundColor: Color(0xFFD4AF37),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Código reenviado por SMS'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFFF07000)
+            : const Color(0xFFF07000),
       ));
     }
   }
@@ -189,12 +191,12 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
-    secondaryGold = const Color(0xFFC5A028);
-    darkBg = const Color(0xFF121212);
-    darkCard = const Color(0xFF1E1E1E);
+    primaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    secondaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    darkBg = const Color(0xFF0E0E0E);
+    darkCard = const Color(0xFF1C1B1B);
     lightBg = const Color(0xFFFFFFFF);
-    lightCard = const Color(0xFFF2F2F2);
+    lightCard = const Color(0xFFF0F0F0);
     textColor = isDark ? Colors.white : darkBg;
 
     return Scaffold(
@@ -836,8 +838,8 @@ class _TermsOfUseModalState extends State<_TermsOfUseModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD4AF37);
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
     final textCol = isDark ? Colors.white : const Color(0xFF1A1A2E);
     final subCol = isDark
         ? Colors.white.withValues(alpha: 0.60)
@@ -1126,9 +1128,11 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     if (res.isSuccess) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Senha redefinida com sucesso. Faça login.'),
-          backgroundColor: Color(0xFFD4AF37),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Senha redefinida com sucesso. Faça login.'),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFFF07000)
+              : const Color(0xFFF07000),
         ));
       }
     } else {
@@ -1148,9 +1152,9 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFD4AF37);
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2F2);
+    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
+    final cardBg = isDark ? const Color(0xFF1C1B1B) : const Color(0xFFF0F0F0);
     final textCol = isDark ? Colors.white : const Color(0xFF1A1A2E);
 
     return Scaffold(

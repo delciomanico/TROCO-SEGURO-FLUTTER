@@ -197,12 +197,12 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
-    secondaryGold = isDark ? const Color(0xFFC5A028) : const Color(0xFFE55A00);
-    darkBg = const Color(0xFF121212);
-    darkCard = const Color(0xFF1E1E1E);
+    primaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    secondaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    darkBg = const Color(0xFF0E0E0E);
+    darkCard = const Color(0xFF1C1B1B);
     lightBg = const Color(0xFFFFFFFF);
-    lightCard = const Color(0xFFF2F2F2);
+    lightCard = const Color(0xFFF0F0F0);
     textColor = isDark ? Colors.white : darkBg;
 
     return Scaffold(
@@ -1073,9 +1073,9 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFFF6600);
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2F2);
+    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
+    final cardBg = isDark ? const Color(0xFF1C1B1B) : const Color(0xFFF0F0F0);
     final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
 
     return Scaffold(

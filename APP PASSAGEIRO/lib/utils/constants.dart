@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:troco_seguro/models/faq_item.dart';
 
 class AppColors {
-  // App-wide palette changed to dark/gold identity
-  // Primary gold accents and neutral dark backgrounds
-  static const Color primaryGold = Color(0xFFD4AF37); // dark theme accent (gold)
-  static const Color secondaryGold = Color(0xFFC5A028);
+  // Paleta alinhada com trocoseguro.wemof.tech (tokens "obsidian"/"ember"/"gold")
+  // Dark theme accent trocado de gold para ember (dark) — nomes mantidos por compatibilidade
+  static const Color primaryGold = Color(0xFFF07000);
+  static const Color secondaryGold = Color(0xFFF07000);
 
-  // Light theme accent — orange from the app logo icon
-  static const Color primaryOrange = Color(0xFFFF6600);
-  static const Color secondaryOrange = Color(0xFFE55A00);
+  // Light theme accent
+  static const Color primaryOrange = Color(0xFFF07000);
+  static const Color secondaryOrange = Color(0xFFF07000);
 
   // Backgrounds / surfaces
-  static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightCard = Color(0xFFF2F2F2);
-  static const Color darkBackground = Color(0xFF121212);
-  static const Color darkCard = Color(0xFF1E1E1E);
+  static const Color lightBackground = Color(0xFFFFFFFF); // obsidian-lowest (light)
+  static const Color lightCard = Color(0xFFF0F0F0); // obsidian-mid (light)
+  static const Color darkBackground = Color(0xFF0E0E0E); // obsidian-lowest
+  static const Color darkCard = Color(0xFF1C1B1B); // obsidian-mid
 
   // Text
-  static const Color textLight = Color(0xFFFFFFFF);
-  static const Color textDark = Color(0xFF121212);
+  static const Color textLight = Color(0xFFE5E2E1); // on-surface
+  static const Color textDark = Color(0xFF131313); // on-surface (light)
 
   // Subtle borders
-  static const Color cardBorder = Color(0xFFE6E6E6);
+  static const Color cardBorder = Color(0xFFE5E5E5); // obsidian-high (light)
 
   // Gradients using gold tones
   static const List<Color> gradientColors = [primaryGold, secondaryGold];

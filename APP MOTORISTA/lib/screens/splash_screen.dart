@@ -100,8 +100,8 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    const gold = Color(0xFFD4AF37);
-    const goldDark = Color(0xFFC5A028);
+    const gold = Color(0xFFF07000); // ember (dark)
+    const goldDark = Color(0xFFF07000); // ember-bright (dark)
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -385,7 +385,7 @@ class _SparkleRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
+    const gold = Color(0xFFF07000); // ember (dark)
     return SizedBox(
       width: radius * 2 + size,
       height: radius * 2 + size,

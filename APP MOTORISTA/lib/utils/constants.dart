@@ -5,36 +5,37 @@ import 'package:troco_seguro_pro/models/trip.dart';
 import 'package:troco_seguro_pro/models/faq_item.dart';
 
 class AppColors {
-  // Core brand palette — dark theme accent (gold)
-  static const Color primaryGold = Color(0xFFD4AF37);
-  static const Color secondaryGold = Color(0xFFC5A028);
+  // Paleta alinhada com trocoseguro.wemof.tech (tokens "obsidian"/"ember"/"gold")
+  // Dark theme accent trocado de gold para ember (dark) — nomes mantidos por compatibilidade
+  static const Color primaryGold = Color(0xFFF07000);
+  static const Color secondaryGold = Color(0xFFF07000);
 
-  // Light theme accent — laranja do logo (idêntico ao passageiro)
-  static const Color primaryOrange = Color(0xFFFF6600);
-  static const Color secondaryOrange = Color(0xFFE55A00);
+  // Light theme accent
+  static const Color primaryOrange = Color(0xFFF07000);
+  static const Color secondaryOrange = Color(0xFFF07000);
 
   // Backwards-compat aliases
   static const Color primaryBlue = primaryGold;
   static const Color secondaryBlue = secondaryGold;
 
   // Light mode
-  static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightSurface = Color(0xFFF2F2F2);
-  static const Color lightCard = Color(0xFFF2F2F2);
-  static const Color lightBorder = Color(0xFFE6E6E6);
+  static const Color lightBackground = Color(0xFFFFFFFF); // obsidian-lowest (light)
+  static const Color lightSurface = Color(0xFFF8F8F8); // obsidian-low (light)
+  static const Color lightCard = Color(0xFFF0F0F0); // obsidian-mid (light)
+  static const Color lightBorder = Color(0xFFE5E5E5); // obsidian-high (light)
 
   // Dark mode
-  static const Color darkBackground = Color(0xFF121212);
-  static const Color darkSurface = Color(0xFF121212);
-  static const Color darkCard = Color(0xFF1E1E1E);
-  static const Color darkCardElevated = Color(0xFF262626);
+  static const Color darkBackground = Color(0xFF0E0E0E); // obsidian-lowest
+  static const Color darkSurface = Color(0xFF131313); // obsidian-low
+  static const Color darkCard = Color(0xFF1C1B1B); // obsidian-mid
+  static const Color darkCardElevated = Color(0xFF201F1F); // obsidian-high
 
-  static const Color textLight = Color(0xFFFFFFFF);
-  static const Color textDark = Color(0xFF121212);
-  static const Color textMutedOnDark = Color(0xFFB8C4D6);
+  static const Color textLight = Color(0xFFE5E2E1); // on-surface
+  static const Color textDark = Color(0xFF131313); // on-surface (light)
+  static const Color textMutedOnDark = Color(0xFFD0C5AF); // on-surface-variant
   static const Color textMutedOnLight = Color(0xFF5E6E82);
 
-  static const Color cardBorder = Color(0xFFE6E6E6);
+  static const Color cardBorder = Color(0xFFE5E5E5); // obsidian-high (light)
 
   // Backwards-compatible aliases
   static const Color accent = primaryGold;
