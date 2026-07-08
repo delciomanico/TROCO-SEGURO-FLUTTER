@@ -27,6 +27,12 @@ class ApiService {
   String? _accessToken;
   String? _refreshToken;
 
+  static final ValueNotifier<int> _sessionExpired = ValueNotifier<int>(0);
+
+  /// Notificado sempre que o token expira e a renovação falha — a UI deve
+  /// terminar a sessão e voltar ao ecrã de login.
+  ValueListenable<int> get sessionExpiredListenable => _sessionExpired;
+
   ApiService._internal()
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
@@ -51,19 +57,41 @@ class ApiService {
       onError: (error, handler) async {
         debugPrint('API error: ${error.response?.statusCode} ${error.requestOptions.path}');
 
+        // Se o próprio pedido de refresh falhou com 401, não tentar renová-lo
+        // outra vez — isso causaria recursão infinita (o refresh passa pelo
+        // mesmo interceptor). Deixa o erro propagar para _refreshTokens(),
+        // cujo catch já devolve false ao chamador.
+        final isRefreshRequest = error.requestOptions.path.contains('auth/refresh');
+
         // Tentar renovar token se expirado
-        if (error.response?.statusCode == 401 && _refreshToken != null) {
-          try {
-            final refreshed = await _refreshTokens();
-            if (refreshed) {
-              // Repetir requisição original
-              final opts = error.requestOptions;
-              opts.headers['Authorization'] = 'Bearer $_accessToken';
-              final response = await _dio.fetch(opts);
-              return handler.resolve(response);
+        if (error.response?.statusCode == 401 && !isRefreshRequest) {
+          final hadSession = isAuthenticated;
+          if (_refreshToken != null) {
+            bool refreshed = false;
+            try {
+              refreshed = await _refreshTokens();
+            } catch (e) {
+              debugPrint('Erro ao renovar token: $e');
             }
-          } catch (e) {
-            debugPrint('Erro ao renovar token: $e');
+            if (refreshed) {
+              try {
+                // Repetir requisição original
+                final opts = error.requestOptions;
+                opts.headers['Authorization'] = 'Bearer $_accessToken';
+                final response = await _dio.fetch(opts);
+                return handler.resolve(response);
+              } catch (e) {
+                debugPrint('Erro ao repetir requisição: $e');
+                return handler.next(error);
+              }
+            } else if (hadSession) {
+              // Refresh token também expirou/inválido: sessão terminou de vez
+              await clearTokens();
+              _sessionExpired.value++;
+            }
+          } else if (hadSession) {
+            await clearTokens();
+            _sessionExpired.value++;
           }
         }
         return handler.next(error);

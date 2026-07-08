@@ -21,6 +21,7 @@ class ApiService {
   static final ApiService _instance = ApiService._internal();
   static final ValueNotifier<int> _activeRequests = ValueNotifier<int>(0);
   static final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
+  static final ValueNotifier<int> _sessionExpired = ValueNotifier<int>(0);
 
   final Dio _dio;
 
@@ -28,6 +29,10 @@ class ApiService {
   String? _refreshToken;
 
   ValueListenable<bool> get loadingListenable => _isLoading;
+
+  /// Notificado sempre que o token expira e a renovação falha — a UI deve
+  /// terminar a sessão e voltar ao ecrã de login.
+  ValueListenable<int> get sessionExpiredListenable => _sessionExpired;
 
   factory ApiService() => _instance;
 
@@ -57,17 +62,38 @@ class ApiService {
       onError: (error, handler) async {
         _endRequest();
 
+        // Se o próprio pedido de refresh falhou com 401, não tentar renová-lo
+        // outra vez — isso causaria recursão infinita (o refresh passa pelo
+        // mesmo interceptor). Deixa o erro propagar para _refreshTokens(),
+        // cujo catch já devolve false ao chamador.
+        final isRefreshRequest = error.requestOptions.path.contains('auth/refresh');
+
         // Tentar renovar token se expirado
-        if (error.response?.statusCode == 401 && _refreshToken != null) {
-          try {
-            final refreshed = await _refreshTokens();
+        if (error.response?.statusCode == 401 && !isRefreshRequest) {
+          final hadSession = isAuthenticated;
+          if (_refreshToken != null) {
+            bool refreshed = false;
+            try {
+              refreshed = await _refreshTokens();
+            } catch (_) {}
             if (refreshed) {
-              final opts = error.requestOptions;
-              opts.headers['Authorization'] = 'Bearer $_accessToken';
-              final response = await _dio.fetch(opts);
-              return handler.resolve(response);
+              try {
+                final opts = error.requestOptions;
+                opts.headers['Authorization'] = 'Bearer $_accessToken';
+                final response = await _dio.fetch(opts);
+                return handler.resolve(response);
+              } catch (_) {
+                return handler.next(error);
+              }
+            } else if (hadSession) {
+              // Refresh token também expirou/inválido: sessão terminou de vez
+              await clearTokens();
+              _sessionExpired.value++;
             }
-          } catch (_) {}
+          } else if (hadSession) {
+            await clearTokens();
+            _sessionExpired.value++;
+          }
         }
         return handler.next(error);
       },

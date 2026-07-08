@@ -40,6 +40,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:troco_seguro_pro/firebase_options.dart';
 
+/// Navigator raiz da app — permite voltar ao login a partir de qualquer ecrã
+/// (ex: quando o token expira num pedido em segundo plano), sem precisar de
+/// um BuildContext local.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -87,6 +92,7 @@ class TrocoSeguroMotoristaApp extends StatelessWidget {
           statusBarBrightness: darkActive ? Brightness.dark : Brightness.light,
         ));
         return MaterialApp(
+          navigatorKey: rootNavigatorKey,
           title: 'Troco Seguro - Motorista',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
@@ -127,7 +133,17 @@ class _AppControllerState extends State<AppController>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _api.sessionExpiredListenable.addListener(_onSessionExpired);
     _loadData();
+  }
+
+  /// Chamado quando o interceptor da API deteta que o token expirou e a
+  /// renovação falhou — termina a sessão automaticamente e volta ao login.
+  void _onSessionExpired() {
+    if (!mounted || driver == null) return;
+    _handleLogout();
+    // Fecha quaisquer ecrãs/modais empilhados para o login ficar visível de imediato
+    rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
   @override
@@ -183,6 +199,7 @@ class _AppControllerState extends State<AppController>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _api.sessionExpiredListenable.removeListener(_onSessionExpired);
     super.dispose();
   }
 
@@ -924,6 +941,21 @@ class _MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<_MainNavigation> {
   int _currentIndex = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   void _showProfileModal() {
     showGeneralDialog(
@@ -958,33 +990,40 @@ class _MainNavigationState extends State<_MainNavigation> {
     return Scaffold(
       backgroundColor:
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (i) => setState(() => _currentIndex = i),
         children: [
-          HomeScreen(
-            driver: widget.driver,
-            isOnline: widget.isOnline,
-            activeVehicleId: widget.activeVehicleId,
-            onToggleOnline: widget.onToggleOnline,
-            onOpenWithdrawal: widget.onOpenWithdrawal,
-            onLogout: widget.onLogout,
-            onOpenProfile: _showProfileModal,
-            showBottomDock: false,
+          _KeepAlivePage(
+            child: HomeScreen(
+              driver: widget.driver,
+              isOnline: widget.isOnline,
+              activeVehicleId: widget.activeVehicleId,
+              onToggleOnline: widget.onToggleOnline,
+              onOpenWithdrawal: widget.onOpenWithdrawal,
+              onLogout: widget.onLogout,
+              onOpenProfile: _showProfileModal,
+              showBottomDock: false,
+            ),
           ),
-          EarningsScreen(
-            driver: widget.driver,
-            showBottomDock: false,
+          _KeepAlivePage(
+            child: EarningsScreen(
+              driver: widget.driver,
+              showBottomDock: false,
+            ),
           ),
-          const TripsScreen(showBottomDock: false),
-          WalletScreen(
-            onOpenWithdrawal: widget.onOpenWithdrawal,
-            showBottomDock: false,
+          const _KeepAlivePage(child: TripsScreen(showBottomDock: false)),
+          _KeepAlivePage(
+            child: WalletScreen(
+              onOpenWithdrawal: widget.onOpenWithdrawal,
+              showBottomDock: false,
+            ),
           ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) => _goToPage(index),
         type: BottomNavigationBarType.fixed,
         backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
         selectedItemColor:
@@ -1023,6 +1062,27 @@ class _MainNavigationState extends State<_MainNavigation> {
         ],
       ),
     );
+  }
+}
+
+// Mantém cada aba viva dentro do PageView (evita perder scroll/estado ao deslizar).
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 

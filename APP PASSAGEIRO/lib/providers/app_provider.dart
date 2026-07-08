@@ -74,6 +74,9 @@ class AppProvider extends ChangeNotifier {
     await _api.loadTokens();
     await _loadFromCache();
 
+    // Terminar sessão automaticamente quando o token expira e a renovação falha
+    _api.sessionExpiredListenable.addListener(_handleSessionExpired);
+
     // Manter token FCM actualizado no backend quando o Firebase o renovar
     NotificationService().subscribeTokenRefresh((newToken) async {
       if (_isAuthenticated) await _api.updateFcmToken(newToken);
@@ -668,6 +671,19 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Chamado quando o interceptor da API deteta que o token expirou e a
+  /// renovação falhou — termina a sessão automaticamente (volta ao login).
+  void _handleSessionExpired() {
+    if (!_isAuthenticated) return;
+    logout();
+  }
+
+  @override
+  void dispose() {
+    _api.sessionExpiredListenable.removeListener(_handleSessionExpired);
+    super.dispose();
   }
 
   /// Fazer logout

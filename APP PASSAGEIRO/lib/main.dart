@@ -35,6 +35,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 
+/// Navigator raiz da app — permite voltar ao login a partir de qualquer ecrã
+/// (ex: quando o token expira num pedido em segundo plano), sem precisar de
+/// um BuildContext local.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -68,6 +73,7 @@ class TrocoSeguroApp extends StatelessWidget {
         return ChangeNotifierProvider(
           create: (_) => AppProvider()..initialize(),
           child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
             title: 'Troco Seguro',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -107,7 +113,17 @@ class _AppControllerState extends State<AppController>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ApiService().sessionExpiredListenable.addListener(_onSessionExpired);
     _loadData();
+  }
+
+  /// Chamado quando o interceptor da API deteta que o token expirou e a
+  /// renovação falhou. O AppProvider já limpa o estado de sessão (o que faz
+  /// este widget re-renderizar como AuthScreen); aqui garantimos que também
+  /// fechamos quaisquer ecrãs/modais empilhados por cima para o login ficar
+  /// visível de imediato.
+  void _onSessionExpired() {
+    rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
   @override
@@ -164,6 +180,7 @@ class _AppControllerState extends State<AppController>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ApiService().sessionExpiredListenable.removeListener(_onSessionExpired);
     super.dispose();
   }
 
@@ -258,12 +275,27 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final PageController _pageController = PageController();
   late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
     _loadPreferences();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _loadPreferences() async {
@@ -429,23 +461,28 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (i) => setState(() => _currentIndex = i),
         children: [
-          HomeScreen(
-            onOpenScanner: _showPaymentModal,
-            onOpenTopup: _showTopupModal,
-            onOpenCards: () => setState(() => _currentIndex = 2),
-            onPanic: _handlePanic,
-            onOpenProfile: _showProfileModal,
-            onTerminateSession: _handleLogout,
+          _KeepAlivePage(
+            child: HomeScreen(
+              onOpenScanner: _showPaymentModal,
+              onOpenTopup: _showTopupModal,
+              onOpenCards: () => _goToPage(2),
+              onPanic: _handlePanic,
+              onOpenProfile: _showProfileModal,
+              onTerminateSession: _handleLogout,
+            ),
           ),
-          WalletScreen(
-            onOpenTopup: _showTopupModal,
-            onOpenTransfer: _showTransferModal,
+          _KeepAlivePage(
+            child: WalletScreen(
+              onOpenTopup: _showTopupModal,
+              onOpenTransfer: _showTransferModal,
+            ),
           ),
-          const CardsScreen(),
-          const TripsScreen(),
+          const _KeepAlivePage(child: CardsScreen()),
+          const _KeepAlivePage(child: TripsScreen()),
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -474,7 +511,7 @@ class _MainScreenState extends State<MainScreen> {
               final isSelected = _currentIndex == i;
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => setState(() => _currentIndex = i),
+                  onTap: () => _goToPage(i),
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -516,6 +553,27 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+}
+
+// Mantém cada aba viva dentro do PageView (evita perder scroll/estado ao deslizar).
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
