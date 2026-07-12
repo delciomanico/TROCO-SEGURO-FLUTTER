@@ -57,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasActiveSession = false;
   int _paidSeats = 0;
   int _totalSeats = 0;
+  int _sessionRevenue = 0;
   String? _sessionPublicToken;
   StreamSubscription<SessionSeatsResult>? _sseSubscription;
 
@@ -87,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _hasActiveSession = seats.active;
           _paidSeats = seats.paidSeats;
           _totalSeats = seats.totalSeats;
+          _sessionRevenue = seats.revenue;
           _sessionPublicToken = seats.publicToken;
         });
       },
@@ -143,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasActiveSession = seats.active;
         _paidSeats = seats.paidSeats;
         _totalSeats = seats.totalSeats;
+        _sessionRevenue = seats.revenue;
         _sessionPublicToken = seats.publicToken;
       });
       // Sincronizar publicToken no QrConfig local se diferente
@@ -275,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _hasActiveSession = true;
                 _paidSeats = 0;
                 _totalSeats = setup.childQrs.length;
+                _sessionRevenue = 0;
               });
             }
           }
@@ -950,6 +954,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _hasActiveSession = true;
           _paidSeats = 0;
           _totalSeats = setup.childQrs.length;
+          _sessionRevenue = 0;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1071,6 +1076,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSeatCounter(ResponsiveHelper responsive, bool isDark) {
     final accent = AppColors.accentOf(context);
+    final available = (_totalSeats - _paidSeats).clamp(0, _totalSeats);
     final filled = _totalSeats > 0 ? _paidSeats / _totalSeats : 0.0;
 
     return GestureDetector(
@@ -1087,39 +1093,40 @@ class _HomeScreenState extends State<HomeScreen> {
             color: accent.withValues(alpha: 0.35),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: responsive.scaledWidth(38),
-              height: responsive.scaledWidth(38),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.event_seat_rounded,
-                color: accent,
-                size: responsive.scaledWidth(20),
-              ),
-            ),
-            SizedBox(width: responsive.scaledWidth(12)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sessão activa',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(11),
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.5)
-                          : Colors.black.withValues(alpha: 0.45),
-                    ),
+            Row(
+              children: [
+                Container(
+                  width: responsive.scaledWidth(38),
+                  height: responsive.scaledWidth(38),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
                   ),
-                  SizedBox(height: responsive.scaledHeight(3)),
-                  Row(
+                  child: Icon(
+                    Icons.event_seat_rounded,
+                    color: accent,
+                    size: responsive.scaledWidth(20),
+                  ),
+                ),
+                SizedBox(width: responsive.scaledWidth(12)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Lotação — sessão activa',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : Colors.black.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      SizedBox(height: responsive.scaledHeight(3)),
                       Text(
                         '$_paidSeats / $_totalSeats assentos pagos',
                         style: TextStyle(
@@ -1130,42 +1137,71 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: responsive.scaledHeight(5)),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: filled.clamp(0.0, 1.0),
-                      minHeight: responsive.scaledHeight(5),
-                      backgroundColor: isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : Colors.black.withValues(alpha: 0.08),
-                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                GestureDetector(
+                  onTap: _confirmEndSession,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: responsive.scaledWidth(10),
+                      vertical: responsive.scaledHeight(6),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Encerrar',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(11),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.red.shade600,
+                      ),
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            SizedBox(height: responsive.scaledHeight(10)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: filled.clamp(0.0, 1.0),
+                minHeight: responsive.scaledHeight(5),
+                backgroundColor: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : Colors.black.withValues(alpha: 0.08),
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
               ),
             ),
-            SizedBox(width: responsive.scaledWidth(8)),
-            GestureDetector(
-              onTap: _confirmEndSession,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: responsive.scaledWidth(10),
-                  vertical: responsive.scaledHeight(6),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Encerrar',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(11),
-                    fontWeight: FontWeight.w700,
-                    color: Colors.red.shade600,
+            SizedBox(height: responsive.scaledHeight(12)),
+            Row(
+              children: [
+                Expanded(
+                  child: _LotacaoStat(
+                    label: 'Pagos',
+                    value: '$_paidSeats',
+                    color: accent,
+                    isDark: isDark,
                   ),
                 ),
-              ),
+                Expanded(
+                  child: _LotacaoStat(
+                    label: 'Disponíveis',
+                    value: '$available',
+                    color: isDark ? Colors.white70 : Colors.black54,
+                    isDark: isDark,
+                  ),
+                ),
+                Expanded(
+                  child: _LotacaoStat(
+                    label: 'Receita',
+                    value: '$_sessionRevenue Kz',
+                    color: accent,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1205,6 +1241,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasActiveSession = false;
         _paidSeats = 0;
         _totalSeats = 0;
+        _sessionRevenue = 0;
         _sessionPublicToken = null;
       });
       // Limpar QrConfig local
@@ -1402,6 +1439,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               );
             }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LotacaoStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final bool isDark;
+
+  const _LotacaoStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(14),
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        SizedBox(height: responsive.scaledHeight(2)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: responsive.responsiveFontSize(10),
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.45),
           ),
         ),
       ],
