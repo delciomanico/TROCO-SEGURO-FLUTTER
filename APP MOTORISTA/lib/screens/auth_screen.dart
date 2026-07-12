@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/widgets/otp_box_input.dart';
 import 'package:troco_seguro_pro/widgets/country_code_field.dart';
@@ -187,9 +188,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('Código reenviado por SMS'),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFFF07000)
-            : const Color(0xFFF07000),
+        backgroundColor: AppColors.primaryGold,
       ));
     }
   }
@@ -214,8 +213,8 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
-    secondaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    primaryGold = AppColors.primaryGold;
+    secondaryGold = AppColors.secondaryGold;
     darkBg = const Color(0xFF0E0E0E);
     darkCard = const Color(0xFF1C1B1B);
     lightBg = const Color(0xFFFFFFFF);
@@ -224,7 +223,23 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? darkBg : lightBg,
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/images/auth_fundo.jpg', fit: BoxFit.cover),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+            ),
+          ),
+          _buildAuthBody(r),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuthBody(ResponsiveHelper r) {
+    return SafeArea(
             child: _mode == AuthMode.choice
                 ? _buildChoiceScreen(r)
                 : Column(
@@ -279,7 +294,6 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ],
                   ),
-          ),
     );
   }
 
@@ -909,7 +923,7 @@ class _TermsOfUseModalState extends State<_TermsOfUseModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    const gold = AppColors.primaryGold;
     final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
     final textCol = isDark ? Colors.white : const Color(0xFF1A1A2E);
     final subCol = isDark
@@ -1207,9 +1221,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: const Text('Senha redefinida com sucesso. Faça login.'),
-          backgroundColor: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFFF07000)
-              : const Color(0xFFF07000),
+          backgroundColor: AppColors.primaryGold,
         ));
       }
     } else {
@@ -1229,7 +1241,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    const gold = AppColors.primaryGold;
     final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
     final cardBg = isDark ? const Color(0xFF1C1B1B) : const Color(0xFFF0F0F0);
     final textCol = isDark ? Colors.white : const Color(0xFF1A1A2E);

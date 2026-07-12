@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
+import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/widgets/otp_box_input.dart';
@@ -220,8 +221,8 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final r = ResponsiveHelper(context);
     isDark = Theme.of(context).brightness == Brightness.dark;
-    primaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
-    secondaryGold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    primaryGold = AppColors.primaryGold;
+    secondaryGold = AppColors.secondaryGold;
     darkBg = const Color(0xFF0E0E0E);
     darkCard = const Color(0xFF1C1B1B);
     lightBg = const Color(0xFFFFFFFF);
@@ -230,7 +231,23 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? darkBg : lightBg,
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/images/auth_fundo.jpg', fit: BoxFit.cover),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+            ),
+          ),
+          _buildAuthBody(r),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuthBody(ResponsiveHelper r) {
+    return SafeArea(
         child: _mode == AuthMode.choice
             ? _buildChoiceScreen(r)
             : _mode == AuthMode.otp
@@ -305,7 +322,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ],
                       ),
-      ),
     );
   }
 
@@ -1134,7 +1150,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gold = isDark ? const Color(0xFFF07000) : const Color(0xFFF07000);
+    const gold = AppColors.primaryGold;
     final bg = isDark ? const Color(0xFF0E0E0E) : Colors.white;
     final cardBg = isDark ? const Color(0xFF1C1B1B) : const Color(0xFFF0F0F0);
     final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
