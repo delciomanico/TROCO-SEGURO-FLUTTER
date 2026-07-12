@@ -36,6 +36,9 @@ class AppColors {
 
   static const Color cardBorder = Color(0xFFE5E5E5); // obsidian-high (light)
 
+  // Prata (bordas/ícones de botões de acção rápida)
+  static const Color silver = Color(0xFFC0C0C0);
+
   // Backwards-compatible aliases
   static const Color accent = primaryGold;
   static const Color accentLight = secondaryGold;

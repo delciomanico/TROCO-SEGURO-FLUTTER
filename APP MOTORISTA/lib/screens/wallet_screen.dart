@@ -408,13 +408,29 @@ class _WalletScreenState extends State<WalletScreen> {
           child: Container(
             width: responsive.scaledWidth(58),
             height: responsive.scaledWidth(58),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryGold,
+              color: AppColors.darkCard,
+              border: Border.all(
+                color: AppColors.silver.withValues(alpha: 0.35),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: AppColors.silver.withValues(alpha: 0.12),
+                  blurRadius: 3,
+                  offset: const Offset(-1, -1),
+                ),
+              ],
             ),
             child: Icon(
               icon,
-              color: Colors.black.withValues(alpha: 0.8),
+              color: AppColors.silver,
               size: responsive.scaledWidth(24),
             ),
           ),

@@ -23,6 +23,9 @@ class AppColors {
   // Subtle borders
   static const Color cardBorder = Color(0xFFE5E5E5); // obsidian-high (light)
 
+  // Prata (bordas/ícones de botões de acção rápida)
+  static const Color silver = Color(0xFFC0C0C0);
+
   // Gradients using gold tones
   static const List<Color> gradientColors = [primaryGold, secondaryGold];
   static const LinearGradient primaryGradient = LinearGradient(

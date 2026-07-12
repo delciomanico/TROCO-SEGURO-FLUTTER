@@ -1024,10 +1024,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String? badge,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accentColor = AppColors.accentOf(context);
-    final iconColor = isDark
-        ? Colors.black.withValues(alpha: 0.8)
-        : Colors.white;
+    const iconColor = AppColors.silver;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1041,7 +1038,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: responsive.scaledWidth(58),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: accentColor,
+                  color: AppColors.darkCard,
+                  border: Border.all(
+                    color: AppColors.silver.withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: AppColors.silver.withValues(alpha: 0.12),
+                      blurRadius: 3,
+                      offset: const Offset(-1, -1),
+                    ),
+                  ],
                 ),
                 child: isLoading
                     ? Padding(
