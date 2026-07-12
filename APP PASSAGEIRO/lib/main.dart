@@ -29,6 +29,7 @@ import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
+import 'package:troco_seguro/services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -103,11 +104,16 @@ class AppController extends StatefulWidget {
   State<AppController> createState() => _AppControllerState();
 }
 
+// TODO(remover após testar o redesign): força onboarding+auth a aparecerem
+// sempre no arranque, ignorando os caches 'ts_onboarding'/sessão guardada.
+const bool kForceOnboardingAuthForTesting = true;
+
 class _AppControllerState extends State<AppController>
     with WidgetsBindingObserver {
   bool hasSeenOnboarding = true; // Onboarding desativado
   bool isLoading = true;
   bool _isLocked = false;
+  bool _justAuthenticated = false;
 
   @override
   void initState() {
@@ -188,7 +194,9 @@ class _AppControllerState extends State<AppController>
     final prefs = await SharedPreferences.getInstance();
 
     setState(() {
-      hasSeenOnboarding = prefs.getBool('ts_onboarding') ?? false;
+      hasSeenOnboarding = kForceOnboardingAuthForTesting
+          ? false
+          : (prefs.getBool('ts_onboarding') ?? false);
       isLoading = false;
     });
   }
@@ -216,6 +224,7 @@ class _AppControllerState extends State<AppController>
     await provider.setAuthenticatedUser(user,
         accessToken: accessToken, refreshToken: refreshToken);
 
+    setState(() => _justAuthenticated = true);
     _saveData();
   }
 
@@ -248,7 +257,11 @@ class _AppControllerState extends State<AppController>
     final provider = context.watch<AppProvider>();
     final user = provider.user;
 
-    if (user == null || !provider.isAuthenticated) {
+    final needsAuth = kForceOnboardingAuthForTesting
+        ? (user == null || !provider.isAuthenticated || !_justAuthenticated)
+        : (user == null || !provider.isAuthenticated);
+
+    if (needsAuth) {
       return AuthScreen(onAuth: _handleAuth);
     }
 
@@ -282,6 +295,16 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadPreferences();
+
+    // Tocar numa notificação de pagamento leva o passageiro ao separador Viagens
+    NotificationService().subscribeNotificationTap((data) {
+      final type = data['type'];
+      if (type == 'PAYMENT_SENT' || type == 'PAYMENT_CONFIRMED') {
+        _goToPage(3);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => NotificationService().checkInitialMessage());
   }
 
   @override

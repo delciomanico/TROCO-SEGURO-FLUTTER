@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/widgets/otp_box_input.dart';
+import 'package:troco_seguro_pro/widgets/country_code_field.dart';
 
 enum AuthMode { choice, login, register, otp }
 
@@ -23,6 +24,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   AuthMode _mode = AuthMode.choice;
+  CountryCode _selectedCountry = kCountryCodes.first;
   bool _obscurePin = true;
   bool isLoading = false;
   bool _agreedToTerms = false;
@@ -58,8 +60,19 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String _formatPhone(String phone) {
     final cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    return cleaned.startsWith('244') ? '+$cleaned' : '+244$cleaned';
+    return cleaned.startsWith(_selectedCountry.dialCode)
+        ? '+$cleaned'
+        : '+${_selectedCountry.dialCode}$cleaned';
   }
+
+  static const String _forbiddenAccessMessage =
+      'Acesso proibido. Esta conta não é de motorista — use a app do passageiro.';
+
+  /// Só contas com role 'DRIVER' podem entrar nesta app. Um role nulo é
+  /// permitido (contas antigas podem não o ter guardado), mas qualquer role
+  /// explicitamente diferente (ex: 'PASSENGER') é bloqueado.
+  bool _isRoleMismatch(String? role) =>
+      role != null && role.toUpperCase() != 'DRIVER';
 
   Future<void> _handleContinue() async {
     setState(() => errorMessage = null);
@@ -89,6 +102,11 @@ class _AuthScreenState extends State<AuthScreen> {
           await _api.login(phoneNumber: phone, password: pinController.text);
       setState(() => isLoading = false);
       if (result.isSuccess) {
+        if (_isRoleMismatch(result.data?.driver?.role)) {
+          await _api.clearTokens();
+          setState(() => errorMessage = _forbiddenAccessMessage);
+          return;
+        }
         widget.onAuth(
           nameController.text.trim().isNotEmpty
               ? nameController.text.trim()
@@ -146,6 +164,11 @@ class _AuthScreenState extends State<AuthScreen> {
     );
     setState(() => isLoading = false);
     if (login.isSuccess) {
+      if (_isRoleMismatch(login.data?.driver?.role)) {
+        await _api.clearTokens();
+        setState(() => errorMessage = _forbiddenAccessMessage);
+        return;
+      }
       widget.onAuth(
         _pendingName ?? 'Motorista',
         _pendingPhone!,
@@ -201,19 +224,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? darkBg : lightBg,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (isDark)
-            Image.asset('assets/images/card_fundo.jpg', fit: BoxFit.cover),
-          if (isDark)
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
-              child: Container(
-                color: darkBg.withValues(alpha: 0.3),
-              ),
-            ),
-          SafeArea(
+      body: SafeArea(
             child: _mode == AuthMode.choice
                 ? _buildChoiceScreen(r)
                 : Column(
@@ -269,8 +280,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     ],
                   ),
           ),
-        ],
-      ),
     );
   }
 
@@ -393,12 +402,12 @@ class _AuthScreenState extends State<AuthScreen> {
 
     switch (_mode) {
       case AuthMode.login:
-        title = 'Bem-vindo!';
-        subtitle = 'Entre com o seu telemóvel';
+        title = 'Bem-vindo de volta';
+        subtitle = 'Introduza os seus dados.';
         break;
       case AuthMode.register:
         title = 'Criar conta';
-        subtitle = 'Preencha os seus dados';
+        subtitle = 'Preencha os seus dados.';
         break;
       case AuthMode.otp:
         title = 'Verificar conta';
@@ -413,13 +422,12 @@ class _AuthScreenState extends State<AuthScreen> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
-          title.toUpperCase(),
+          title,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: r.responsiveFontSize(20),
-            fontWeight: FontWeight.w800,
-            color: primaryGold,
-            letterSpacing: 1.2,
+            fontSize: r.responsiveFontSize(24),
+            fontWeight: FontWeight.w900,
+            color: textColor,
           ),
         ),
         SizedBox(height: r.scaledHeight(6)),
@@ -435,26 +443,91 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _buildPhoneField(ResponsiveHelper r) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: r.scaledHeight(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Telefone',
+            style: TextStyle(
+              fontSize: r.responsiveFontSize(13),
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.grey[700],
+            ),
+          ),
+          SizedBox(height: r.scaledHeight(6)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CountryCodeSelector(
+                selected: _selectedCountry,
+                isDark: isDark,
+                onChanged: (c) => setState(() => _selectedCountry = c),
+              ),
+              SizedBox(width: r.scaledWidth(10)),
+              Expanded(
+                child: TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: TextStyle(
+                    fontSize: r.responsiveFontSize(15),
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                  ),
+                  cursorColor: primaryGold,
+                  decoration: InputDecoration(
+                    hintText: '9XX XXX XXX',
+                    hintStyle: TextStyle(color: Colors.grey[500]),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: r.scaledWidth(16),
+                        vertical: r.scaledHeight(14)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          width: 1.2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          width: 1.2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: primaryGold, width: 1.6),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFormFields(ResponsiveHelper r) {
     return Column(
       children: [
         if (_mode == AuthMode.register) ...[
           _buildField(r,
               controller: nameController,
-              hint: 'Nome completo',
+              label: 'Nome completo',
+              hint: 'Digite o seu nome',
               icon: Icons.person_outline),
           SizedBox(height: r.scaledHeight(4)),
         ],
-        _buildField(r,
-            controller: phoneController,
-            hint: '9XX XXX XXX',
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            prefix: '+244 '),
+        _buildPhoneField(r),
         SizedBox(height: r.scaledHeight(4)),
         _buildField(
           r,
           controller: pinController,
+          label: 'PIN',
           hint: '••••••',
           icon: Icons.lock_outline,
           keyboardType: TextInputType.number,
@@ -471,6 +544,25 @@ class _AuthScreenState extends State<AuthScreen> {
             onPressed: () => setState(() => _obscurePin = !_obscurePin),
           ),
         ),
+        if (_mode == AuthMode.login)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _handleRecover,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Recuperar credenciais',
+                style: TextStyle(
+                    color: primaryGold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: r.responsiveFontSize(13)),
+              ),
+            ),
+          ),
         if (_mode == AuthMode.register) ...[
           SizedBox(height: r.scaledHeight(14)),
           _buildTermsRow(r),
@@ -586,13 +678,10 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         SizedBox(height: r.scaledHeight(20)),
-        _buildField(
-          r,
+        OtpBoxInput(
           controller: otpController,
-          hint: 'Código de 6 dígitos',
-          icon: Icons.sms_outlined,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
+          accentColor: primaryGold,
+          isDark: isDark,
         ),
       ],
     );
@@ -603,6 +692,7 @@ class _AuthScreenState extends State<AuthScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    String? label,
     TextInputType? keyboardType,
     bool obscure = false,
     int? maxLength,
@@ -611,76 +701,67 @@ class _AuthScreenState extends State<AuthScreen> {
   }) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: r.scaledHeight(8)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isDark
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withAlpha((0.5 * 255).round()),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Colors.white.withAlpha((0.05 * 255).round()),
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withAlpha((0.3 * 255).round()),
-                    blurRadius: 6,
-                    offset: const Offset(2, 2),
-                    spreadRadius: -1,
-                  ),
-                ]
-              : null,
-        ),
-        child: TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          obscureText: obscure,
-          maxLength: maxLength,
-          inputFormatters: keyboardType == TextInputType.number
-              ? [FilteringTextInputFormatter.digitsOnly]
-              : null,
-          style: TextStyle(
-            fontSize: r.responsiveFontSize(15),
-            fontWeight: FontWeight.w500,
-            color: textColor,
-          ),
-          cursorColor: primaryGold,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[500]),
-            counterText: '',
-            prefixIcon: Icon(icon, color: primaryGold),
-            suffixIcon: suffix,
-            prefixText: prefix,
-            prefixStyle: TextStyle(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null) ...[
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: r.responsiveFontSize(13),
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: r.scaledHeight(6)),
+          ],
+          TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            obscureText: obscure,
+            maxLength: maxLength,
+            inputFormatters: keyboardType == TextInputType.number
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
+            style: TextStyle(
               fontSize: r.responsiveFontSize(15),
               fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white70 : Colors.grey[700],
+              color: textColor,
             ),
-            filled: true,
-            fillColor: isDark ? darkCard : lightCard,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
-                  width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
-                  width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryGold, width: 2),
+            cursorColor: primaryGold,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              counterText: '',
+              suffixIcon: suffix,
+              prefixText: prefix,
+              prefixStyle: TextStyle(
+                fontSize: r.responsiveFontSize(15),
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.grey[700],
+              ),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(
+                  horizontal: r.scaledWidth(16), vertical: r.scaledHeight(14)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1.2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1.2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: primaryGold, width: 1.6),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -720,9 +801,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Container(
       width: double.infinity,
-      height: r.scaledHeight(52),
+      height: r.scaledHeight(56),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: isDark
@@ -758,7 +839,7 @@ class _AuthScreenState extends State<AuthScreen> {
               : primaryGold,
           foregroundColor: isDark ? Colors.black : darkBg,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
         child: isLoading
@@ -780,16 +861,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildFooter(ResponsiveHelper r) {
-    if (_mode == AuthMode.login) {
-      return TextButton(
-        onPressed: _handleRecover,
-        child: Text(
-          'Recuperar credenciais',
-          style: TextStyle(
-              color: primaryGold, fontSize: r.responsiveFontSize(13)),
-        ),
-      );
-    }
     if (_mode == AuthMode.otp) {
       return TextButton(
         onPressed: isLoading ? null : _resendOtp,
@@ -1058,6 +1129,8 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   final ApiService _api = ApiService();
   int _step = 1;
   bool _busy = false;
+  CountryCode _selectedCountry = kCountryCodes.first;
+  String _formattedPhone = '';
 
   final _phoneCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
@@ -1077,11 +1150,15 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   }
 
   Future<void> _step1() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
+    final digits = _phoneCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
       _err('Insira o número de telefone');
       return;
     }
+    final phone = digits.startsWith(_selectedCountry.dialCode)
+        ? '+$digits'
+        : '+${_selectedCountry.dialCode}$digits';
+    _formattedPhone = phone;
     setState(() => _busy = true);
     final res = await _api.forgotPassword(phone);
     setState(() => _busy = false);
@@ -1100,7 +1177,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     }
     setState(() => _busy = true);
     final res = await _api.verifyForgotPasswordOtp(
-        phoneNumber: _phoneCtrl.text.trim(), otp: otp);
+        phoneNumber: _formattedPhone, otp: otp);
     setState(() => _busy = false);
     if (res.isSuccess && res.data != null) {
       _resetToken = res.data;
@@ -1272,8 +1349,41 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
                   ? Colors.white.withValues(alpha: 0.55)
                   : Colors.black.withValues(alpha: 0.5))),
       const SizedBox(height: 28),
-      _inputField('Número de telefone (+244...)', _phoneCtrl, isDark, gold,
-          icon: Icons.phone_outlined, type: TextInputType.phone),
+      Text('Número de telefone',
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.grey[700])),
+      const SizedBox(height: 6),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CountryCodeSelector(
+            selected: _selectedCountry,
+            isDark: isDark,
+            onChanged: (c) => setState(() => _selectedCountry = c),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                hintText: '9XX XXX XXX',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: gold, width: 1.6)),
+              ),
+            ),
+          ),
+        ],
+      ),
       const SizedBox(height: 28),
       _submitButton('Enviar código', _step1, isDark, gold),
     ]);
@@ -1294,7 +1404,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
           style: TextStyle(
               fontSize: 22, fontWeight: FontWeight.w900, color: textCol)),
       const SizedBox(height: 8),
-      Text('Código de 6 dígitos enviado para ${_phoneCtrl.text.trim()}',
+      Text('Código de 6 dígitos enviado para $_formattedPhone',
           style: TextStyle(
               fontSize: 13,
               height: 1.5,
@@ -1302,10 +1412,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
                   ? Colors.white.withValues(alpha: 0.55)
                   : Colors.black.withValues(alpha: 0.5))),
       const SizedBox(height: 28),
-      _inputField('Código OTP (6 dígitos)', _otpCtrl, isDark, gold,
-          icon: Icons.lock_outline,
-          type: TextInputType.number,
-          maxLen: 6),
+      OtpBoxInput(controller: _otpCtrl, accentColor: gold, isDark: isDark),
       const SizedBox(height: 28),
       _submitButton('Verificar código', _step2, isDark, gold),
       const SizedBox(height: 16),
@@ -1373,44 +1480,54 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     bool obscure = false,
     VoidCallback? onToggleObscure,
   }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: type,
-      obscureText: obscure,
-      maxLength: maxLen,
-      decoration: InputDecoration(
-        labelText: label,
-        counterText: '',
-        prefixIcon: Icon(icon, color: gold),
-        suffixIcon: onToggleObscure != null
-            ? IconButton(
-                icon: Icon(
-                    obscure
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: gold,
-                    size: 20),
-                onPressed: onToggleObscure)
-            : null,
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.black.withValues(alpha: 0.03),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.black.withValues(alpha: 0.12))),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: gold, width: 1.5)),
-        labelStyle: TextStyle(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.black.withValues(alpha: 0.45)),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white70 : Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          keyboardType: type,
+          obscureText: obscure,
+          maxLength: maxLen,
+          decoration: InputDecoration(
+            counterText: '',
+            suffixIcon: onToggleObscure != null
+                ? IconButton(
+                    icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: gold,
+                        size: 20),
+                    onPressed: onToggleObscure)
+                : null,
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1.2)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1.2)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: gold, width: 1.6)),
+          ),
+        ),
+      ],
     );
   }
 

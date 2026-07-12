@@ -952,6 +952,19 @@ class ApiService {
     }
   }
 
+  /// Verifica a identidade do motorista lendo o QR code do verso do Bilhete
+  /// de Identidade angolano. Se válido, o backend aprova a conta
+  /// automaticamente (sem fila de aprovação manual).
+  Future<ApiResponse<Map<String, dynamic>>> verifyBiQr(String qrData) async {
+    try {
+      final response =
+          await _dio.post('users/verify-bi-qr', data: {'qrData': qrData});
+      return ApiResponse.success(_payload(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ DETALHE DE VIAGEM ============
 
   Future<ApiResponse<Trip>> getTripDetail(String tripId) async {

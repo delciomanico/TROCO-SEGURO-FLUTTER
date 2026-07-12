@@ -10,9 +10,9 @@ import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/widgets/qr_display_modal.dart';
 import 'package:troco_seguro_pro/widgets/qr_scanner_modal.dart';
 import 'package:troco_seguro_pro/widgets/qr_config_modal.dart';
+import 'package:troco_seguro_pro/widgets/passenger_rating_modal.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/screens/vehicles_screen.dart';
-import 'package:troco_seguro_pro/screens/earnings_screen.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -359,10 +359,31 @@ class _HomeScreenState extends State<HomeScreen> {
             _sessionPublicToken ?? _qrConfig?.sessionPublicToken,
         api: _api,
         responsive: responsive,
-        onSuccess: (_) {
+        onSuccess: (result) {
           _loadTodayStats();
           _loadBalance();
           _loadSessionSeats();
+
+          final tripId = result.tripId;
+          if (tripId != null && tripId.isNotEmpty) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                PassengerRatingModal.show(
+                  context,
+                  tripId: tripId,
+                  passengerName: passengerName,
+                  onSubmitRating: (id, stars, comment) async {
+                    final response = await _api.rateTrip(
+                      tripId: id,
+                      stars: stars,
+                      comment: comment,
+                    );
+                    return response.isSuccess;
+                  },
+                );
+              }
+            });
+          }
         },
       ),
     );
@@ -812,12 +833,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: Icons.account_balance_wallet_outlined,
                           label: 'Levantar',
                           onTap: widget.onOpenWithdrawal,
-                        ),
-                        (
-                          icon: Icons.bar_chart_rounded,
-                          label: 'Ganhos',
-                          onTap: () => _openScreen(
-                              EarningsScreen(driver: widget.driver)),
                         ),
                       ],
                     ),

@@ -1,8 +1,5 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
-import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -23,22 +20,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Pagamentos sem troco',
       description:
           'Pague suas corridas de táxi em Luanda de forma digital e esqueça a confusão com as notas.',
-      icon: Icons.payments_outlined,
-      color: AppColors.primaryOrange,
+      imageAsset: 'assets/images/onboarding_1.jpg',
     ),
     OnboardingData(
       title: 'Rápido e seguro',
       description:
           'Escaneie o QR Code do taxista e confirme o pagamento com seu PIN. Simples assim!',
-      icon: Icons.qr_code_scanner,
-      color: Colors.blue,
+      imageAsset: 'assets/images/onboarding_2.jpg',
     ),
     OnboardingData(
       title: 'Controle total',
       description:
           'Acompanhe todas as suas viagens, gerencie cartões virtuais e tenha controle financeiro completo.',
-      icon: Icons.credit_card,
-      color: Colors.green,
+      imageAsset: 'assets/images/onboarding_3.jpg',
     ),
   ];
 
@@ -70,31 +64,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final overlayGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: isDark
-          ? [
-              Colors.black.withValues(alpha: 0.35),
-              AppColors.darkBackground.withValues(alpha: 0.94),
-            ]
-          : [
-              Colors.white.withValues(alpha: 0.55),
-              AppColors.lightBackground.withValues(alpha: 0.96),
-            ],
-    );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/card_fundo.jpg', fit: BoxFit.cover),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
-            child:
-                Container(decoration: BoxDecoration(gradient: overlayGradient)),
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            itemCount: _pages.length,
+            itemBuilder: (context, index) => _buildPage(_pages[index], responsive),
           ),
           SafeArea(
             child: Column(
@@ -109,7 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(16),
                           fontWeight: FontWeight.w900,
-                          color: AppColors.accentOf(context),
+                          color: Colors.white,
                         ),
                       ),
                       if (_currentPage < _pages.length - 1)
@@ -120,26 +100,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             style: TextStyle(
                               fontSize: responsive.responsiveFontSize(14),
                               fontWeight: FontWeight.w600,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.6),
+                              color: Colors.white.withValues(alpha: 0.75),
                             ),
                           ),
                         ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: _onPageChanged,
-                    itemCount: _pages.length,
-                    itemBuilder: (context, index) {
-                      return _buildPage(_pages[index], responsive);
-                    },
-                  ),
-                ),
+                const Spacer(),
                 Padding(
                   padding: responsive.responsiveAllPadding(),
                   child: Column(
@@ -172,51 +140,78 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildPage(OnboardingData data, ResponsiveHelper responsive) {
-    return Padding(
-      padding: responsive.responsiveAllPadding(),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: responsive.scaledWidth(200),
-            height: responsive.scaledWidth(200),
-            decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Icon(
-                data.icon,
-                size: responsive.scaledWidth(100),
-                color: data.color,
-              ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(data.imageAsset, fit: BoxFit.cover),
+        // Vinheta radial — escurece as bordas mantendo o centro visível.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.1,
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+              stops: const [0.5, 1.0],
             ),
           ),
-          SizedBox(height: responsive.scaledHeight(60)),
-          Text(
-            data.title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: responsive.responsiveFontSize(28),
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.onSurface,
+        ),
+        // Gradiente inferior — garante contraste para o texto.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.92)],
+              stops: const [0.35, 1.0],
             ),
           ),
-          SizedBox(height: responsive.scaledHeight(20)),
-          Text(
-            data.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: responsive.responsiveFontSize(15),
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
-              height: 1.6,
+        ),
+        // Gradiente superior — garante contraste para o cabeçalho/"Pular".
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent],
+              stops: const [0.0, 0.25],
             ),
           ),
-        ],
-      ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              responsive.responsivePadding(),
+              0,
+              responsive.responsivePadding(),
+              responsive.scaledHeight(150),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  data.title,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(26),
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: responsive.scaledHeight(12)),
+                Text(
+                  data.description,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    color: Colors.white.withValues(alpha: 0.85),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -228,9 +223,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       width: isActive ? responsive.scaledWidth(32) : responsive.scaledWidth(8),
       height: responsive.scaledWidth(8),
       decoration: BoxDecoration(
-        color: isActive
-            ? AppColors.accentOf(context)
-            : Theme.of(context).colorScheme.outline,
+        color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(responsive.scaledWidth(4)),
       ),
     );
@@ -240,13 +233,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingData {
   final String title;
   final String description;
-  final IconData icon;
-  final Color color;
+  final String imageAsset;
 
   OnboardingData({
     required this.title,
     required this.description,
-    required this.icon,
-    required this.color,
+    required this.imageAsset,
   });
 }

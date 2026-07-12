@@ -1264,12 +1264,18 @@ class AppNotification {
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
+    // O backend não documenta o nome exacto do campo de estado lido — aceita
+    // as variantes mais comuns em vez de assumir sempre 'read' (se a chave
+    // real for outra, o valor por defeito 'false' fazia tudo parecer sempre
+    // não lido).
+    final rawRead =
+        json['read'] ?? json['isRead'] ?? json['is_read'] ?? json['seen'];
     return AppNotification(
       id: json['id'] ?? '',
       type: json['type'] ?? 'info',
       title: json['title'] ?? '',
-      message: json['message'] ?? '',
-      read: json['read'] ?? false,
+      message: json['message'] ?? json['body'] ?? '',
+      read: rawRead == true || rawRead == 'true' || rawRead == 1,
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     );
   }

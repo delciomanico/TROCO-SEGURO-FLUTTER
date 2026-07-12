@@ -93,6 +93,13 @@ class _QrConfigModalState extends State<QrConfigModal> {
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? AppColors.textLight : AppColors.textDark;
+    final textSecondaryColor =
+        isDark ? Colors.white.withValues(alpha: 0.6) : AppColors.textSecondary;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : AppColors.cardBorder;
 
     return Container(
       constraints: BoxConstraints(
@@ -148,7 +155,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(18),
                           fontWeight: FontWeight.w800,
-                          color: AppColors.text,
+                          color: textColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -156,7 +163,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                         'Defina o valor da corrida',
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(12),
-                          color: AppColors.textSecondary,
+                          color: textSecondaryColor,
                         ),
                       ),
                     ],
@@ -170,7 +177,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
             ),
           ),
 
-          Divider(color: AppColors.cardBorder, height: 1),
+          Divider(color: borderColor, height: 1),
 
           // Content
           Flexible(
@@ -185,7 +192,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(11),
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
+                      color: textSecondaryColor,
                       letterSpacing: 1,
                     ),
                   ),
@@ -199,7 +206,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(24),
                       fontWeight: FontWeight.w900,
-                      color: AppColors.darkBlue,
+                      color: AppColors.accentOf(context),
                     ),
                     decoration: InputDecoration(
                       hintText: '0',
@@ -207,11 +214,11 @@ class _QrConfigModalState extends State<QrConfigModal> {
                       suffixStyle: TextStyle(
                         fontSize: responsive.responsiveFontSize(16),
                         fontWeight: FontWeight.w700,
-                        color: AppColors.darkBlue,
+                        color: AppColors.accentOf(context),
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.cardBorder),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -233,7 +240,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(11),
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
+                      color: textSecondaryColor,
                       letterSpacing: 1,
                     ),
                   ),
@@ -315,6 +322,10 @@ class _QrConfigModalState extends State<QrConfigModal> {
 
   Widget _buildQuickFareButton(ResponsiveHelper responsive, int value) {
     final isSelected = _fareController.text == value.toString();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.cardBorder;
+    final textColor = isDark ? AppColors.textLight : AppColors.textDark;
     return GestureDetector(
       onTap: () {
         _fareController.text = value.toString();
@@ -329,7 +340,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
           color: isSelected ? AppColors.accent : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.cardBorder,
+            color: isSelected ? AppColors.accent : borderColor,
           ),
         ),
         child: Text(
@@ -337,7 +348,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(12),
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.text,
+            color: isSelected ? Colors.white : textColor,
           ),
         ),
       ),

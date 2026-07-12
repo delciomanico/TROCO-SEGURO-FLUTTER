@@ -430,6 +430,8 @@ class _WalletScreenState extends State<WalletScreen> {
           onTap: () => widget.onOpenTopup?.call()),
       (icon: Icons.send_rounded, label: 'Transferir',
           onTap: _showTransferModal),
+      (icon: Icons.account_balance_rounded, label: 'Levantar',
+          onTap: _showWithdrawalModal),
       (icon: Icons.credit_card_rounded, label: 'P/ Cartão',
           onTap: _showDepositToCardModal),
       (icon: Icons.grid_view_rounded, label: 'Mais',
@@ -460,8 +462,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final moreActions = [
       (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
           onTap: _showExternalCardModal),
-      (icon: Icons.account_balance_rounded, label: 'Levantar',
-          onTap: _showWithdrawalModal),
       (icon: Icons.qr_code_scanner_rounded, label: 'Saldo QR',
           onTap: _showQrBalanceModal),
     ];

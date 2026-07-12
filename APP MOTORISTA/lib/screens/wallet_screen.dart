@@ -344,7 +344,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildQuickActions(ResponsiveHelper responsive, bool isDark) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildCircularAction(
           responsive,
@@ -352,20 +352,6 @@ class _WalletScreenState extends State<WalletScreen> {
           icon: Icons.currency_exchange_rounded,
           label: 'Sacar',
           onTap: widget.onOpenWithdrawal ?? () {},
-        ),
-        _buildCircularAction(
-          responsive,
-          isDark: isDark,
-          icon: Icons.history_rounded,
-          label: 'Histórico',
-          onTap: () {},
-        ),
-        _buildCircularAction(
-          responsive,
-          isDark: isDark,
-          icon: Icons.bar_chart_rounded,
-          label: 'Estatísticas',
-          onTap: () {},
         ),
       ],
     );

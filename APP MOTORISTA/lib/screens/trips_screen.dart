@@ -91,11 +91,7 @@ class _TripsScreenState extends State<TripsScreen> {
 
   List<Trip> get filteredTrips {
     return trips.where((trip) {
-      final matchesSearch = trip.destination
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase()) ||
-          trip.passengerName.toLowerCase().contains(searchQuery.toLowerCase());
-      return matchesSearch;
+      return trip.passengerName.toLowerCase().contains(searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -676,11 +672,6 @@ class _TripsScreenState extends State<TripsScreen> {
                           trip.passengerPhone!),
                     _detailRow(ctx, isDark, Icons.calendar_today_outlined,
                         'Data', '${trip.date} às ${trip.time}'),
-                    _detailRow(ctx, isDark, Icons.trip_origin, 'Origem',
-                        trip.origin.isNotEmpty ? trip.origin : '—'),
-                    _detailRow(ctx, isDark, Icons.location_on_outlined,
-                        'Destino',
-                        trip.destination.isNotEmpty ? trip.destination : '—'),
                     _detailRow(ctx, isDark, Icons.payments_outlined, 'Valor',
                         _formatCurrency(trip.amount)),
                     if (trip.distance != null)
@@ -842,79 +833,6 @@ class _TripsScreenState extends State<TripsScreen> {
                 ),
               ),
             ],
-          ),
-          SizedBox(height: responsive.scaledHeight(12)),
-          // Route
-          Container(
-            padding: EdgeInsets.all(responsive.scaledWidth(12)),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkBackground : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: isDark ? AppColors.darkCard : Colors.white,
-                            width: 2),
-                      ),
-                    ),
-                    Container(
-                      width: 2,
-                      height: 20,
-                      color: Colors.grey.withValues(alpha: 0.3),
-                    ),
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: isDark ? AppColors.darkCard : Colors.white,
-                            width: 2),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(width: responsive.scaledWidth(12)),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        trip.origin,
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(12),
-                          color: textColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: responsive.scaledHeight(12)),
-                      Text(
-                        trip.destination,
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(12),
-                          color: textColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
           SizedBox(height: responsive.scaledHeight(12)),
           // Footer

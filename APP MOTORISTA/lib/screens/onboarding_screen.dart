@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
@@ -19,28 +17,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      icon: Icons.qr_code_rounded,
       title: 'Receba Pagamentos',
       description:
           'Mostre seu QR Code único e receba pagamentos dos passageiros de forma instantânea e segura.',
+      imageAsset: 'assets/images/onboarding_1.jpg',
     ),
     OnboardingPage(
-      icon: Icons.trending_up_rounded,
       title: 'Acompanhe seus Ganhos',
       description:
           'Veja em tempo real seus ganhos diários, semanais e mensais. Tenha controle total do seu negócio.',
+      imageAsset: 'assets/images/onboarding_2.jpg',
     ),
     OnboardingPage(
-      icon: Icons.account_balance_wallet_rounded,
       title: 'Saque Fácil',
       description:
           'Transfira seus ganhos para sua conta bancária ou MCX Express quando quiser. Rápido e sem complicação.',
+      imageAsset: 'assets/images/onboarding_3.jpg',
     ),
     OnboardingPage(
-      icon: Icons.verified_user_rounded,
       title: 'Segurança Total',
       description:
           'Todas as transações são protegidas com PIN e biometria. Seus dados estão seguros conosco.',
+      imageAsset: 'assets/images/onboarding_4.jpg',
     ),
   ];
 
@@ -64,32 +62,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final overlayGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: isDark
-          ? [
-              Colors.black.withValues(alpha: 0.35),
-              AppColors.darkBackground.withValues(alpha: 0.94),
-            ]
-          : [
-              Colors.white.withValues(alpha: 0.55),
-              AppColors.lightBackground.withValues(alpha: 0.96),
-            ],
-    );
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/card_fundo.jpg', fit: BoxFit.cover),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
-            child:
-                Container(decoration: BoxDecoration(gradient: overlayGradient)),
+          PageView.builder(
+            controller: _pageController,
+            itemCount: _pages.length,
+            onPageChanged: (index) {
+              setState(() => _currentPage = index);
+            },
+            itemBuilder: (context, index) => _buildPage(_pages[index], responsive),
           ),
           SafeArea(
             child: Column(
@@ -109,11 +94,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.accent
-                              .withValues(alpha: isDark ? 0.18 : 0.12),
+                          color: AppColors.accent.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppColors.accent.withValues(alpha: 0.35),
+                            color: AppColors.accent.withValues(alpha: 0.45),
                             width: 1,
                           ),
                         ),
@@ -147,9 +131,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Text(
                             'Pular',
                             style: TextStyle(
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textSecondary,
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontSize: responsive.responsiveFontSize(14),
                             ),
                           ),
@@ -159,65 +141,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ],
                   ),
                 ),
-                // Page content
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _pages.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentPage = index);
-                    },
-                    itemBuilder: (context, index) {
-                      final page = _pages[index];
-                      return Padding(
-                        padding:
-                            EdgeInsets.all(responsive.responsivePadding() * 2),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: responsive.scaledWidth(120),
-                              height: responsive.scaledWidth(120),
-                              decoration: BoxDecoration(
-                                color: AppColors.adaptiveAccent(context)
-                                    .withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                page.icon,
-                                size: responsive.scaledWidth(60),
-                                color: AppColors.adaptiveAccent(context),
-                              ),
-                            ),
-                            SizedBox(height: responsive.scaledHeight(48)),
-                            Text(
-                              page.title,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: responsive.responsiveFontSize(28),
-                                fontWeight: FontWeight.w900,
-                                color:
-                                    isDark ? Colors.white : AppColors.textDark,
-                              ),
-                            ),
-                            SizedBox(height: responsive.scaledHeight(16)),
-                            Text(
-                              page.description,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: responsive.responsiveFontSize(14),
-                                color: isDark
-                                    ? Colors.white70
-                                    : AppColors.textSecondary,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                const Spacer(),
                 // Page indicators
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -229,8 +153,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       height: 8,
                       decoration: BoxDecoration(
                         color: _currentPage == index
-                            ? AppColors.adaptiveAccent(context)
-                            : (isDark ? Colors.white30 : AppColors.lightBorder),
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
@@ -246,7 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: ElevatedButton(
                       onPressed: _nextPage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.adaptiveAccent(context),
+                        backgroundColor: AppColors.accent,
                         foregroundColor: AppColors.textDark,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
@@ -274,16 +198,92 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+
+  Widget _buildPage(OnboardingPage page, ResponsiveHelper responsive) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(page.imageAsset, fit: BoxFit.cover),
+        // Vinheta radial — escurece as bordas mantendo o centro visível.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.1,
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+              stops: const [0.5, 1.0],
+            ),
+          ),
+        ),
+        // Gradiente inferior — garante contraste para o texto.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.92)],
+              stops: const [0.35, 1.0],
+            ),
+          ),
+        ),
+        // Gradiente superior — garante contraste para o cabeçalho/"Pular".
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent],
+              stops: const [0.0, 0.25],
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              responsive.responsivePadding(),
+              0,
+              responsive.responsivePadding(),
+              responsive.scaledHeight(150),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  page.title,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(26),
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: responsive.scaledHeight(12)),
+                Text(
+                  page.description,
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(14),
+                    color: Colors.white.withValues(alpha: 0.85),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class OnboardingPage {
-  final IconData icon;
   final String title;
   final String description;
+  final String imageAsset;
 
   OnboardingPage({
-    required this.icon,
     required this.title,
     required this.description,
+    required this.imageAsset,
   });
 }

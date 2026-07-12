@@ -15,7 +15,6 @@ import 'package:troco_seguro_pro/models/vehicle.dart';
 import 'package:troco_seguro_pro/models/emergency_contact.dart';
 import 'package:troco_seguro_pro/models/notification.dart';
 import 'package:troco_seguro_pro/screens/onboarding_screen.dart';
-import 'package:troco_seguro_pro/screens/splash_screen.dart';
 import 'package:troco_seguro_pro/screens/auth_screen.dart';
 import 'package:troco_seguro_pro/screens/home_screen.dart';
 import 'package:troco_seguro_pro/screens/earnings_screen.dart';
@@ -26,6 +25,7 @@ import 'package:troco_seguro_pro/screens/about_screen.dart';
 import 'package:troco_seguro_pro/screens/terms_and_conditions_screen.dart';
 import 'package:troco_seguro_pro/widgets/withdrawal_modal.dart';
 import 'package:troco_seguro_pro/widgets/success_modal.dart';
+import 'package:troco_seguro_pro/widgets/bi_scanner_modal.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -59,6 +59,12 @@ Future<void> main() async {
     final api = ApiService();
     await api.loadTokens();
     if (api.isAuthenticated) await api.updateFcmToken(newToken);
+  });
+  // Tocar numa notificação de pagamento leva o motorista ao separador Viagens
+  NotificationService().subscribeNotificationTap((data) {
+    if (data['type'] == 'PAYMENT_RECEIVED') {
+      _MainNavigationState.goToTrips();
+    }
   });
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
@@ -120,7 +126,6 @@ class _AppControllerState extends State<AppController>
   bool isLoading = true;
   bool _isLocked = false;
   bool isOnline = false;
-  bool _showSplash = true;
   String? activeVehicleId;
   final ApiService _api = ApiService();
 
@@ -362,6 +367,22 @@ class _AppControllerState extends State<AppController>
     await prefs.setString('ts_driver', json.encode(updatedDriver.toJson()));
   }
 
+  /// Marca a conta como verificada após leitura bem-sucedida do QR do BI.
+  /// [verifiedName] é o nome extraído pelo backend do BI, quando disponível —
+  /// passa a ser o nome oficial e inalterável do motorista na plataforma.
+  Future<void> _markIdentityVerified(String? verifiedName) async {
+    if (driver == null) return;
+
+    final updatedDriver = driver!.copyWith(
+      isVerified: true,
+      fullName: verifiedName ?? driver!.fullName,
+    );
+    setState(() => driver = updatedDriver);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ts_driver', json.encode(updatedDriver.toJson()));
+  }
+
   void _toggleOnlineStatus() async {
     if (!isOnline) {
       // Ao ativar: pedir veículo ativo primeiro
@@ -436,12 +457,6 @@ class _AppControllerState extends State<AppController>
 
   @override
   Widget build(BuildContext context) {
-    if (_showSplash) {
-      return SplashScreen(
-        onComplete: () => setState(() => _showSplash = false),
-      );
-    }
-
     if (isLoading) {
       return const Scaffold(
         body: Center(
@@ -487,6 +502,7 @@ class _AppControllerState extends State<AppController>
       onLogout: _handleLogout,
       onRefresh: _refreshFromApi,
       onUpdateProfile: _updateProfileName,
+      onIdentityVerified: _markIdentityVerified,
     );
   }
 }
@@ -922,6 +938,7 @@ class _MainNavigation extends StatefulWidget {
   final VoidCallback onLogout;
   final Future<void> Function() onRefresh;
   final Function(String name)? onUpdateProfile;
+  final Function(String? verifiedName)? onIdentityVerified;
 
   const _MainNavigation({
     required this.driver,
@@ -933,6 +950,7 @@ class _MainNavigation extends StatefulWidget {
     required this.onLogout,
     required this.onRefresh,
     this.onUpdateProfile,
+    this.onIdentityVerified,
   });
 
   @override
@@ -940,11 +958,22 @@ class _MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<_MainNavigation> {
+  static _MainNavigationState? _current;
+
   int _currentIndex = 0;
   final PageController _pageController = PageController();
 
   @override
+  void initState() {
+    super.initState();
+    _current = this;
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => NotificationService().checkInitialMessage());
+  }
+
+  @override
   void dispose() {
+    if (_current == this) _current = null;
     _pageController.dispose();
     super.dispose();
   }
@@ -956,6 +985,10 @@ class _MainNavigationState extends State<_MainNavigation> {
       curve: Curves.easeOutCubic,
     );
   }
+
+  /// Navega para o separador Viagens a partir de qualquer ponto da app
+  /// (usado pelo tap numa push notification de pagamento).
+  static void goToTrips() => _current?._goToPage(2);
 
   void _showProfileModal() {
     showGeneralDialog(
@@ -976,6 +1009,7 @@ class _MainNavigationState extends State<_MainNavigation> {
             driver: widget.driver,
             onLogout: widget.onLogout,
             onUpdateProfile: widget.onUpdateProfile,
+            onIdentityVerified: widget.onIdentityVerified,
           ),
         );
       },
@@ -1091,11 +1125,13 @@ class _MenuModal extends StatefulWidget {
   final DriverUser driver;
   final VoidCallback? onLogout;
   final Function(String name)? onUpdateProfile;
+  final Function(String? verifiedName)? onIdentityVerified;
 
   const _MenuModal({
     required this.driver,
     this.onLogout,
     this.onUpdateProfile,
+    this.onIdentityVerified,
   });
 
   @override
@@ -1235,6 +1271,7 @@ class _MenuModalState extends State<_MenuModal> {
               () => _openSubModal(_ProfileModal(
                 driver: widget.driver,
                 onUpdateProfile: widget.onUpdateProfile,
+                onIdentityVerified: widget.onIdentityVerified,
               )),
             ),
             _navTile(
@@ -1410,10 +1447,54 @@ Widget _subModalHeader(
 class _ProfileModal extends StatelessWidget {
   final DriverUser driver;
   final Function(String name)? onUpdateProfile;
+  final Function(String? verifiedName)? onIdentityVerified;
 
-  const _ProfileModal({required this.driver, this.onUpdateProfile});
+  const _ProfileModal({
+    required this.driver,
+    this.onUpdateProfile,
+    this.onIdentityVerified,
+  });
+
+  /// [context] é o contexto da sheet de Documentos (permanece montado — só é
+  /// fechado explicitamente após sucesso — não deve ser fechado antes de
+  /// abrir o scanner, para continuar válido nesta função assíncrona).
+  Future<void> _startBiVerification(BuildContext context, bool isDark) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (scannerCtx) => BiScannerModal(
+        onCancel: () {},
+        onScanned: (qrData) async {
+          Navigator.pop(scannerCtx); // fecha o scanner
+          final result = await ApiService().verifyBiQr(qrData);
+          if (!context.mounted) return;
+          final messenger = ScaffoldMessenger.of(context);
+
+          if (result.isSuccess) {
+            final verifiedName = result.data?['fullName']?.toString() ??
+                result.data?['name']?.toString();
+            onIdentityVerified?.call(verifiedName);
+            Navigator.of(context).pop(); // fecha a sheet de Documentos
+            messenger.showSnackBar(const SnackBar(
+              content: Text('Identidade verificada com sucesso!'),
+              backgroundColor: Colors.green,
+            ));
+          } else {
+            messenger.showSnackBar(SnackBar(
+              content: Text(result.error ??
+                  'Não foi possível verificar o BI. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        },
+      ),
+    );
+  }
 
   void _showDocumentsSheet(BuildContext context, bool isDark) {
+    final isVerified = driver.isVerified == true;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1451,7 +1532,9 @@ class _ProfileModal extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'O upload de documentos requer a câmara ou galeria do dispositivo. Esta funcionalidade estará disponível em breve.',
+              isVerified
+                  ? 'A sua identidade já foi verificada.'
+                  : 'Escaneie o QR code no verso do seu Bilhete de Identidade para verificar a sua conta automaticamente.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
@@ -1461,9 +1544,22 @@ class _ProfileModal extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            _docUploadRow(isDark, Icons.credit_card_outlined, 'Licença de Condução'),
+            _docUploadRow(
+              isDark,
+              Icons.credit_card_outlined,
+              'Licença de Condução',
+              onTap: null,
+            ),
             const SizedBox(height: 12),
-            _docUploadRow(isDark, Icons.badge_outlined, 'Bilhete de Identidade'),
+            _docUploadRow(
+              isDark,
+              Icons.badge_outlined,
+              'Bilhete de Identidade',
+              verified: isVerified,
+              onTap: isVerified
+                  ? null
+                  : () => _startBiVerification(ctx, isDark),
+            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -1471,48 +1567,60 @@ class _ProfileModal extends StatelessWidget {
     );
   }
 
-  Widget _docUploadRow(bool isDark, IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.05)
-            : Colors.black.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
+  Widget _docUploadRow(bool isDark, IconData icon, String label,
+      {VoidCallback? onTap, bool verified = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.black.withValues(alpha: 0.08),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.08),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primaryGold, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.textDark,
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primaryGold, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                ),
               ),
             ),
-          ),
-          Icon(
-            Icons.cloud_upload_outlined,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.35)
-                : Colors.black.withValues(alpha: 0.3),
-            size: 20,
-          ),
-        ],
+            if (verified)
+              const Icon(Icons.verified_rounded,
+                  color: Colors.green, size: 20)
+            else
+              Icon(
+                onTap != null
+                    ? Icons.qr_code_scanner_rounded
+                    : Icons.cloud_upload_outlined,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : Colors.black.withValues(alpha: 0.3),
+                size: 20,
+              ),
+          ],
+        ),
       ),
     );
   }
 
   void _showEditSheet(BuildContext context, bool isDark) {
     final nameCtrl = TextEditingController(text: driver.fullName);
+    final nameLocked = driver.isVerified == true;
 
     showModalBottomSheet(
       context: context,
@@ -1554,10 +1662,15 @@ class _ProfileModal extends StatelessWidget {
               const SizedBox(height: 20),
               TextField(
                 controller: nameCtrl,
+                enabled: !nameLocked,
                 decoration: InputDecoration(
                   labelText: 'Nome completo',
                   prefixIcon:
                       const Icon(Icons.person_outline, color: AppColors.primaryGold),
+                  suffixIcon: nameLocked
+                      ? const Icon(Icons.lock_outline_rounded,
+                          color: Colors.green, size: 18)
+                      : null,
                   border:
                       OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   enabledBorder: OutlineInputBorder(
@@ -1579,17 +1692,31 @@ class _ProfileModal extends StatelessWidget {
                       : Colors.black.withValues(alpha: 0.03),
                 ),
               ),
+              if (nameLocked) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Nome verificado pelo Bilhete de Identidade — não pode ser alterado.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : Colors.black.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    final name = nameCtrl.text.trim();
-                    if (name.isNotEmpty) {
-                      onUpdateProfile?.call(name);
-                    }
-                    Navigator.pop(ctx);
-                  },
+                  onPressed: nameLocked
+                      ? null
+                      : () {
+                          final name = nameCtrl.text.trim();
+                          if (name.isNotEmpty) {
+                            onUpdateProfile?.call(name);
+                          }
+                          Navigator.pop(ctx);
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accentOf(ctx),
                     foregroundColor: isDark ? Colors.black : Colors.white,

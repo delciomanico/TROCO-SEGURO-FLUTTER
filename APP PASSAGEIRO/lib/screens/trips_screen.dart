@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/api_service.dart' show ApiService, TripStats;
 import 'package:troco_seguro/widgets/ratings_history_modal.dart';
+import 'package:troco_seguro/widgets/rating_modal.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key});
@@ -489,9 +490,6 @@ class _TripsScreenState extends State<TripsScreen> {
   }) {
     final statusColor = _statusColor(trip.status);
     final textPrimary = isDark ? Colors.white : AppColors.textDark;
-    final textSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.55)
-        : Colors.black.withValues(alpha: 0.5);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,6 +518,8 @@ class _TripsScreenState extends State<TripsScreen> {
         SizedBox(width: responsive.scaledWidth(12)),
         // Card
         Expanded(
+          child: GestureDetector(
+          onTap: () => _showTripDetail(trip, isDark),
           child: Container(
             margin:
                 EdgeInsets.only(bottom: responsive.scaledHeight(12)),
@@ -539,9 +539,15 @@ class _TripsScreenState extends State<TripsScreen> {
               children: [
                 Row(
                   children: [
+                    Icon(
+                      Icons.person_outline_rounded,
+                      size: responsive.scaledWidth(14),
+                      color: textPrimary,
+                    ),
+                    SizedBox(width: responsive.scaledWidth(5)),
                     Expanded(
                       child: Text(
-                        '${trip.origin} → ${trip.destination}',
+                        trip.driverName,
                         style: TextStyle(
                           fontSize: responsive.responsiveFontSize(13),
                           fontWeight: FontWeight.w700,
@@ -563,45 +569,23 @@ class _TripsScreenState extends State<TripsScreen> {
                   ],
                 ),
                 SizedBox(height: responsive.scaledHeight(7)),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person_outline_rounded,
-                      size: responsive.scaledWidth(13),
-                      color: textSecondary,
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.scaledWidth(8),
+                    vertical: responsive.scaledHeight(3),
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _statusLabel(trip.status),
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(10),
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
                     ),
-                    SizedBox(width: responsive.scaledWidth(5)),
-                    Expanded(
-                      child: Text(
-                        trip.driverName,
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(11),
-                          color: textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: responsive.scaledWidth(8),
-                        vertical: responsive.scaledHeight(3),
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _statusLabel(trip.status),
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(10),
-                          color: statusColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 SizedBox(height: responsive.scaledHeight(5)),
                 Row(
@@ -638,8 +622,213 @@ class _TripsScreenState extends State<TripsScreen> {
               ],
             ),
           ),
+          ),
         ),
       ],
+    );
+  }
+
+  void _showTripDetail(Trip trip, bool isDark) {
+    final textColor = isDark ? Colors.white : AppColors.textDark;
+    final statusColor = _statusColor(trip.status);
+    final statusLabel = _statusLabel(trip.status);
+    final vehicleParts = [trip.vehicleModel, trip.vehicleColor]
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Detalhes da Viagem',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.06),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _detailRow(isDark, Icons.person_outline_rounded,
+                        'Motorista', trip.driverName),
+                    if (trip.licensePlate.isNotEmpty)
+                      _detailRow(isDark, Icons.directions_car_outlined,
+                          'Matrícula', trip.licensePlate),
+                    if (vehicleParts.isNotEmpty)
+                      _detailRow(isDark, Icons.local_taxi_outlined,
+                          'Viatura', vehicleParts.join(' • ')),
+                    _detailRow(isDark, Icons.calendar_today_outlined, 'Data',
+                        '${trip.date} às ${trip.time}'),
+                    _detailRow(isDark, Icons.payments_outlined, 'Valor',
+                        _fmt(trip.amount)),
+                    if (trip.distance != null)
+                      _detailRow(isDark, Icons.straighten_outlined,
+                          'Distância', '${trip.distance!.toStringAsFixed(1)} km'),
+                    if (trip.duration != null)
+                      _detailRow(isDark, Icons.timer_outlined, 'Duração',
+                          '${trip.duration} min'),
+                    if (trip.rating != null) ...[
+                      _detailRow(
+                          isDark,
+                          Icons.star_outline_rounded,
+                          'Avaliação',
+                          '${trip.rating!.toStringAsFixed(1)} estrelas'),
+                      if (trip.comment != null && trip.comment!.isNotEmpty)
+                        _detailRow(isDark, Icons.comment_outlined,
+                            'Comentário', trip.comment!),
+                    ] else if (trip.status == 'completed') ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _rateTrip(ctx, trip),
+                          icon: Icon(Icons.star_outline_rounded,
+                              color: AppColors.accentOf(context)),
+                          label: Text(
+                            'Avaliar viagem',
+                            style: TextStyle(
+                              color: AppColors.accentOf(context),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppColors.accentOf(context)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _rateTrip(BuildContext sheetContext, Trip trip) {
+    RatingModal.show(
+      sheetContext,
+      tripId: trip.id,
+      driverName: trip.driverName,
+      onSubmitRating: (tripId, stars, comment) async {
+        final response = await ApiService()
+            .rateTrip(tripId: tripId, stars: stars, comment: comment);
+        if (response.isSuccess && sheetContext.mounted) {
+          await sheetContext.read<AppProvider>().refreshTrips();
+          if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+        }
+        return response.isSuccess;
+      },
+    );
+  }
+
+  Widget _detailRow(
+      bool isDark, IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.4),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.4)
+                        : Colors.black.withValues(alpha: 0.38),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
