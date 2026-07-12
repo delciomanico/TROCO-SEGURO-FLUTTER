@@ -623,7 +623,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Transferir para outro usuário (P2P)
   Future<bool> transfer({
-    required String receiverPhone,
+    String? receiverPhone,
+    String? receiverId,
     required int amount,
     String? description,
   }) async {
@@ -633,6 +634,7 @@ class AppProvider extends ChangeNotifier {
       final result = await _api.transfer(
         amount: amount,
         receiverPhone: receiverPhone,
+        receiverId: receiverId,
         description: description,
       );
 

@@ -38,6 +38,8 @@ class _TransferModalState extends State<TransferModal> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => QRScannerModal(
+        title: 'ESCANEAR QR',
+        subtitle: 'Aponte a câmera para o QR do destinatário',
         onCancel: () {},
         onQRScanned: (qrData) {
           Navigator.pop(context, qrData);

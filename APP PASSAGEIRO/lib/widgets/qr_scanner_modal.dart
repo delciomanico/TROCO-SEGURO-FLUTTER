@@ -8,11 +8,15 @@ class QRScannerModal extends StatefulWidget {
   final Function(String scannedData)
       onQRScanned; // Callback with scanned QR data
   final VoidCallback onCancel;
+  final String title;
+  final String subtitle;
 
   const QRScannerModal({
     super.key,
     required this.onQRScanned,
     required this.onCancel,
+    this.title = 'ESCANEAR QR DO TAXISTA',
+    this.subtitle = 'Aponte a câmera para o QR code',
   });
 
   @override
@@ -145,7 +149,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   color: Theme.of(context).colorScheme.primary),
                 SizedBox(height: responsive.scaledHeight(12)),
                 Text(
-                  'ESCANEAR QR DO TAXISTA',
+                  widget.title,
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(16),
                     fontWeight: FontWeight.w900,
@@ -154,7 +158,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                 ),
                 SizedBox(height: responsive.scaledHeight(8)),
                 Text(
-                  'Aponte a câmera para o QR code',
+                  widget.subtitle,
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(12),
                     color: Theme.of(context)

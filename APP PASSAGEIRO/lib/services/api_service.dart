@@ -406,16 +406,21 @@ class ApiService {
     }
   }
 
-  /// Transferir para outro utilizador
+  /// Transferir para outro utilizador (por telefone) ou directamente para um
+  /// motorista já identificado por QR (por receiverId).
   Future<ApiResponse<TransactionResult>> transfer({
     required int amount,
-    required String receiverPhone,
+    String? receiverPhone,
+    String? receiverId,
     String? description,
   }) async {
+    assert(receiverPhone != null || receiverId != null,
+        'Informe receiverPhone ou receiverId');
     try {
       final data = <String, dynamic>{
         'amount': amount,
-        'receiverPhone': receiverPhone,
+        if (receiverPhone != null) 'receiverPhone': receiverPhone,
+        if (receiverId != null) 'receiverId': receiverId,
       };
       if (description != null) data['description'] = description;
 
