@@ -1546,15 +1546,13 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
   }
 
   void _proceedToPin() {
-    if (_originController.text.trim().isEmpty ||
-        _destinationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha a origem e o destino.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    // Origem/destino são opcionais — usa um valor genérico quando não
+    // preenchidos, em vez de bloquear o motorista neste passo.
+    if (_originController.text.trim().isEmpty) {
+      _originController.text = 'Não especificado';
+    }
+    if (_destinationController.text.trim().isEmpty) {
+      _destinationController.text = 'Não especificado';
     }
     setState(() => _step = _PassengerStep.pin);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1685,7 +1683,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
         controller: _originController,
         style: TextStyle(fontSize: r.responsiveFontSize(14), color: primaryText),
         decoration: InputDecoration(
-          labelText: 'Origem',
+          labelText: 'Origem (opcional)',
           hintText: 'Ex: Roque Santeiro',
           labelStyle: TextStyle(color: subtleText),
           border: OutlineInputBorder(
@@ -1705,7 +1703,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
         controller: _destinationController,
         style: TextStyle(fontSize: r.responsiveFontSize(14), color: primaryText),
         decoration: InputDecoration(
-          labelText: 'Destino',
+          labelText: 'Destino (opcional)',
           hintText: 'Ex: Talatona',
           labelStyle: TextStyle(color: subtleText),
           border: OutlineInputBorder(
