@@ -1711,11 +1711,11 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
                 ),
                 SizedBox(width: r.scaledWidth(14)),
                 GestureDetector(
-                  onTap: _seatsCount < 10
+                  onTap: _seatsCount < 65
                       ? () => setState(() => _seatsCount++)
                       : null,
                   child: AnimatedOpacity(
-                    opacity: _seatsCount < 10 ? 1.0 : 0.3,
+                    opacity: _seatsCount < 65 ? 1.0 : 0.3,
                     duration: const Duration(milliseconds: 150),
                     child: Container(
                       width: r.scaledWidth(36),
