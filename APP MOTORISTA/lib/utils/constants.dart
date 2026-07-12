@@ -5,14 +5,13 @@ import 'package:troco_seguro_pro/models/trip.dart';
 import 'package:troco_seguro_pro/models/faq_item.dart';
 
 class AppColors {
-  // Paleta alinhada com trocoseguro.wemof.tech (tokens "obsidian"/"ember"/"gold")
-  // Dark theme accent trocado de gold para ember (dark) — nomes mantidos por compatibilidade
-  static const Color primaryGold = Color(0xFFF07000);
-  static const Color secondaryGold = Color(0xFFF07000);
+  // Dourado da app (tema único, preto+dourado — sem tema claro)
+  static const Color primaryGold = Color(0xFFD4AF37);
+  static const Color secondaryGold = Color(0xFFC5A028);
 
-  // Light theme accent
-  static const Color primaryOrange = Color(0xFFF07000);
-  static const Color secondaryOrange = Color(0xFFF07000);
+  // Mantidos por compatibilidade com código legado que ainda referencia estes nomes
+  static const Color primaryOrange = primaryGold;
+  static const Color secondaryOrange = secondaryGold;
 
   // Backwards-compat aliases
   static const Color primaryBlue = primaryGold;
