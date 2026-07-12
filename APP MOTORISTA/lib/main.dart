@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_pro/utils/theme.dart';
-import 'package:troco_seguro_pro/services/theme_controller.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
@@ -68,16 +67,13 @@ Future<void> main() async {
   });
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
-  await ThemeController.instance.load();
 
-  final initialDark =
-      ThemeController.instance.themeMode.value == ThemeMode.dark;
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: initialDark ? Brightness.light : Brightness.dark,
-    statusBarBrightness: initialDark ? Brightness.dark : Brightness.light,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
   ));
-  
+
   await dotenv.load();
   runApp(const TrocoSeguroMotoristaApp());
 }
@@ -87,26 +83,14 @@ class TrocoSeguroMotoristaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeController.instance.themeMode,
-      builder: (context, mode, _) {
-        final darkActive = mode == ThemeMode.dark;
-        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              darkActive ? Brightness.light : Brightness.dark,
-          statusBarBrightness: darkActive ? Brightness.dark : Brightness.light,
-        ));
-        return MaterialApp(
-          navigatorKey: rootNavigatorKey,
-          title: 'Troco Seguro - Motorista',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: mode,
-          debugShowCheckedModeBanner: false,
-          home: const AppController(),
-        );
-      },
+    return MaterialApp(
+      navigatorKey: rootNavigatorKey,
+      title: 'Troco Seguro - Motorista',
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      debugShowCheckedModeBanner: false,
+      home: const AppController(),
     );
   }
 }
@@ -3164,23 +3148,8 @@ class _SettingsModal extends StatefulWidget {
 }
 
 class _SettingsModalState extends State<_SettingsModal> {
-  bool _darkMode = false;
   bool _notifications = true;
   final ApiService _api = ApiService();
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(
-          () => _darkMode = prefs.getString('ts_theme_mode') == 'dark');
-    }
-  }
 
   void _openFullscreen(Widget page) {
     showGeneralDialog(
@@ -3209,17 +3178,6 @@ class _SettingsModalState extends State<_SettingsModal> {
             _subModalHeader(context, 'Configurações', isDark,
                 () => Navigator.pop(context)),
             const SizedBox(height: 8),
-            _toggleTile(
-              isDark,
-              Icons.dark_mode_outlined,
-              'Tema escuro',
-              'Alternar entre modo claro e escuro',
-              _darkMode,
-              (v) async {
-                await ThemeController.instance.setDark(v);
-                if (mounted) setState(() => _darkMode = v);
-              },
-            ),
             _toggleTile(
               isDark,
               Icons.notifications_outlined,

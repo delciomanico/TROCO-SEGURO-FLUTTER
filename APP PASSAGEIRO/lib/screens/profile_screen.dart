@@ -10,7 +10,6 @@ import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/services/biometric_service.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
-import 'package:troco_seguro/services/theme_controller.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -33,7 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool notificationsEnabled = true;
   bool twoFactorEnabled = false;
   bool biometricsEnabled = false;
-  bool darkModeEnabled = false;
   bool isLoading = false;
   bool isChangingPassword = false;
   final ApiService _api = ApiService();
@@ -50,11 +48,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final bioPref = prefs.getBool('ts_bio_enabled') ?? false;
-    final themePref = prefs.getString('ts_theme_mode');
 
     setState(() {
       biometricsEnabled = bioPref;
-      darkModeEnabled = themePref == 'dark';
     });
   }
 
@@ -297,20 +293,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontWeight: FontWeight.w700,
               color: isDark ? AppColors.textLight : AppColors.textDark,
             ),
-          ),
-          SizedBox(height: responsive.scaledHeight(12)),
-          _buildSettingCard(
-            responsive,
-            'Tema Escuro',
-            'Use fundo escuro',
-            Icons.dark_mode_outlined,
-            darkModeEnabled,
-            (value) async {
-              final enabled = value ?? false;
-              await ThemeController.instance.setDark(enabled);
-              if (mounted) setState(() => darkModeEnabled = enabled);
-            },
-            isDark,
           ),
           SizedBox(height: responsive.scaledHeight(12)),
           _buildSettingCard(

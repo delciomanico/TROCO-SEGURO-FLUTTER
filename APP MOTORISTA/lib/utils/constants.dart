@@ -90,6 +90,16 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 
+  // Cartão de saldo dourado (estilo da 1ª versão do app)
+  static const Color walletCardGoldLight = Color(0xFFFFD873);
+  static const Color walletCardGoldDark = Color(0xFFC77A00);
+  static const LinearGradient walletCardGradient = LinearGradient(
+    colors: [walletCardGoldLight, primaryGold, walletCardGoldDark],
+    stops: [0.0, 0.55, 1.0],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   // ── Helpers de acento adaptativos (laranja no claro, dourado no escuro) ──────
 
   /// Acento principal: laranja no tema claro, dourado no tema escuro.

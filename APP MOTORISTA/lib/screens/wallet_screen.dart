@@ -290,55 +290,87 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildBalanceSection(ResponsiveHelper responsive, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Saldo disponível',
-          style: TextStyle(
-            fontSize: responsive.responsiveFontSize(13),
-            fontWeight: FontWeight.w500,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.black.withValues(alpha: 0.45),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(responsive.scaledWidth(20)),
+      decoration: BoxDecoration(
+        gradient: AppColors.walletCardGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-        ),
-        SizedBox(height: responsive.scaledHeight(6)),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => showBalance = !showBalance),
-                child: Text(
-                  showBalance ? _formatCurrency(balance) : '••••••••',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(38),
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                    height: 1.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Image.asset(
+                'assets/images/logo.png',
+                height: responsive.scaledWidth(26),
+                width: responsive.scaledWidth(26),
+                fit: BoxFit.contain,
+              ),
+              SizedBox(width: responsive.scaledWidth(8)),
+              Text(
+                'Troco Seguro Pro',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(13),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                  letterSpacing: 0.3,
                 ),
               ),
+            ],
+          ),
+          SizedBox(height: responsive.scaledHeight(18)),
+          Text(
+            'Saldo disponível',
+            style: TextStyle(
+              fontSize: responsive.responsiveFontSize(13),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textDark.withValues(alpha: 0.7),
             ),
-            GestureDetector(
-              onTap: () => setState(() => showBalance = !showBalance),
-              child: Icon(
-                showBalance
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-                size: responsive.scaledWidth(22),
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.45)
-                    : Colors.black.withValues(alpha: 0.35),
+          ),
+          SizedBox(height: responsive.scaledHeight(6)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => showBalance = !showBalance),
+                  child: Text(
+                    showBalance ? _formatCurrency(balance) : '••••••••',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(34),
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textDark,
+                      height: 1.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+              GestureDetector(
+                onTap: () => setState(() => showBalance = !showBalance),
+                child: Icon(
+                  showBalance
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                  size: responsive.scaledWidth(22),
+                  color: AppColors.textDark.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

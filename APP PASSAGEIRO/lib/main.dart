@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro/utils/theme.dart';
-import 'package:troco_seguro/services/theme_controller.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/screens/onboarding_screen.dart';
@@ -51,7 +50,6 @@ Future<void> main() async {
   };
   await initializeDateFormatting('pt_AO', null);
   Intl.defaultLocale = 'pt_AO';
-  await ThemeController.instance.load();
   await dotenv.load();
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -68,31 +66,26 @@ class TrocoSeguroApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeController.instance.themeMode,
-      builder: (context, mode, _) {
-        return ChangeNotifierProvider(
-          create: (_) => AppProvider()..initialize(),
-          child: MaterialApp(
-            navigatorKey: rootNavigatorKey,
-            title: 'Troco Seguro',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: mode,
-            debugShowCheckedModeBanner: false,
-            builder: (context, child) {
-              final media = MediaQuery.of(context);
-              return MediaQuery(
-                data: media.copyWith(
-                  textScaler: const TextScaler.linear(1.0),
-                ),
-                child: child ?? const SizedBox.shrink(),
-              );
-            },
-            home: const AppController(),
-          ),
-        );
-      },
+    return ChangeNotifierProvider(
+      create: (_) => AppProvider()..initialize(),
+      child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
+        title: 'Troco Seguro',
+        theme: AppTheme.darkTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.dark,
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+              textScaler: const TextScaler.linear(1.0),
+            ),
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        home: const AppController(),
+      ),
     );
   }
 }
@@ -1295,19 +1288,7 @@ class _SettingsModal extends StatefulWidget {
 }
 
 class _SettingsModalState extends State<_SettingsModal> {
-  bool _darkMode = false;
   bool _notifications = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _darkMode = prefs.getString('ts_theme_mode') == 'dark');
-  }
 
   void _openFullscreen(Widget page) {
     showGeneralDialog(
@@ -1415,10 +1396,6 @@ class _SettingsModalState extends State<_SettingsModal> {
           children: [
             _subModalHeader(context, 'Configurações', isDark, () => Navigator.pop(context)),
             const SizedBox(height: 8),
-            _toggleTile(isDark, Icons.dark_mode_outlined, 'Tema escuro', 'Alternar entre modo claro e escuro', _darkMode, (v) async {
-              await ThemeController.instance.setDark(v);
-              if (mounted) setState(() => _darkMode = v);
-            }),
             _toggleTile(isDark, Icons.notifications_outlined, 'Notificações', 'Receber alertas e novidades', _notifications, (v) => setState(() => _notifications = v)),
             Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
             _actionTile(isDark, Icons.report_problem_outlined, 'Reclamações', 'Reportar um problema ou incidente', () => ComplaintModal.show(context)),

@@ -562,8 +562,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBalanceSection(ResponsiveHelper responsive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: EdgeInsets.fromLTRB(
         responsive.scaledWidth(20),
@@ -571,84 +569,112 @@ class _HomeScreenState extends State<HomeScreen> {
         responsive.scaledWidth(20),
         responsive.scaledHeight(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Saldo total',
-                style: TextStyle(
-                  fontSize: responsive.responsiveFontSize(13),
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.55)
-                      : Colors.black.withValues(alpha: 0.45),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(width: responsive.scaledWidth(8)),
-              GestureDetector(
-                onTap: () => setState(() => showBalance = !showBalance),
-                child: Icon(
-                  showBalance
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  size: responsive.scaledWidth(16),
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.55)
-                      : Colors.black.withValues(alpha: 0.45),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: responsive.scaledHeight(10)),
-          GestureDetector(
-            onTap: () => setState(() => showBalance = !showBalance),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(responsive.scaledWidth(20)),
+        decoration: BoxDecoration(
+          gradient: AppColors.walletCardGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGold.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  showBalance
-                      ? NumberFormat('#,##0', 'pt_AO').format(currentBalance)
-                      : '••••••',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(38),
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                    height: 1.0,
-                  ),
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: responsive.scaledWidth(26),
+                  width: responsive.scaledWidth(26),
+                  fit: BoxFit.contain,
                 ),
-                SizedBox(width: responsive.scaledWidth(6)),
-                Padding(
-                  padding: EdgeInsets.only(bottom: responsive.scaledHeight(5)),
-                  child: Text(
-                    'kzs',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(16),
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.6)
-                          : AppColors.textDark.withValues(alpha: 0.5),
-                    ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                Text(
+                  'Troco Seguro Pro',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(13),
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
             ),
-          ),
-          if (todayTrips > 0) ...[
-            SizedBox(height: responsive.scaledHeight(8)),
-            Text(
-              '$todayTrips corrida${todayTrips != 1 ? 's' : ''} hoje',
-              style: TextStyle(
-                fontSize: responsive.responsiveFontSize(12),
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.45)
-                    : Colors.black.withValues(alpha: 0.38),
-                fontWeight: FontWeight.w500,
+            SizedBox(height: responsive.scaledHeight(18)),
+            Row(
+              children: [
+                Text(
+                  'Saldo total',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(13),
+                    color: AppColors.textDark.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                GestureDetector(
+                  onTap: () => setState(() => showBalance = !showBalance),
+                  child: Icon(
+                    showBalance
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: responsive.scaledWidth(16),
+                    color: AppColors.textDark.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: responsive.scaledHeight(10)),
+            GestureDetector(
+              onTap: () => setState(() => showBalance = !showBalance),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    showBalance
+                        ? NumberFormat('#,##0', 'pt_AO').format(currentBalance)
+                        : '••••••',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(34),
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textDark,
+                      height: 1.0,
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(6)),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: responsive.scaledHeight(5)),
+                    child: Text(
+                      'kzs',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(16),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (todayTrips > 0) ...[
+              SizedBox(height: responsive.scaledHeight(8)),
+              Text(
+                '$todayTrips corrida${todayTrips != 1 ? 's' : ''} hoje',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(12),
+                  color: AppColors.textDark.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1446,6 +1472,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
   String _enteredPin = '';
   String? _errorMessage;
   int _seatsCount = 1;
+  PassengerQrPaymentResult? _result;
 
   static const int _pinLength = 6;
 
@@ -1500,7 +1527,10 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
     if (!mounted) return;
 
     if (result.isSuccess && result.data != null) {
-      setState(() => _step = _PassengerStep.success);
+      setState(() {
+        _step = _PassengerStep.success;
+        _result = result.data;
+      });
       widget.onSuccess(result.data!);
     } else {
       setState(() {
@@ -1564,7 +1594,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
             if (_step == _PassengerStep.processing)
               ..._buildProcessingStep(r, primaryText, subtleText),
             if (_step == _PassengerStep.success)
-              ..._buildSuccessStep(r, primaryText, subtleText),
+              ..._buildSuccessStep(r, primaryText, subtleText, accent),
             if (_step == _PassengerStep.error)
               ..._buildErrorStep(r, primaryText),
           ],
@@ -1732,6 +1762,11 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
             ),
           ],
         ),
+      ),
+      SizedBox(height: r.scaledHeight(10)),
+      Text(
+        'Se houver tarifa da plataforma, ela será apresentada no recibo após a confirmação.',
+        style: TextStyle(fontSize: r.responsiveFontSize(11), color: subtleText),
       ),
       SizedBox(height: r.scaledHeight(16)),
       Row(children: [
@@ -1927,7 +1962,9 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
   }
 
   List<Widget> _buildSuccessStep(
-      ResponsiveHelper r, Color primaryText, Color subtleText) {
+      ResponsiveHelper r, Color primaryText, Color subtleText, Color accent) {
+    final totalAmount = widget.amount * _seatsCount;
+    final fee = _result?.platformFeeApplied ?? 0;
     return [
       Container(
         width: r.scaledWidth(88),
@@ -1945,14 +1982,41 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               color: Colors.green,
               letterSpacing: 0.5)),
       SizedBox(height: r.scaledHeight(8)),
-      Text(_formatAmt(widget.amount),
+      Text(_formatAmt(totalAmount),
           style: TextStyle(
               fontSize: r.responsiveFontSize(36),
               fontWeight: FontWeight.w900,
               color: primaryText)),
       SizedBox(height: r.scaledHeight(4)),
-      Text('de ${widget.passengerName}',
-          style: TextStyle(fontSize: r.responsiveFontSize(14), color: subtleText)),
+      Text(
+        _seatsCount > 1
+            ? 'de ${widget.passengerName} · $_seatsCount assentos'
+            : 'de ${widget.passengerName}',
+        style: TextStyle(fontSize: r.responsiveFontSize(14), color: subtleText),
+      ),
+      if (fee > 0) ...[
+        SizedBox(height: r.scaledHeight(16)),
+        Container(
+          padding: EdgeInsets.symmetric(
+              horizontal: r.scaledWidth(16), vertical: r.scaledHeight(10)),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.info_outline_rounded, size: r.scaledWidth(16), color: accent),
+              SizedBox(width: r.scaledWidth(8)),
+              Text('Tarifa da plataforma aplicada: ${_formatAmt(fee)}',
+                  style: TextStyle(
+                      fontSize: r.responsiveFontSize(12),
+                      fontWeight: FontWeight.w700,
+                      color: primaryText)),
+            ],
+          ),
+        ),
+      ],
       SizedBox(height: r.scaledHeight(32)),
       SizedBox(
         width: double.infinity,

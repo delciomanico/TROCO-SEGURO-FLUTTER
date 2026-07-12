@@ -353,73 +353,103 @@ class _WalletScreenState extends State<WalletScreen> {
         responsive.scaledWidth(20),
         responsive.scaledHeight(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Saldo disponível',
-                style: TextStyle(
-                  fontSize: responsive.responsiveFontSize(13),
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.55)
-                      : Colors.black.withValues(alpha: 0.45),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(width: responsive.scaledWidth(8)),
-              GestureDetector(
-                onTap: () => setState(() => showBalance = !showBalance),
-                child: Icon(
-                  showBalance
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  size: responsive.scaledWidth(16),
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.55)
-                      : Colors.black.withValues(alpha: 0.45),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: responsive.scaledHeight(10)),
-          GestureDetector(
-            onTap: () => setState(() => showBalance = !showBalance),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(responsive.scaledWidth(20)),
+        decoration: BoxDecoration(
+          gradient: AppColors.walletCardGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGold.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  showBalance
-                      ? NumberFormat('#,##0', 'pt_AO')
-                          .format(user?.balance ?? 0)
-                      : '••••••',
-                  style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(38),
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                    height: 1.0,
-                  ),
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: responsive.scaledWidth(26),
+                  width: responsive.scaledWidth(26),
+                  fit: BoxFit.contain,
                 ),
-                SizedBox(width: responsive.scaledWidth(6)),
-                Padding(
-                  padding:
-                      EdgeInsets.only(bottom: responsive.scaledHeight(5)),
-                  child: Text(
-                    'kzs',
-                    style: TextStyle(
-                      fontSize: responsive.responsiveFontSize(16),
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.6)
-                          : AppColors.textDark.withValues(alpha: 0.5),
-                    ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                Text(
+                  'Troco Seguro',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(13),
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            SizedBox(height: responsive.scaledHeight(18)),
+            Row(
+              children: [
+                Text(
+                  'Saldo disponível',
+                  style: TextStyle(
+                    fontSize: responsive.responsiveFontSize(13),
+                    color: AppColors.textDark.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: responsive.scaledWidth(8)),
+                GestureDetector(
+                  onTap: () => setState(() => showBalance = !showBalance),
+                  child: Icon(
+                    showBalance
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: responsive.scaledWidth(16),
+                    color: AppColors.textDark.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: responsive.scaledHeight(10)),
+            GestureDetector(
+              onTap: () => setState(() => showBalance = !showBalance),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    showBalance
+                        ? NumberFormat('#,##0', 'pt_AO')
+                            .format(user?.balance ?? 0)
+                        : '••••••',
+                    style: TextStyle(
+                      fontSize: responsive.responsiveFontSize(34),
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textDark,
+                      height: 1.0,
+                    ),
+                  ),
+                  SizedBox(width: responsive.scaledWidth(6)),
+                  Padding(
+                    padding:
+                        EdgeInsets.only(bottom: responsive.scaledHeight(5)),
+                    child: Text(
+                      'kzs',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(16),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
