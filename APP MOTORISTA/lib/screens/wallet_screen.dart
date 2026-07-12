@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
+import 'package:troco_seguro_pro/widgets/wallet_transfer_modals.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenWithdrawal;
@@ -344,7 +345,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildQuickActions(ResponsiveHelper responsive, bool isDark) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _buildCircularAction(
           responsive,
@@ -352,6 +353,27 @@ class _WalletScreenState extends State<WalletScreen> {
           icon: Icons.currency_exchange_rounded,
           label: 'Sacar',
           onTap: widget.onOpenWithdrawal ?? () {},
+        ),
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.storefront_rounded,
+          label: 'Pagar Lotador',
+          onTap: () => PayLoaderModal.show(context),
+        ),
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.send_rounded,
+          label: 'Transferir',
+          onTap: () => WalletTransferModal.show(context),
+        ),
+        _buildCircularAction(
+          responsive,
+          isDark: isDark,
+          icon: Icons.qr_code_scanner_rounded,
+          label: 'Saldo Cartão',
+          onTap: () => CardBalanceModal.show(context),
         ),
       ],
     );
