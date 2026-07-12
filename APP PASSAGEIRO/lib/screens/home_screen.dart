@@ -486,11 +486,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   color: Colors.red,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.crisis_alert_rounded, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                      Icon(Icons.crisis_alert_rounded, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
                         child: Text(
                           'EMERGÊNCIA ACTIVA — A enviar localização  •  Toque para encerrar',
                           style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
@@ -628,8 +628,12 @@ class _HomeScreenState extends State<HomeScreen> {
         width: double.infinity,
         padding: EdgeInsets.all(responsive.scaledWidth(20)),
         decoration: BoxDecoration(
-          gradient: AppColors.walletCardGradient,
+          image: const DecorationImage(
+            image: AssetImage('assets/images/card_fundo.jpg'),
+            fit: BoxFit.cover,
+          ),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
               color: AppColors.primaryGold.withValues(alpha: 0.35),
@@ -655,7 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(13),
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
+                    color: Colors.white,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -668,7 +672,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Saldo total',
                   style: TextStyle(
                     fontSize: responsive.responsiveFontSize(13),
-                    color: AppColors.textDark.withValues(alpha: 0.7),
+                    color: Colors.white.withValues(alpha: 0.75),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -680,7 +684,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
                     size: responsive.scaledWidth(16),
-                    color: AppColors.textDark.withValues(alpha: 0.6),
+                    color: Colors.white.withValues(alpha: 0.65),
                   ),
                 ),
               ],
@@ -698,7 +702,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
                       fontWeight: FontWeight.w900,
-                      color: AppColors.textDark,
+                      color: Colors.white,
                       height: 1.0,
                     ),
                   ),
@@ -710,7 +714,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: responsive.responsiveFontSize(16),
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textDark.withValues(alpha: 0.55),
+                        color: Colors.white.withValues(alpha: 0.6),
                       ),
                     ),
                   ),

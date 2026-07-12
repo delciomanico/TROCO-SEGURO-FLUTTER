@@ -294,8 +294,12 @@ class _WalletScreenState extends State<WalletScreen> {
       width: double.infinity,
       padding: EdgeInsets.all(responsive.scaledWidth(20)),
       decoration: BoxDecoration(
-        gradient: AppColors.walletCardGradient,
+        image: const DecorationImage(
+          image: AssetImage('assets/images/card_fundo.jpg'),
+          fit: BoxFit.cover,
+        ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primaryGold, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryGold.withValues(alpha: 0.35),
@@ -321,7 +325,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(13),
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: Colors.white,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -333,7 +337,7 @@ class _WalletScreenState extends State<WalletScreen> {
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(13),
               fontWeight: FontWeight.w500,
-              color: AppColors.textDark.withValues(alpha: 0.7),
+              color: Colors.white.withValues(alpha: 0.75),
             ),
           ),
           SizedBox(height: responsive.scaledHeight(6)),
@@ -349,7 +353,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
                       fontWeight: FontWeight.w900,
-                      color: AppColors.textDark,
+                      color: Colors.white,
                       height: 1.1,
                     ),
                     maxLines: 1,
@@ -364,7 +368,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ? Icons.visibility_rounded
                       : Icons.visibility_off_rounded,
                   size: responsive.scaledWidth(22),
-                  color: AppColors.textDark.withValues(alpha: 0.55),
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
             ],
