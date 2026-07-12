@@ -302,9 +302,9 @@ class _WalletScreenState extends State<WalletScreen> {
         border: Border.all(color: AppColors.primaryGold, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
