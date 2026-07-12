@@ -466,8 +466,6 @@ class _WalletScreenState extends State<WalletScreen> {
           onTap: _showTransferModal),
       (icon: Icons.account_balance_rounded, label: 'Levantar',
           onTap: _showWithdrawalModal),
-      (icon: Icons.credit_card_rounded, label: 'P/ Cartão',
-          onTap: _showDepositToCardModal),
       (icon: Icons.grid_view_rounded, label: 'Mais',
           onTap: () => _showMoreWalletActionsModal(isDark, responsive)),
     ];
@@ -494,6 +492,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
   void _showMoreWalletActionsModal(bool isDark, ResponsiveHelper responsive) {
     final moreActions = [
+      (icon: Icons.credit_card_rounded, label: 'P/ Cartão',
+          onTap: _showDepositToCardModal),
       (icon: Icons.swap_horiz_rounded, label: 'Cartão Ext.',
           onTap: _showExternalCardModal),
       (icon: Icons.qr_code_scanner_rounded, label: 'Saldo QR',
