@@ -479,13 +479,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Center(
               child: Text(
-                'Troco Seguro',
+                widget.driver.fullName,
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(17),
                   fontWeight: FontWeight.w800,
                   color: isDark ? Colors.white : AppColors.textDark,
                   letterSpacing: 0.4,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -571,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.all(responsive.scaledWidth(20)),
+        padding: EdgeInsets.all(responsive.scaledWidth(24)),
         decoration: BoxDecoration(
           image: const DecorationImage(
             image: AssetImage('assets/images/card_fundo.jpg'),
@@ -594,15 +596,15 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Image.asset(
                   'assets/images/logo.png',
-                  height: responsive.scaledWidth(26),
-                  width: responsive.scaledWidth(26),
+                  height: responsive.scaledWidth(36),
+                  width: responsive.scaledWidth(36),
                   fit: BoxFit.contain,
                 ),
-                SizedBox(width: responsive.scaledWidth(8)),
+                SizedBox(width: responsive.scaledWidth(10)),
                 Text(
                   'Troco Seguro Pro',
                   style: TextStyle(
-                    fontSize: responsive.responsiveFontSize(13),
+                    fontSize: responsive.responsiveFontSize(17),
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: 0.3,
@@ -1024,7 +1026,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String? badge,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const iconColor = AppColors.silver;
+    final iconColor = Colors.black.withValues(alpha: 0.8);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1038,19 +1040,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: responsive.scaledWidth(58),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.darkCard,
-                  border: Border.all(
-                    color: AppColors.silver.withValues(alpha: 0.35),
-                    width: 1.2,
+                  gradient: LinearGradient(
+                    colors: [AppColors.primaryGold, AppColors.secondaryGold],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 8,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                     BoxShadow(
-                      color: AppColors.silver.withValues(alpha: 0.12),
+                      color: AppColors.primaryGold.withValues(alpha: 0.3),
                       blurRadius: 3,
                       offset: const Offset(-1, -1),
                     ),
