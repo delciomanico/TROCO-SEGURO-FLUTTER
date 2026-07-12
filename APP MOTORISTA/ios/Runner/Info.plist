@@ -45,6 +45,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Utilizamos a biometria para proteger o acesso à sua carteira e ganhos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Precisamos da câmara para ler códigos QR de pagamento e do BI, e para fotografar documentos.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 </dict>

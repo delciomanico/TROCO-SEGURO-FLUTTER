@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_pro/utils/theme.dart';
@@ -1455,6 +1457,37 @@ class _ProfileModal extends StatelessWidget {
     this.onIdentityVerified,
   });
 
+  /// Upload opcional da carta de condução como alternativa/complemento ao BI
+  /// com QR — útil para residentes estrangeiros cujo cartão de residente não
+  /// tem QR code legível.
+  Future<void> _uploadLicense(BuildContext context) async {
+    final picker = ImagePicker();
+    final photo = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (photo == null || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final result =
+        await ApiService().uploadDocuments(license: File(photo.path));
+
+    if (result.isSuccess) {
+      navigator.pop(); // fecha a sheet de Documentos
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Carta de condução enviada com sucesso!'),
+        backgroundColor: Colors.green,
+      ));
+    } else {
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            result.error ?? 'Não foi possível enviar a carta de condução.'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
   /// [context] é o contexto da sheet de Documentos (permanece montado — só é
   /// fechado explicitamente após sucesso — não deve ser fechado antes de
   /// abrir o scanner, para continuar válido nesta função assíncrona).
@@ -1534,7 +1567,7 @@ class _ProfileModal extends StatelessWidget {
             Text(
               isVerified
                   ? 'A sua identidade já foi verificada.'
-                  : 'Escaneie o QR code no verso do seu Bilhete de Identidade para verificar a sua conta automaticamente.',
+                  : 'Escaneie o QR code no verso do seu Bilhete de Identidade para verificar a sua conta automaticamente. Se for residente estrangeiro e o seu cartão não tiver QR, pode enviar a carta de condução em alternativa.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
@@ -1548,7 +1581,7 @@ class _ProfileModal extends StatelessWidget {
               isDark,
               Icons.credit_card_outlined,
               'Licença de Condução',
-              onTap: null,
+              onTap: () => _uploadLicense(ctx),
             ),
             const SizedBox(height: 12),
             _docUploadRow(

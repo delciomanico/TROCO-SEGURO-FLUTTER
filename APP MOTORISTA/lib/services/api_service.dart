@@ -1003,13 +1003,14 @@ class ApiService {
   // ============ DOCUMENTOS ============
 
   Future<ApiResponse<void>> uploadDocuments({
-    required File license,
-    required File bi,
+    File? license,
+    File? bi,
   }) async {
     try {
       final formData = FormData.fromMap({
-        'license': await MultipartFile.fromFile(license.path),
-        'bi': await MultipartFile.fromFile(bi.path),
+        if (license != null)
+          'license': await MultipartFile.fromFile(license.path),
+        if (bi != null) 'bi': await MultipartFile.fromFile(bi.path),
       });
       await _dio.post('users/upload-docs', data: formData);
       return ApiResponse.success(null);
