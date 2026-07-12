@@ -580,8 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fit: BoxFit.cover,
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: AppColors.primaryGold.withValues(alpha: 0.35), width: 1),
+          border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.45),
