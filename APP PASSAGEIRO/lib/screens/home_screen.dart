@@ -15,6 +15,7 @@ import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart' show AppNotification;
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1093,6 +1094,8 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => QRScannerModal(
+        title: 'IDENTIFICAR MOTORISTA',
+        subtitle: 'Aponte a câmera para o QR do motorista',
         onCancel: () {},
         onQRScanned: (data) => Navigator.pop(context, data),
       ),
@@ -1124,15 +1127,45 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
                 'Valor: ${validation.amount != null ? '${validation.amount} Kz' : 'N/A'}'),
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Fechar'),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (validation.driverId != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showTransferToDriverSheet(
+                        driverId: validation.driverId!,
+                        driverName: validation.driverName ?? 'Motorista',
+                      );
+                    },
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    label: const Text('Transferir para este motorista'),
+                  ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Fechar'),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _showTransferToDriverSheet({
+    required String driverId,
+    required String driverName,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DriverTransferSheet(
+        driverId: driverId,
+        driverName: driverName,
       ),
     );
   }
@@ -1486,6 +1519,160 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Colors.black.withValues(alpha: 0.06),
           ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Transferência directa para um motorista identificado por QR
+// ---------------------------------------------------------------------------
+
+class _DriverTransferSheet extends StatefulWidget {
+  final String driverId;
+  final String driverName;
+
+  const _DriverTransferSheet({required this.driverId, required this.driverName});
+
+  @override
+  State<_DriverTransferSheet> createState() => _DriverTransferSheetState();
+}
+
+class _DriverTransferSheetState extends State<_DriverTransferSheet> {
+  final _amountCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Informe um montante válido.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final provider = context.read<AppProvider>();
+    final ok = await provider.transfer(
+      receiverId: widget.driverId,
+      amount: amount,
+      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+      FeedbackService.showSuccess(context,
+          message: 'Transferência para ${widget.driverName} realizada com sucesso!');
+      return;
+    }
+    setState(() {
+      _loading = false;
+      _error = provider.error ?? 'Erro ao realizar transferência.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = isDark ? Colors.white : AppColors.textDark;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Transferir para ${widget.driverName}',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onSurface)),
+            const SizedBox(height: 4),
+            Text('O valor sai da sua carteira Troco Seguro',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : Colors.black.withValues(alpha: 0.45))),
+            const SizedBox(height: 20),
+            if (_error != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Valor',
+                suffixText: 'Kz',
+                prefixIcon: const Icon(Icons.payments_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              decoration: InputDecoration(
+                labelText: 'Descrição (opcional)',
+                prefixIcon: const Icon(Icons.notes_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentOf(context),
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    : const Text('Confirmar Transferência',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -92,6 +92,8 @@ class _WalletScreenState extends State<WalletScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QRScannerModal(
+        title: 'ESCANEAR QR DO CARTÃO',
+        subtitle: 'Aponte a câmera para o QR do cartão',
         onCancel: () {},
         onQRScanned: (data) => Navigator.pop(context, data),
       ),
@@ -965,6 +967,8 @@ class _ExternalCardSheetState extends State<_ExternalCardSheet> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QRScannerModal(
+        title: 'ESCANEAR QR DO CARTÃO',
+        subtitle: 'Aponte a câmera para o QR do cartão',
         onCancel: () {},
         onQRScanned: (data) => Navigator.pop(context, data),
       ),
@@ -1144,6 +1148,8 @@ class _TransferSheetState extends State<_TransferSheet> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QRScannerModal(
+        title: 'ESCANEAR QR',
+        subtitle: 'Aponte a câmera para o QR do destinatário',
         onCancel: () {},
         onQRScanned: (data) => Navigator.pop(context, data),
       ),
@@ -1624,6 +1630,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
   final _amountCtrl = TextEditingController();
   final _ibanCtrl = TextEditingController();
   bool _busy = false;
+  String _method = 'bank';
 
   @override
   void dispose() {
@@ -1636,16 +1643,21 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
 
   Future<void> _submit() async {
     final amount = int.tryParse(_amountCtrl.text.trim()) ?? 0;
-    final iban = _ibanCtrl.text.trim();
+    final account = _ibanCtrl.text.trim();
 
     if (amount <= 0) {
       FeedbackService.showError(context, message: 'Valor deve ser maior que 0');
       return;
     }
-    if (!_validIban(iban)) {
+    if (_method == 'bank' && !_validIban(account)) {
       FeedbackService.showError(context, message: 'IBAN inválido (deve começar por AO06)');
       return;
     }
+    if (_method == 'mcx_express' && account.isEmpty) {
+      FeedbackService.showError(context, message: 'Informe o número de telefone');
+      return;
+    }
+    final iban = account;
 
     setState(() => _busy = true);
     final provider = context.read<AppProvider>();
@@ -1696,11 +1708,37 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Levantar para IBAN',
+            Text('Solicitar Levantamento',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onSurface)),
             const SizedBox(height: 4),
-            Text('Transferência bancária em 1-3 dias úteis',
+            Text('Escolha o método de levantamento',
                 style: TextStyle(fontSize: 12, color: subtle)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _WithdrawalMethodOption(
+                    label: 'Banco',
+                    sublabel: 'Transferência bancária',
+                    icon: Icons.account_balance_rounded,
+                    isSelected: _method == 'bank',
+                    isDark: isDark,
+                    onTap: () => setState(() => _method = 'bank'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _WithdrawalMethodOption(
+                    label: 'MCX Express',
+                    sublabel: 'Receba em minutos',
+                    icon: Icons.flash_on_rounded,
+                    isSelected: _method == 'mcx_express',
+                    isDark: isDark,
+                    onTap: () => setState(() => _method = 'mcx_express'),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _amountCtrl,
@@ -1708,7 +1746,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
               decoration: InputDecoration(
                 labelText: 'Valor a levantar',
                 suffixText: 'Kz',
-                prefixIcon: const Icon(Icons.account_balance_rounded),
+                prefixIcon: const Icon(Icons.payments_outlined),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1725,9 +1763,13 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _ibanCtrl,
+              keyboardType: _method == 'bank' ? TextInputType.text : TextInputType.phone,
               decoration: InputDecoration(
-                labelText: 'IBAN (AO06...)',
-                prefixIcon: const Icon(Icons.credit_score_rounded),
+                labelText: _method == 'bank' ? 'IBAN (AO06...)' : 'Número de telefone',
+                hintText: _method == 'bank' ? null : '9XX XXX XXX',
+                prefixIcon: Icon(_method == 'bank'
+                    ? Icons.credit_score_rounded
+                    : Icons.phone_android_rounded),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1755,7 +1797,9 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'O valor será transferido para a sua conta bancária em 1-3 dias úteis',
+                      _method == 'bank'
+                          ? 'O valor será transferido para a sua conta bancária em 1-3 dias úteis'
+                          : 'O valor será transferido via Multicaixa Express em poucos minutos',
                       style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
                     ),
                   ),
@@ -1782,6 +1826,68 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     : const Text('Solicitar Levantamento',
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WithdrawalMethodOption extends StatelessWidget {
+  final String label;
+  final String sublabel;
+  final IconData icon;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _WithdrawalMethodOption({
+    required this.label,
+    required this.sublabel,
+    required this.icon,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.accentOf(context);
+    final unselectedBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03);
+    final unselectedBorder = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.15);
+    final textColor = isDark ? Colors.white : AppColors.textDark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? accent.withValues(alpha: 0.12) : unselectedBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? accent : unselectedBorder,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? accent : textColor.withValues(alpha: 0.6), size: 22),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? accent : textColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              style: TextStyle(fontSize: 10, color: textColor.withValues(alpha: 0.5)),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
