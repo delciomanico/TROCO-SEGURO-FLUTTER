@@ -1,5 +1,6 @@
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 
 /// Modelo para rastrear o estado do pagamento
@@ -126,7 +127,8 @@ class PaymentService {
         if (context.mounted) {
           FeedbackService.showError(
             context,
-            message: response.error ?? 'Erro ao validar QR Code',
+            message: PaymentErrorMessages.friendly(response.error,
+                fallback: 'Erro ao validar QR Code'),
           );
         }
         return null;
@@ -192,7 +194,8 @@ class PaymentService {
         if (context.mounted) {
           FeedbackService.showError(
             context,
-            message: response.error ?? 'Erro ao processar pagamento',
+            message: PaymentErrorMessages.friendly(response.error,
+                fallback: 'Erro ao processar pagamento'),
             duration: const Duration(seconds: 4),
           );
         }

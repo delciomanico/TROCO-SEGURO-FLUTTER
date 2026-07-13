@@ -5,7 +5,7 @@ import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:intl/intl.dart';
+import 'package:troco_seguro_pro/utils/formatters.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
 import 'package:troco_seguro_pro/widgets/wallet_transfer_modals.dart';
@@ -105,10 +105,7 @@ class _WalletScreenState extends State<WalletScreen> {
     }).toList();
   }
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)} Kz';
-  }
+  String _formatCurrency(int amount) => '${AppFormatters.currency(amount)} Kz';
 
   @override
   Widget build(BuildContext context) {

@@ -1450,6 +1450,23 @@ class ChildQrData {
   }
 }
 
+class SeatStatus {
+  final String label;
+  final bool paid;
+
+  SeatStatus({required this.label, required this.paid});
+
+  factory SeatStatus.fromJson(Map<String, dynamic> json) {
+    return SeatStatus(
+      label: json['label']?.toString() ??
+          json['seatLabel']?.toString() ??
+          json['seatNumber']?.toString() ??
+          '',
+      paid: json['paid'] == true || json['isPaid'] == true,
+    );
+  }
+}
+
 class SessionSeatsResult {
   final bool active;
   final String? parentQrId;
@@ -1460,6 +1477,11 @@ class SessionSeatsResult {
   final int availableSeats;
   final int revenue;
   final int childQrCount;
+  // Detalhe por assento — o backend ainda não o envia hoje (ver
+  // BACKEND_PENDING_CHANGES.md, item 7), fica nulo até lá. O painel de
+  // Lotação usa isto para mostrar uma grelha real assim que existir, sem
+  // mudar o comportamento actual (agregados) enquanto for nulo.
+  final List<SeatStatus>? seats;
 
   SessionSeatsResult({
     required this.active,
@@ -1471,9 +1493,11 @@ class SessionSeatsResult {
     this.availableSeats = 0,
     this.revenue = 0,
     this.childQrCount = 0,
+    this.seats,
   });
 
   factory SessionSeatsResult.fromJson(Map<String, dynamic> json) {
+    final rawSeats = json['seats'] ?? json['seatList'];
     return SessionSeatsResult(
       active: json['active'] == true,
       parentQrId: json['parentQrId']?.toString(),
@@ -1490,6 +1514,12 @@ class SessionSeatsResult {
       revenue: int.tryParse(json['revenue']?.toString() ?? '0') ?? 0,
       childQrCount:
           int.tryParse(json['childQrCount']?.toString() ?? '0') ?? 0,
+      seats: rawSeats is List
+          ? rawSeats
+              .whereType<Map<String, dynamic>>()
+              .map(SeatStatus.fromJson)
+              .toList()
+          : null,
     );
   }
 }

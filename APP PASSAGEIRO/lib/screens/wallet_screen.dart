@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/utils/formatters.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
@@ -428,8 +429,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   Text(
                     showBalance
-                        ? NumberFormat('#,##0', 'pt_AO')
-                            .format(user?.balance ?? 0)
+                        ? AppFormatters.currency(user?.balance ?? 0)
                         : '••••••',
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
@@ -1222,7 +1222,7 @@ class _TransferSheetState extends State<_TransferSheet> {
       _loading = true;
     });
     final provider = context.read<AppProvider>();
-    final ok = await provider.transfer(
+    final result = await provider.transfer(
       amount: amount,
       receiverPhone: _phoneCtrl.text.trim(),
       description: _descCtrl.text.trim().isEmpty
@@ -1230,10 +1230,15 @@ class _TransferSheetState extends State<_TransferSheet> {
           : _descCtrl.text.trim(),
     );
     if (!mounted) return;
-    if (ok) {
+    if (result != null) {
       Navigator.of(context).pop();
-      FeedbackService.showSuccess(context,
-          message: 'Transferência realizada com sucesso!');
+      final fee = result.feeAmount;
+      FeedbackService.showSuccess(
+        context,
+        message: (fee != null && fee > 0)
+            ? 'Transferência realizada com sucesso! Tarifa aplicada: $fee Kz.'
+            : 'Transferência realizada com sucesso!',
+      );
       return;
     }
     final errMsg = provider.error;

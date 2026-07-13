@@ -13,7 +13,8 @@ import 'package:troco_seguro_pro/widgets/qr_config_modal.dart';
 import 'package:troco_seguro_pro/widgets/passenger_rating_modal.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/screens/vehicles_screen.dart';
-import 'package:intl/intl.dart';
+import 'package:troco_seguro_pro/utils/formatters.dart';
+import 'package:troco_seguro_pro/utils/error_messages.dart';
 
 class HomeScreen extends StatefulWidget {
   final DriverUser driver;
@@ -59,6 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _totalSeats = 0;
   int _sessionRevenue = 0;
   String? _sessionPublicToken;
+  // Nulo enquanto o backend não devolver detalhe por assento (ver
+  // BACKEND_PENDING_CHANGES.md, item 7) — o painel usa a vista agregada.
+  List<SeatStatus>? _seatStatuses;
   StreamSubscription<SessionSeatsResult>? _sseSubscription;
 
   @override
@@ -90,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _totalSeats = seats.totalSeats;
           _sessionRevenue = seats.revenue;
           _sessionPublicToken = seats.publicToken;
+          _seatStatuses = seats.seats;
         });
       },
       onError: (e) => debugPrint('SSE error: $e'),
@@ -147,6 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _totalSeats = seats.totalSeats;
         _sessionRevenue = seats.revenue;
         _sessionPublicToken = seats.publicToken;
+        _seatStatuses = seats.seats;
       });
       // Sincronizar publicToken no QrConfig local se diferente
       if (seats.publicToken != null &&
@@ -199,10 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)} Kz';
-  }
+  String _formatCurrency(int amount) => '${AppFormatters.currency(amount)} Kz';
 
   Future<void> _showQRCode() async {
     final qrImage = _qrConfig?.parentQrImage;
@@ -279,6 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _paidSeats = 0;
                 _totalSeats = setup.childQrs.length;
                 _sessionRevenue = 0;
+                _seatStatuses = null;
               });
             }
           }
@@ -648,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     showBalance
-                        ? NumberFormat('#,##0', 'pt_AO').format(currentBalance)
+                        ? AppFormatters.currency(currentBalance)
                         : '••••••',
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
@@ -987,6 +991,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _paidSeats = 0;
           _totalSeats = setup.childQrs.length;
           _sessionRevenue = 0;
+          _seatStatuses = null;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1248,6 +1253,46 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+            if (_seatStatuses != null && _seatStatuses!.isNotEmpty) ...[
+              SizedBox(height: responsive.scaledHeight(12)),
+              Wrap(
+                spacing: responsive.scaledWidth(6),
+                runSpacing: responsive.scaledHeight(6),
+                children: _seatStatuses!
+                    .map((seat) => Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: responsive.scaledWidth(8),
+                            vertical: responsive.scaledHeight(4),
+                          ),
+                          decoration: BoxDecoration(
+                            color: seat.paid
+                                ? accent.withValues(alpha: 0.15)
+                                : (isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.05)),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: seat.paid
+                                  ? accent
+                                  : (isDark
+                                      ? Colors.white.withValues(alpha: 0.15)
+                                      : Colors.black.withValues(alpha: 0.12)),
+                            ),
+                          ),
+                          child: Text(
+                            seat.label,
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(10),
+                              fontWeight: FontWeight.w700,
+                              color: seat.paid
+                                  ? accent
+                                  : (isDark ? Colors.white70 : Colors.black54),
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
           ],
         ),
       ),
@@ -1288,6 +1333,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _totalSeats = 0;
         _sessionRevenue = 0;
         _sessionPublicToken = null;
+        _seatStatuses = null;
       });
       // Limpar QrConfig local
       if (_qrConfig != null) {
@@ -1632,7 +1678,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
     } else {
       setState(() {
         _step = _PassengerStep.error;
-        _errorMessage = result.error ?? 'Pagamento recusado pela API.';
+        _errorMessage = PaymentErrorMessages.friendly(result.error);
       });
     }
   }

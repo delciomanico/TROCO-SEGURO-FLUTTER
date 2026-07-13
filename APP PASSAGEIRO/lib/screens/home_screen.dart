@@ -16,6 +16,7 @@ import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart' show AppNotification;
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/utils/formatters.dart';
 import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -700,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     showBalance
-                        ? NumberFormat('#,##0', 'pt_AO').format(user?.balance ?? 0)
+                        ? AppFormatters.currency(user?.balance ?? 0)
                         : '••••••',
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
@@ -1561,16 +1562,20 @@ class _DriverTransferSheetState extends State<_DriverTransferSheet> {
       _loading = true;
     });
     final provider = context.read<AppProvider>();
-    final ok = await provider.transfer(
+    final result = await provider.transfer(
       receiverId: widget.driverId,
       amount: amount,
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
     );
     if (!mounted) return;
-    if (ok) {
+    if (result != null) {
       Navigator.of(context).pop();
-      FeedbackService.showSuccess(context,
-          message: 'Transferência para ${widget.driverName} realizada com sucesso!');
+      final fee = result.feeAmount;
+      final base = 'Transferência para ${widget.driverName} realizada com sucesso!';
+      FeedbackService.showSuccess(
+        context,
+        message: (fee != null && fee > 0) ? '$base Tarifa aplicada: $fee Kz.' : base,
+      );
       return;
     }
     setState(() {

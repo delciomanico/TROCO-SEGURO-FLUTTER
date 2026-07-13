@@ -622,7 +622,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Transferir para outro usuário (P2P)
-  Future<bool> transfer({
+  /// Devolve o [TransactionResult] em caso de sucesso (inclui `feeAmount`,
+  /// hoje sempre nulo até o backend o expor — ver
+  /// BACKEND_PENDING_CHANGES.md, item 3) ou `null` em caso de erro.
+  Future<TransactionResult?> transfer({
     String? receiverPhone,
     String? receiverId,
     required int amount,
@@ -661,17 +664,17 @@ class AppProvider extends ChangeNotifier {
         // Recarregar transações da API em background
         invalidate(AppDomain.transactions);
 
-        return true;
+        return result.data;
       } else {
         _error = result.error ?? 'Erro ao realizar transferência';
         notifyListeners();
-        return false;
+        return null;
       }
     } catch (e) {
       debugPrint('Erro ao transferir: $e');
       _error = 'Erro ao realizar transferência';
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

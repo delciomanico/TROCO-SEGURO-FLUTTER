@@ -1145,12 +1145,17 @@ class TransactionResult {
   final int? amount;
   final int? newBalance;
   final String? message;
+  // Ainda não devolvido pelo backend para transferências/pagamentos do
+  // passageiro (ver BACKEND_PENDING_CHANGES.md, item 3) — fica nulo até lá,
+  // sem alterar o comportamento actual.
+  final int? feeAmount;
 
   TransactionResult({
     this.transactionId,
     this.amount,
     this.newBalance,
     this.message,
+    this.feeAmount,
   });
 
   factory TransactionResult.fromJson(Map<String, dynamic> json) {
@@ -1159,6 +1164,7 @@ class TransactionResult {
       amount: json['amount'],
       newBalance: json['newBalance'] ?? json['balance'],
       message: json['message'],
+      feeAmount: json['feeAmount'] ?? json['fee'] ?? json['tax'] ?? json['platformFeeApplied'],
     );
   }
 }
@@ -1209,6 +1215,9 @@ class PaymentResult {
   final String status;
   final String message;
   final String? tripId;
+  // Ainda não devolvido pelo backend (ver BACKEND_PENDING_CHANGES.md, item
+  // 3) — fica nulo até lá, sem alterar o comportamento actual.
+  final int? feeAmount;
 
   PaymentResult({
     required this.transactionId,
@@ -1217,6 +1226,7 @@ class PaymentResult {
     required this.status,
     required this.message,
     this.tripId,
+    this.feeAmount,
   });
 
   factory PaymentResult.fromJson(Map<String, dynamic> json) {
@@ -1227,6 +1237,7 @@ class PaymentResult {
       status: json['status'] ?? 'completed',
       message: json['message'] ?? 'Pagamento realizado com sucesso',
       tripId: json['tripId'],
+      feeAmount: json['feeAmount'] ?? json['fee'] ?? json['tax'] ?? json['platformFeeApplied'],
     );
   }
 }
