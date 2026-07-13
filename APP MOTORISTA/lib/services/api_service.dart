@@ -534,6 +534,72 @@ class ApiService {
     }
   }
 
+  // ============ CARTEIRA — TRANSFERÊNCIAS ============
+
+  /// Transferir da carteira para outro utilizador por número de telefone
+  /// (ex: devolução de dinheiro a um passageiro).
+  Future<ApiResponse<TransactionResult>> transfer({
+    required int amount,
+    required String receiverPhone,
+    String? description,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'amount': amount,
+        'receiverPhone': receiverPhone,
+      };
+      if (description != null) data['description'] = description;
+
+      final response = await _dio.post('transactions/transfer', data: data);
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Transferir para o cartão virtual de terceiros por número
+  /// (ex: pagar ao lotador).
+  Future<ApiResponse<TransactionResult>> transferToExternalCard({
+    required String cardNumber,
+    required int amount,
+    required String pin,
+  }) async {
+    try {
+      final response = await _dio.post('wallet/transfer-to-card', data: {
+        'cardNumber': cardNumber,
+        'amount': amount,
+        'pin': pin,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Resolver o QR de um cartão virtual (número/dono) a partir do conteúdo lido.
+  Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(
+      String qrData) async {
+    try {
+      final response =
+          await _dio.post('virtual-cards/resolve-qr', data: {'qrData': qrData});
+      return ApiResponse.success(VirtualCardQrResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Consultar o saldo de um cartão virtual de terceiros a partir do QR (só-leitura).
+  Future<ApiResponse<CardBalanceResult>> getWalletBalanceByQr(
+      String qrId) async {
+    try {
+      final response =
+          await _dio.get('wallet/balance-by-qr/${Uri.encodeComponent(qrId)}');
+      return ApiResponse.success(CardBalanceResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   // ============ QR CODE ============
 
   /// Iniciar sessão de viagem e gerar QR Codes (pai + filhos por assento)
@@ -937,13 +1003,14 @@ class ApiService {
   // ============ DOCUMENTOS ============
 
   Future<ApiResponse<void>> uploadDocuments({
-    required File license,
-    required File bi,
+    File? license,
+    File? bi,
   }) async {
     try {
       final formData = FormData.fromMap({
-        'license': await MultipartFile.fromFile(license.path),
-        'bi': await MultipartFile.fromFile(bi.path),
+        if (license != null)
+          'license': await MultipartFile.fromFile(license.path),
+        if (bi != null) 'bi': await MultipartFile.fromFile(bi.path),
       });
       await _dio.post('users/upload-docs', data: formData);
       return ApiResponse.success(null);
@@ -1265,6 +1332,63 @@ class ApiService {
         return 'Erro de comunicação com o servidor. (${e.type})';
     }
   }
+}
+
+// ============ CARTEIRA — TRANSFERÊNCIAS/CARTÃO DE TERCEIROS ============
+
+class TransactionResult {
+  final String? transactionId;
+  final int? amount;
+  final int? newBalance;
+  final String? message;
+
+  TransactionResult({
+    this.transactionId,
+    this.amount,
+    this.newBalance,
+    this.message,
+  });
+
+  factory TransactionResult.fromJson(Map<String, dynamic> json) {
+    return TransactionResult(
+      transactionId: json['transactionId'] ?? json['id'],
+      amount: json['amount'],
+      newBalance: json['newBalance'] ?? json['balance'],
+      message: json['message'],
+    );
+  }
+}
+
+class VirtualCardQrResult {
+  final String? cardNumber;
+  final String? ownerName;
+  final String? cardId;
+
+  VirtualCardQrResult({this.cardNumber, this.ownerName, this.cardId});
+
+  factory VirtualCardQrResult.fromJson(Map<String, dynamic> json) {
+    final card = json['card'] as Map<String, dynamic>?;
+    return VirtualCardQrResult(
+      cardNumber: card?['cardNumber'] ?? json['cardNumber'] ?? json['number'],
+      ownerName: card?['ownerName'] ?? json['ownerName'] ?? json['name'],
+      cardId: card?['id'] ?? json['id'] ?? json['cardId'],
+    );
+  }
+}
+
+class CardBalanceResult {
+  final int balance;
+  final String? ownerName;
+  final String? cardName;
+
+  CardBalanceResult({required this.balance, this.ownerName, this.cardName});
+
+  factory CardBalanceResult.fromJson(Map<String, dynamic> json) =>
+      CardBalanceResult(
+        balance: json['balance'] ?? json['saldo'] ?? 0,
+        ownerName: json['ownerName'] ?? json['name'],
+        cardName: json['cardName'] ?? json['card']?['name'],
+      );
 }
 
 // ============ NOVOS MODELOS — QR SETUP + SESSÃO ============
