@@ -186,13 +186,55 @@ texto).
 
 ---
 
-## 9. Nota (não bloqueante) — `receiverId` vs `receiverPhone` em transferências
+## 9. `POST transactions/transfer` rejeita `receiverId` (confirmado — bloqueia a funcionalidade "Transferir para este motorista")
 
-`API_ENDPOINTS.md` documenta `POST transactions/transfer` com
-`receiverId` no corpo do pedido; a implementação actual do app usa
-maioritariamente `receiverPhone` (fluxo de transferência por número de
-telefone) e, mais recentemente, também `receiverId` (nova funcionalidade
-"Transferir para este motorista", que usa o `driverId` já devolvido pela
-resolução do QR, sem precisar de telefone). Pedimos confirmação de que o
-backend aceita ambos os campos de forma estável e continuada, para não
-haver divergência futura entre a documentação e o comportamento real.
+**Endpoint:** `POST transactions/transfer`
+
+**Confirmado em 2026-07-13** contra o staging real
+(`trocoseguro.wemof.tech`), com um teste funcional autenticado
+(`APP PASSAGEIRO/test/functional/auth_and_wallet_test.dart`, teste 6): o
+backend devolve 400 com a mensagem `"property receiverId should not
+exist. receiverPhone should not be empty. receiverPhone must be a
+string"` quando o pedido inclui `receiverId` — ou seja, **só aceita
+`receiverPhone`**, ao contrário do que `API_ENDPOINTS.md` documenta
+(nota: esse ficheiro parece descrever um backend antigo, em
+`troco-seguro.onrender.com`, não o ambiente actual).
+
+Confirmámos também que `GET users/drivers/{id}` (a única forma que o app
+tem de obter mais dados sobre um motorista a partir do seu `driverId`)
+**não devolve o número de telefone** — só `id`, `fullName`, `isVerified`,
+`createdAt`, `totalTrips`, `rating`. Ou seja, não há hoje nenhuma forma
+de o passageiro transferir directamente para um motorista identificado
+por QR sem pedir o número de telefone por outro meio.
+
+**Pedido:** ou (a) `POST transactions/transfer` passar a aceitar
+`receiverId` como alternativa a `receiverPhone`, ou (b)
+`GET users/drivers/{id}` passar a incluir o número de telefone (se a
+política de privacidade permitir).
+
+**Estado no app:** a funcionalidade "Transferir para este motorista" foi
+**removida do ecrã de identificação por QR**
+(`APP PASSAGEIRO/lib/screens/home_screen.dart`, `_handleIdentifyQr`) para
+não deixar um botão que falha sempre que tocado — mostra agora uma
+mensagem a explicar que depende desta actualização. `ApiService.transfer`/
+`AppProvider.transfer` mantêm o parâmetro `receiverId` (testado
+unitariamente, sem custo) pronto a ligar de volta à UI assim que este
+item for resolvido. Há um teste funcional "canário"
+(`auth_and_wallet_test.dart`, teste 6) que falha propositadamente hoje e
+passará a ter sucesso no dia em que o backend aceitar `receiverId` — é o
+sinal para reactivar a UI.
+
+---
+
+## 10. Nota — `POST transactions/deposit` devolve 404 no staging actual
+
+Confirmado pelo mesmo teste funcional: `POST transactions/deposit`
+("carregamento simulado", usado pelo passageiro para testar sem gateway
+de pagamento real) devolve 404 em `trocoseguro.wemof.tech` — só existe
+documentado para o backend antigo (`troco-seguro.onrender.com`). Não é
+necessariamente um bug (pode ser intencional não ter carregamento
+simulado em staging) — mas sem ele não há forma de dar saldo a uma conta
+de teste a partir do próprio app, o que limita testes automatizados de
+funcionalidades que movimentam dinheiro. Se for útil ter uma forma de
+carregar contas de teste sem gateway real, agradecemos indicação de como
+fazê-lo (endpoint dedicado, acesso ao painel admin, etc.).

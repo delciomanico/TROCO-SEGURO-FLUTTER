@@ -1134,10 +1134,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (validation.driverId != null)
                   TextButton.icon(
                     onPressed: () {
+                      // Confirmado contra o backend real (staging) que
+                      // POST transactions/transfer rejeita `receiverId`
+                      // ("property receiverId should not exist") — só
+                      // aceita receiverPhone, que não temos aqui (a
+                      // identificação por QR não devolve o telefone do
+                      // motorista). Ver BACKEND_PENDING_CHANGES.md, item 9.
+                      // Mantém o botão visível (não descartar o trabalho já
+                      // feito) mas explica a limitação em vez de tentar uma
+                      // transferência que sabemos que vai falhar.
                       Navigator.pop(context);
-                      _showTransferToDriverSheet(
-                        driverId: validation.driverId!,
-                        driverName: validation.driverName ?? 'Motorista',
+                      FeedbackService.showInfo(
+                        context,
+                        message:
+                            'Transferência directa ao motorista ainda depende de uma actualização do backend. Use "Transferir" na Carteira com o número de telefone por agora.',
                       );
                     },
                     icon: const Icon(Icons.send_rounded, size: 18),
@@ -1152,21 +1162,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Future<void> _showTransferToDriverSheet({
-    required String driverId,
-    required String driverName,
-  }) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _DriverTransferSheet(
-        driverId: driverId,
-        driverName: driverName,
       ),
     );
   }
@@ -1520,164 +1515,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Colors.black.withValues(alpha: 0.06),
           ),
       ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Transferência directa para um motorista identificado por QR
-// ---------------------------------------------------------------------------
-
-class _DriverTransferSheet extends StatefulWidget {
-  final String driverId;
-  final String driverName;
-
-  const _DriverTransferSheet({required this.driverId, required this.driverName});
-
-  @override
-  State<_DriverTransferSheet> createState() => _DriverTransferSheetState();
-}
-
-class _DriverTransferSheetState extends State<_DriverTransferSheet> {
-  final _amountCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  String? _error;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _amountCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final amount = int.tryParse(_amountCtrl.text.trim());
-    if (amount == null || amount <= 0) {
-      setState(() => _error = 'Informe um montante válido.');
-      return;
-    }
-    setState(() {
-      _error = null;
-      _loading = true;
-    });
-    final provider = context.read<AppProvider>();
-    final result = await provider.transfer(
-      receiverId: widget.driverId,
-      amount: amount,
-      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-    );
-    if (!mounted) return;
-    if (result != null) {
-      Navigator.of(context).pop();
-      final fee = result.feeAmount;
-      final base = 'Transferência para ${widget.driverName} realizada com sucesso!';
-      FeedbackService.showSuccess(
-        context,
-        message: (fee != null && fee > 0) ? '$base Tarifa aplicada: $fee Kz.' : base,
-      );
-      return;
-    }
-    setState(() {
-      _loading = false;
-      _error = provider.error ?? 'Erro ao realizar transferência.';
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final onSurface = isDark ? Colors.white : AppColors.textDark;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Transferir para ${widget.driverName}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onSurface)),
-            const SizedBox(height: 4),
-            Text('O valor sai da sua carteira Troco Seguro',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.5)
-                        : Colors.black.withValues(alpha: 0.45))),
-            const SizedBox(height: 20),
-            if (_error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Valor',
-                suffixText: 'Kz',
-                prefixIcon: const Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              decoration: InputDecoration(
-                labelText: 'Descrição (opcional)',
-                prefixIcon: const Icon(Icons.notes_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentOf(context),
-                  foregroundColor: isDark ? Colors.black : Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Text('Confirmar Transferência',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
