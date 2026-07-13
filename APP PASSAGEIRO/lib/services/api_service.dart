@@ -24,6 +24,13 @@ class ApiService {
     return _instance;
   }
 
+  /// Construtor só para testes — injecta um [Dio] falso (ex.: mocktail)
+  /// para verificar pedidos sem rede real. Não é singleton (cada chamada
+  /// cria uma instância nova) e não altera o construtor por omissão usado
+  /// em produção.
+  @visibleForTesting
+  ApiService.test(Dio dio) : _dio = dio;
+
   String? _accessToken;
   String? _refreshToken;
 
