@@ -148,18 +148,18 @@ class _TransferModalState extends State<TransferModal> {
 
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     
-    final success = await appProvider.transfer(
+    final result = await appProvider.transfer(
       receiverPhone: receiverPhoneController.text.trim(),
       amount: int.parse(amountController.text),
-      description: descriptionController.text.isNotEmpty 
-          ? descriptionController.text 
+      description: descriptionController.text.isNotEmpty
+          ? descriptionController.text
           : 'Transferência P2P',
     );
 
     if (mounted) {
       setState(() => isLoading = false);
-      
-      if (success) {
+
+      if (result != null) {
         widget.onClose();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
