@@ -413,6 +413,26 @@ class ApiService {
     }
   }
 
+  /// Iniciar um carregamento de saldo via Multicaixa Express.
+  ///
+  /// Substitui o antigo `deposit()`/`transactions/deposit` (endpoint morto
+  /// no ambiente actual — ver BACKEND_PENDING_CHANGES.md, item 10). Devolve
+  /// uma referência de pagamento; o saldo só é creditado depois de o
+  /// pagamento ser confirmado do lado do backend (o endpoint que confirma,
+  /// `payments/webhook/simulate`, é restrito a administradores).
+  Future<ApiResponse<DepositInitiateResult>> initiateDeposit({
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.post('payments/deposit/initiate', data: {
+        'amount': amount,
+      });
+      return ApiResponse.success(DepositInitiateResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Transferir para outro utilizador (por telefone) ou directamente para um
   /// motorista já identificado por QR (por receiverId).
   Future<ApiResponse<TransactionResult>> transfer({
@@ -1172,6 +1192,31 @@ class TransactionResult {
       newBalance: json['newBalance'] ?? json['balance'],
       message: json['message'],
       feeAmount: json['feeAmount'] ?? json['fee'] ?? json['tax'] ?? json['platformFeeApplied'],
+    );
+  }
+}
+
+/// Resultado de `POST payments/deposit/initiate` — carregamento de saldo
+/// pendente de confirmação (ver `ApiService.initiateDeposit`).
+class DepositInitiateResult {
+  final String? transactionId;
+  final String? reference;
+  final String? status;
+  final String? message;
+
+  DepositInitiateResult({
+    this.transactionId,
+    this.reference,
+    this.status,
+    this.message,
+  });
+
+  factory DepositInitiateResult.fromJson(Map<String, dynamic> json) {
+    return DepositInitiateResult(
+      transactionId: json['transactionId'],
+      reference: json['reference'],
+      status: json['status'],
+      message: json['message'],
     );
   }
 }

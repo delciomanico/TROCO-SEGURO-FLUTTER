@@ -82,12 +82,15 @@ void main() {
 
   // Nota: `POST transactions/deposit` devolve 404 neste ambiente (staging
   // trocoseguro.wemof.tech) — só existia no backend antigo documentado em
-  // API_ENDPOINTS.md (troco-seguro.onrender.com). A conta de teste não tem
-  // forma de ser carregada a partir do app; os testes de transferência
-  // abaixo por isso toleram tanto sucesso como "Saldo insuficiente" como
-  // resultado válido — ambos confirmam que o pedido chegou bem formado à
-  // lógica de negócio (o que estamos a validar), só o resultado depende de
-  // haver saldo ou não na conta de teste.
+  // API_ENDPOINTS.md (troco-seguro.onrender.com, agora completamente
+  // inacessível). O carregamento de saldo vivo é `payments/deposit/initiate`
+  // (ver testes 7/8 abaixo), mas a confirmação (`webhook/simulate`) é
+  // restrita a administradores — a conta de teste não consegue creditar-se
+  // sozinha. Os testes de transferência abaixo por isso toleram tanto
+  // sucesso como "Saldo insuficiente" como resultado válido — ambos
+  // confirmam que o pedido chegou bem formado à lógica de negócio (o que
+  // estamos a validar), só o resultado depende de haver saldo ou não na
+  // conta de teste.
 
   test('4. verifyTransferRecipient encontra a conta de teste do motorista', () async {
     final result = await api.verifyTransferRecipient(_driverPhone);
@@ -131,5 +134,16 @@ void main() {
     expect(result.isSuccess, isFalse,
         reason: 'O backend passou a aceitar receiverId — reactivar a UI removida.');
     expect(result.error, contains('receiverId'));
+  });
+
+  test(
+      '7. initiateDeposit gera uma referência de pagamento pendente '
+      '(payments/deposit/initiate, ver BACKEND_PENDING_CHANGES.md item 10)',
+      () async {
+    final result = await api.initiateDeposit(amount: 500);
+    expect(result.isSuccess, isTrue, reason: result.error);
+    expect(result.data?.reference, isNotNull);
+    expect(result.data?.reference, isNotEmpty);
+    expect(result.data?.status, 'PENDING');
   });
 }

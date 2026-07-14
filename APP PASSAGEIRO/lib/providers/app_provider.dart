@@ -678,6 +678,47 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Iniciar um carregamento de saldo (Multicaixa Express).
+  ///
+  /// Diferente de `transfer()`: o saldo NÃO é actualizado aqui, porque a
+  /// confirmação do pagamento (`payments/webhook/simulate`) é restrita a
+  /// administradores — fica só a referência para o utilizador pagar e uma
+  /// transação local com estado `PENDING` até a próxima sincronização.
+  Future<DepositInitiateResult?> deposit(int amount) async {
+    _error = null;
+
+    try {
+      final result = await _api.initiateDeposit(amount: amount);
+
+      if (result.isSuccess && result.data != null) {
+        addTransaction(Transaction(
+          id: result.data!.transactionId ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
+          type: 'DEPOSIT',
+          description: 'Carregamento via Multicaixa Express',
+          amount: amount,
+          date: DateTime.now().toString().split(' ')[0],
+          time:
+              '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+          status: result.data!.status ?? 'PENDING',
+        ));
+
+        invalidate(AppDomain.transactions);
+
+        return result.data;
+      } else {
+        _error = result.error ?? 'Erro ao iniciar carregamento';
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erro ao iniciar depósito: $e');
+      _error = 'Erro ao iniciar carregamento';
+      notifyListeners();
+      return null;
+    }
+  }
+
   /// Chamado quando o interceptor da API deteta que o token expirou e a
   /// renovação falhou — termina a sessão automaticamente (volta ao login).
   void _handleSessionExpired() {

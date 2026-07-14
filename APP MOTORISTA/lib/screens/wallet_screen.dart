@@ -9,6 +9,7 @@ import 'package:troco_seguro_pro/utils/formatters.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
 import 'package:troco_seguro_pro/widgets/wallet_transfer_modals.dart';
+import 'package:troco_seguro_pro/widgets/deposit_modal.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenWithdrawal;
@@ -367,6 +368,19 @@ class _WalletScreenState extends State<WalletScreen> {
                       : Icons.visibility_off_rounded,
                   size: responsive.scaledWidth(22),
                   color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+              SizedBox(width: responsive.scaledWidth(12)),
+              GestureDetector(
+                onTap: () => DepositModal.show(
+                  context,
+                  currentBalance: balance,
+                  onSuccess: _loadData,
+                ),
+                child: Icon(
+                  Icons.add_circle_rounded,
+                  size: responsive.scaledWidth(22),
+                  color: AppColors.primaryGold,
                 ),
               ),
             ],

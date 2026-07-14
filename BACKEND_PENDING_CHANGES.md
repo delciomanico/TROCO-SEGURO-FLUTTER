@@ -60,7 +60,21 @@ por ser inseguro.
 **Endpoints:** `POST transactions/transfer`, `POST payments/process`,
 `POST transactions/deposit`
 
-**Actual:** nenhuma destas respostas devolve o valor da taxa cobrada.
+**`POST payments/process` — JÁ RESOLVIDO, confirmado 2026-07-14**: ao
+testar um pagamento real de assento de ponta a ponta (passageiro paga,
+ver item 11), a resposta já inclui a taxa:
+`{"success":true,"transactionId":"...","tripId":"...",
+"platformFeeApplied":5,"platformFeePercentage":5,"newBalance":4900}`.
+A taxa é descontada do lado do **motorista** (recebeu 95 de um pagamento
+de 100), não do passageiro (pagou os 100 completos) — útil para a UI não
+mostrar "tarifa" como um custo extra ao passageiro neste fluxo, só
+informativamente. Como `PaymentResult.fromJson` já tinha
+`platformFeeApplied` como uma das chaves aceites (ver "Estado no app"
+abaixo), **não foi preciso nenhuma mudança no Flutter** — a UI já mostra
+a tarifa automaticamente neste ecrã.
+
+**`POST transactions/transfer` e `POST transactions/deposit` — ainda por
+resolver.** Nenhuma destas respostas devolve o valor da taxa cobrada.
 Comparar com `POST payments/authorize-passenger-qr` (usado pelo
 motorista), que **já devolve** `platformFeeApplied` (valor em Kz) — o app
 do motorista já mostra isto ao passageiro/motorista no ecrã de sucesso
@@ -118,21 +132,34 @@ app (nunca teve restrição própria).
 
 ---
 
-## 6. Capacidade de assentos por sessão (`childQrs`)
+## 6. ~~Capacidade de assentos por sessão (`childQrs`)~~ — RESPONDIDO (confirmado 2026-07-14)
 
-**Endpoint:** `POST qrcodes/session/start`
+**Endpoint:** `POST qrcodes/session/start` / `PUT fleet/vehicles/{id}`
 
-**Actual:** o número de QRs filho (`childQrs`) devolvido depende do
-backend/perfil do veículo, não do app.
+**Confirmado directamente contra a API** com a conta de teste do
+motorista: o número de `childQrs` devolvido por `qrcodes/session/start`
+é **exactamente igual** ao campo `seats` do veículo activo (testado com
+um veículo de 4 lugares → 4 `childQrs`, cada um com o seu `label`/
+`publicToken`). E `PUT fleet/vehicles/{id}` tem uma validação rígida:
+`{"seats": 65}` devolve `400` com `"seats must not be greater than 60"`;
+`{"seats": 60}` é aceite. **Ou seja, a capacidade máxima real de uma
+sessão é 60 assentos, não 65** — não há nenhum limite adicional a
+"confirmar", a resposta é definitiva: o tecto é o próprio campo `seats`
+do veículo, capado a 60 no backend.
 
-**Pedido:** confirmar se a capacidade máxima por sessão pode chegar a 65
-assentos (o cliente pediu para o limite de cobrança por scan subir de 10
-para 65 — já feito no app — mas se a *sessão inteira* estiver limitada a
-menos de 65 QRs no backend, o pedido do cliente não fica plenamente
-satisfeito).
+Isto é **diferente** do outro limite de 65 já implementado no app — o
+"limite de cobrança por scan" (`_seatsCount` em
+`APP MOTORISTA/lib/screens/home_screen.dart`, usado no modal de cobrança
+por cartão do passageiro, `payments/authorize-passenger-qr`) é um
+multiplicador manual independente do número de lugares do veículo, sem
+validação de tecto no backend — esse continua correctamente em 65 e não
+precisa de mudança.
 
-**Estado no app:** o limite de UI conhecido (quantos assentos cobrar de
-uma vez ao escanear o cartão do passageiro) já subiu de 10 para 65.
+**Estado no app:** nenhuma mudança necessária — o app já usa o `childQrs`
+que a API devolve, sem impor um limite próprio. Se o cliente quiser
+mesmo sessões de 65 lugares, o pedido passa a ser ao backend para subir o
+tecto de validação de `seats` em `fleet/vehicles` de 60 para 65 (não é
+uma limitação do Flutter).
 
 ---
 
@@ -146,10 +173,20 @@ uma vez ao escanear o cartão do passageiro) já subiu de 10 para 65.
 **Parcialmente resolvido**: o bug do 500 no endpoint REST já não
 acontece — testado em 2026-07-14 com a conta de teste do motorista
 (sem sessão activa), devolveu `200` com
-`{"active":false,"totalPayments":0,"totalSeats":0,"revenue":0}`. Ainda
-**não confirmámos** se, com uma sessão activa, a resposta já inclui
-detalhe por assento (`seats`) ou continua só agregada — falta testar com
-uma sessão de cobrança real em curso.
+`{"active":false,"totalPayments":0,"totalSeats":0,"revenue":0}`.
+
+**Confirmado definitivamente em 2026-07-14, com um pagamento real de
+ponta a ponta**: creditámos saldo à conta de teste do passageiro (depósito
+aprovado manualmente pelo admin, ver item 10), verificámos a conta do
+motorista (precisou de ser marcada como verificada no admin para poder
+ficar online — ver item 11), iniciámos uma sessão real, e o passageiro
+pagou um lugar com sucesso (`payments/process` → `success: true`,
+`newBalance: 4900`). Mesmo **depois** desse pagamento confirmado,
+`GET qrcodes/session/seats` continuou só agregada:
+`{"active":true,"sessionId":"...","totalPayments":1,"totalSeats":1,
+"revenue":100}` — sem nenhum array `seats`. Isto fecha definitivamente a
+questão: não é falta de sessão activa nem de pagamentos — o backend
+simplesmente não expõe detalhe por assento em nenhum cenário testado.
 
 **Pedido (ainda válido se a resposta continuar só agregada com sessão
 activa):** incluir no payload (REST ou SSE) um array por assento, ex.:
@@ -182,6 +219,14 @@ genérico ("Pagamento recusado pela API.").
 `INVALID_PIN`, `SEAT_UNAVAILABLE`, `QR_EXPIRED`) nas respostas de erro dos
 endpoints de pagamento/transferência, além da mensagem em texto livre
 (que pode continuar a existir para debug).
+
+**Re-verificado em 2026-07-14**: provocámos vários erros reais de propósito
+(saldo insuficiente numa transferência, payload inválido num pagamento por
+QR) para inspeccionar a resposta completa — em todos os casos o formato é
+o mesmo (`{"statusCode":400,"message":"Saldo insuficiente.","error":"Bad
+Request"}` ou `message` como array de strings de validação), sem nenhum
+campo de código estável escondido. Confirma que não há nada a extrair do
+lado do cliente — o pedido ao backend continua válido tal como descrito.
 
 **Estado no app:** criado `PaymentErrorMessages` (ambos os apps,
 `lib/utils/error_messages.dart`) — hoje faz correspondência por
@@ -239,17 +284,88 @@ sinal para reactivar a UI.
 
 ---
 
-## 10. Nota — `POST transactions/deposit` devolve 404 no staging actual
+## 10. ~~`POST transactions/deposit` devolve 404~~ — RESOLVIDO com endpoint vivo alternativo (2026-07-14)
 
-**Re-testado em 2026-07-14, continua 404.**
+`POST transactions/deposit` continua a devolver 404 em
+`trocoseguro.wemof.tech` (só existe documentado para o backend antigo,
+`troco-seguro.onrender.com`, que aliás está agora completamente
+inacessível — confirmámos via `curl` que nem responde ao handshake TLS
+após 90s, ao contrário deste host que responde em <1s). **Mas** confirmámos
+que o backend actual já expõe um par de endpoints vivo e funcional que
+resolve a mesma necessidade (carregar saldo com referência):
 
-Confirmado pelo mesmo teste funcional: `POST transactions/deposit`
-("carregamento simulado", usado pelo passageiro para testar sem gateway
-de pagamento real) devolve 404 em `trocoseguro.wemof.tech` — só existe
-documentado para o backend antigo (`troco-seguro.onrender.com`). Não é
-necessariamente um bug (pode ser intencional não ter carregamento
-simulado em staging) — mas sem ele não há forma de dar saldo a uma conta
-de teste a partir do próprio app, o que limita testes automatizados de
-funcionalidades que movimentam dinheiro. Se for útil ter uma forma de
-carregar contas de teste sem gateway real, agradecemos indicação de como
-fazê-lo (endpoint dedicado, acesso ao painel admin, etc.).
+- `POST payments/deposit/initiate` `{ "amount": 500 }` → `201`
+  `{ "message": "Pedido de carregamento iniciado.", "transactionId": "...",
+  "reference": "MCX-1784049688328", "status": "PENDING" }`. Testado com
+  as duas contas de teste (passageiro e motorista) — ambas conseguem
+  iniciar um pedido. A transação aparece de imediato em
+  `GET transactions/history` com `status: "PENDING"`.
+- `POST payments/webhook/simulate` `{ "reference": "..." }` — confirma o
+  pagamento e credita o saldo. **Importante**: está protegido a
+  administradores (`403 Forbidden` — "Acesso restrito a administradores"
+  para contas `PASSENGER`/`DRIVER`). Ou seja, hoje só um admin consegue
+  confirmar um depósito manualmente; não há forma de o próprio
+  utilizador (nem os testes automatizados com as contas de teste)
+  completar o ciclo sozinho.
+
+**Estado no app:** ambos os apps já chamam `payments/deposit/initiate` e
+mostram a referência devolvida ao utilizador (ecrã "Carregar Saldo"), com
+instruções para pagar via Multicaixa Express/ATM usando essa referência.
+O saldo só é actualizado depois de confirmado do lado do backend — os
+apps não tentam chamar `payments/webhook/simulate` (ficaria sempre 403
+para utilizadores normais).
+
+**Pedido (opcional):** se for útil para testes automatizados ou para o
+próprio utilizador poder confirmar um pagamento real sem esperar por um
+admin, seria bom ter uma forma de o `webhook/simulate` (ou um endpoint
+equivalente) ser chamado automaticamente por um gateway de pagamento real,
+ou disponibilizar credenciais de admin dedicadas só para os testes
+automatizados confirmarem o ciclo completo em staging.
+
+**Ciclo completo validado em 2026-07-14**: o dono do projecto aprovou
+manualmente os dois pedidos de depósito (passageiro e motorista, 5.000 Kz
+cada) através do painel admin — confirmámos via `GET users/me` que ambos
+os saldos foram creditados correctamente (`0 → 5000`). O fluxo
+`initiate` → aprovação manual → saldo creditado funciona de ponta a
+ponta; só falta automatizar a aprovação (ver pedido acima).
+
+---
+
+## 11. Backend rejeita `isOnline: true` para motoristas não verificados — outra causa real de "motorista não está online"
+
+**Endpoint:** `PUT users/me/status`
+
+Ao investigar a reclamação do cliente de que o pagamento falha com
+"motorista não está online" mesmo com o motorista a dizer que está
+online, corrigimos uma dessincronização client-side (ver histórico de
+commits — `APP MOTORISTA/lib/main.dart`, `_refreshFromApi`/
+`_toggleOnlineStatus`). Mas ao **reproduzir o erro de ponta a ponta**
+com as contas de teste (motorista inicia sessão, passageiro paga um
+lugar), descobrimos uma **segunda causa, esta genuinamente do backend**:
+
+`PUT users/me/status` com `{"isOnline": true}` devolve `403 Forbidden`
+para a conta de teste do motorista (que tem `isVerified: false`):
+```json
+{"statusCode":403,"message":"Conta ainda não verificada. Conclua a verificação (QR do BI ou envio de documentos) antes de ficar online.","error":"Forbidden"}
+```
+Ou seja, um motorista **não verificado não consegue mesmo ficar online**
+— o backend recusa sempre, não é um bug. Com a correcção que já fizemos
+no app (reverter o estado local quando o backend recusa e mostrar o erro
+numa SnackBar), um motorista nesta situação passa agora a **ver** a
+mensagem real de "conta ainda não verificada" em vez de continuar
+convencido de que está online. Isto por si só já deve resolver a maior
+parte dos casos reportados pelo cliente, desde que os motoristas afectados
+não tenham ainda completado a verificação de identidade (QR do BI /
+envio de documentos) no app.
+
+**Não é pedido nenhum ao backend** — este comportamento (exigir conta
+verificada para ficar online) parece correcto e intencional. Este item
+é só para registar a descoberta e ligar as duas causas (dessincronização
+client-side + verificação de identidade em falta) que juntas explicam o
+sintoma reportado.
+
+**Estado no app:** nenhuma mudança adicional necessária além da já feita
+(reverter/mostrar erro no toggle). Se o motorista de teste precisar de
+ficar online para mais testes (ex. validar o item 7 com um pagamento de
+lugar real), a conta precisa de ser marcada como verificada no painel
+admin — não há forma de simular isto via API sem um QR de BI real.

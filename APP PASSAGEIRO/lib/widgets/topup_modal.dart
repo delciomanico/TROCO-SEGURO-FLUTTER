@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 
-class TopupModal extends StatelessWidget {
+class TopupModal extends StatefulWidget {
   final int currentBalance;
   final VoidCallback onClose;
 
@@ -12,6 +15,52 @@ class TopupModal extends StatelessWidget {
     required this.currentBalance,
     required this.onClose,
   });
+
+  @override
+  State<TopupModal> createState() => _TopupModalState();
+}
+
+class _TopupModalState extends State<TopupModal> {
+  final _amountCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  String? _reference;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestReference() async {
+    final amount = int.tryParse(_amountCtrl.text.trim());
+    if (amount == null || amount < 500) {
+      setState(() => _error = 'Informe um montante válido (mínimo 500 Kz).');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final provider = context.read<AppProvider>();
+    final result = await provider.deposit(amount);
+    if (!mounted) return;
+    if (result != null && result.reference != null) {
+      setState(() {
+        _loading = false;
+        _reference = result.reference;
+      });
+      FeedbackService.showSuccess(
+        context,
+        message: 'Referência gerada! Conclua o pagamento para creditar o saldo.',
+      );
+    } else {
+      setState(() {
+        _loading = false;
+        _error = provider.error ?? 'Erro ao gerar referência de carregamento.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +126,7 @@ class TopupModal extends StatelessWidget {
             SizedBox(height: responsive.scaledHeight(12)),
             Center(
               child: Text(
-                'Saldo atual: $currentBalance Kz',
+                'Saldo atual: ${widget.currentBalance} Kz',
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(12),
                   color:
@@ -85,7 +134,78 @@ class TopupModal extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: responsive.scaledHeight(32)),
+            SizedBox(height: responsive.scaledHeight(24)),
+
+            if (_reference == null) ...[
+              if (_error != null)
+                Padding(
+                  padding: EdgeInsets.only(bottom: responsive.scaledHeight(12)),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: responsive.responsiveFontSize(12),
+                    ),
+                  ),
+                ),
+              TextField(
+                controller: _amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Valor a carregar (Kz)',
+                  hintText: 'Mínimo 500 Kz',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(12)),
+              CustomButton(
+                text: 'GERAR REFERÊNCIA',
+                onPressed: _loading ? null : _requestReference,
+                isLoading: _loading,
+                fullWidth: true,
+              ),
+            ] else ...[
+              Container(
+                padding: EdgeInsets.all(responsive.responsiveSpacing()),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round()),
+                  borderRadius: BorderRadius.circular(responsive.responsiveBorderRadius()),
+                  border: Border.all(color: Theme.of(context).colorScheme.primary),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Referência de pagamento',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(12),
+                        color: Theme.of(context).colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+                      ),
+                    ),
+                    SizedBox(height: responsive.scaledHeight(4)),
+                    Text(
+                      _reference!,
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(20),
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    SizedBox(height: responsive.scaledHeight(8)),
+                    Text(
+                      'Use esta referência num dos métodos abaixo. O saldo é creditado depois de o pagamento ser confirmado.',
+                      style: TextStyle(
+                        fontSize: responsive.responsiveFontSize(11),
+                        color: Theme.of(context).colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(8)),
+            ],
+
+            SizedBox(height: responsive.scaledHeight(24)),
 
             // Multicaixa Express
             _buildPaymentMethod(
@@ -95,11 +215,11 @@ class TopupModal extends StatelessWidget {
                 'Vá a qualquer caixa Multicaixa Express',
                 'Selecione "Pagamentos"',
                 'Escolha "Pagamento de Serviços"',
-                'Digite a referência da empresa Troco Seguro',
+                'Digite a referência gerada acima',
                 'Digite seu número de telefone',
                 'Insira o valor desejado',
                 'Confirme o pagamento',
-                'O saldo será creditado imediatamente',
+                'O saldo é creditado após confirmação',
               ],
               responsive: responsive,
             ),
@@ -114,7 +234,7 @@ class TopupModal extends StatelessWidget {
                 'Vá ao Multicaixa ou ATM',
                 'Selecione "Pagamentos"',
                 'Escolha "Pagamento de Serviços"',
-                'Digite a referência da empresa Troco Seguro',
+                'Digite a referência gerada acima',
                 'Digite seu número de telefone',
                 'Insira o valor desejado',
                 'Confirme o pagamento',
@@ -155,7 +275,7 @@ class TopupModal extends StatelessWidget {
             SizedBox(height: responsive.scaledHeight(24)),
             CustomButton(
               text: 'FECHAR',
-              onPressed: onClose,
+              onPressed: widget.onClose,
               fullWidth: true,
             ),
           ],

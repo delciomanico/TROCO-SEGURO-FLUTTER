@@ -262,6 +262,22 @@ class _AppControllerState extends State<AppController>
       return;
     }
 
+    // Re-sincronizar o estado "online" com o backend. O `isOnline` local
+    // vem só do cache (SharedPreferences) e nunca é reenviado ao backend no
+    // arranque — se o backend tiver esquecido esse estado entretanto
+    // (reinício, expiração de sessão, etc.), a app continuaria a mostrar
+    // "ONLINE" apesar de o backend recusar pagamentos com "motorista não
+    // está online". Reenviar aqui elimina essa divergência; se o backend
+    // recusar, reverter localmente em vez de manter uma promessa falsa.
+    if (isOnline) {
+      final statusResult = await _api.updateDriverStatus(isOnline: true);
+      if (!statusResult.isSuccess) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('ts_driver_online', false);
+        if (mounted) setState(() => isOnline = false);
+      }
+    }
+
     // Buscar perfil atualizado
     final profileResult = await _api.getProfile();
     if (profileResult.isSuccess && profileResult.data != null) {
@@ -381,17 +397,46 @@ class _AppControllerState extends State<AppController>
         isOnline = true;
         activeVehicleId = selectedId;
       });
-      await _api.updateDriverStatus(isOnline: true);
+      final result = await _api.updateDriverStatus(isOnline: true);
+      if (!result.isSuccess) {
+        // O backend recusou — reverter para não deixar a app a afirmar
+        // "online" enquanto os pagamentos continuariam a ser recusados.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result.error ?? 'Não foi possível ficar online.'),
+        ));
+        await prefs.remove('ts_active_vehicle_id');
+        await prefs.setBool('ts_driver_online', false);
+        setState(() {
+          isOnline = false;
+          activeVehicleId = null;
+        });
+      }
     } else {
       // Ao desativar: limpar veículo ativo
       final prefs = await SharedPreferences.getInstance();
+      final previousVehicleId = activeVehicleId;
       await prefs.remove('ts_active_vehicle_id');
       await prefs.setBool('ts_driver_online', false);
       setState(() {
         isOnline = false;
         activeVehicleId = null;
       });
-      await _api.updateDriverStatus(isOnline: false);
+      final result = await _api.updateDriverStatus(isOnline: false);
+      if (!result.isSuccess) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result.error ?? 'Não foi possível ficar offline.'),
+        ));
+        if (previousVehicleId != null) {
+          await prefs.setString('ts_active_vehicle_id', previousVehicleId);
+        }
+        await prefs.setBool('ts_driver_online', true);
+        setState(() {
+          isOnline = true;
+          activeVehicleId = previousVehicleId;
+        });
+      }
     }
   }
 

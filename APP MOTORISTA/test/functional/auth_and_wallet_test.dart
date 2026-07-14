@@ -100,4 +100,14 @@ void main() {
     final result = await api.requestWithdrawal(amount: 1000, iban: 'AO06 TESTE');
     expect(result.isSuccess, isTrue, reason: result.error);
   }, skip: 'Efeito colateral real no ambiente partilhado — correr manualmente');
+
+  test(
+      '7. initiateDeposit gera uma referência de pagamento pendente '
+      '(payments/deposit/initiate, ver BACKEND_PENDING_CHANGES.md item 10)',
+      () async {
+    final result = await api.initiateDeposit(amount: 500);
+    expect(result.isSuccess, isTrue, reason: result.error);
+    expect(result.data?['reference'], isNotNull);
+    expect(result.data?['status'], 'PENDING');
+  });
 }
