@@ -103,21 +103,18 @@ mudança necessária no Flutter.
 
 ---
 
-## 5. Segunda viatura devolve erro 500
+## 5. ~~Segunda viatura devolve erro 500~~ — CORRIGIDO (confirmado 2026-07-14)
 
 **Endpoint:** `POST fleet/vehicles`
 
-**Actual:** ao tentar registar uma segunda viatura para o mesmo
-motorista, a API devolve 500. Confirmado que **não há nenhuma restrição
-do lado do app** — o ecrã `vehicles_screen.dart` sempre permitiu
-adicionar múltiplas viaturas.
+**Estado anterior:** ao tentar registar uma segunda viatura para o mesmo
+motorista, a API devolvia 500.
 
-**Pedido:** isto é um **bug report**, não um pedido de funcionalidade —
-por favor investigar por que `POST fleet/vehicles` falha para um
-motorista que já tem uma viatura activa.
-
-**Estado no app:** nada a mudar; assim que o backend corrigir, a
-funcionalidade já funciona sem qualquer alteração no Flutter.
+**Confirmado corrigido em 2026-07-14**: testado directamente contra
+`trocoseguro.wemof.tech` com a conta de teste do motorista (que já tinha
+uma viatura) — `POST fleet/vehicles` com uma segunda viatura devolveu
+`201` com o registo criado normalmente. Nenhuma mudança necessária no
+app (nunca teve restrição própria).
 
 ---
 
@@ -141,12 +138,21 @@ uma vez ao escanear o cartão do passageiro) já subiu de 10 para 65.
 
 ## 7. Detalhe por assento (pago/disponível) na sessão activa
 
-**Endpoints:** `GET qrcodes/session/seats` (REST, hoje devolve 500) e
-`qrcodes/session/seats-live` (stream SSE, só envia agregados:
+**Endpoints:** `GET qrcodes/session/seats` (REST — **500 corrigido em
+2026-07-14**, confirmado a devolver 200 directamente contra a API) e
+`qrcodes/session/seats-live` (stream SSE, ainda só envia agregados:
 `totalSeats`/`paidSeats`/`availableSeats`/`revenue`).
 
-**Pedido:** ou corrigir o endpoint REST, ou (preferível, evita polling)
-incluir no payload do SSE um array por assento, ex.:
+**Parcialmente resolvido**: o bug do 500 no endpoint REST já não
+acontece — testado em 2026-07-14 com a conta de teste do motorista
+(sem sessão activa), devolveu `200` com
+`{"active":false,"totalPayments":0,"totalSeats":0,"revenue":0}`. Ainda
+**não confirmámos** se, com uma sessão activa, a resposta já inclui
+detalhe por assento (`seats`) ou continua só agregada — falta testar com
+uma sessão de cobrança real em curso.
+
+**Pedido (ainda válido se a resposta continuar só agregada com sessão
+activa):** incluir no payload (REST ou SSE) um array por assento, ex.:
 ```json
 {
   "totalSeats": 10,
@@ -212,6 +218,13 @@ por QR sem pedir o número de telefone por outro meio.
 `GET users/drivers/{id}` passar a incluir o número de telefone (se a
 política de privacidade permitir).
 
+**Re-testado em 2026-07-14** (pedido explícito para confirmar depois de
+outras correcções do backend) — **ainda não resolvido**: mesmo pedido
+directo à API devolveu exactamente a mesma mensagem de erro
+(`"property receiverId should not exist..."`). Itens 5 e 7 (segunda
+viatura, `GET qrcodes/session/seats`) já foram corrigidos nesta mesma
+ronda — este continua pendente.
+
 **Estado no app:** a funcionalidade "Transferir para este motorista" foi
 **removida do ecrã de identificação por QR**
 (`APP PASSAGEIRO/lib/screens/home_screen.dart`, `_handleIdentifyQr`) para
@@ -227,6 +240,8 @@ sinal para reactivar a UI.
 ---
 
 ## 10. Nota — `POST transactions/deposit` devolve 404 no staging actual
+
+**Re-testado em 2026-07-14, continua 404.**
 
 Confirmado pelo mesmo teste funcional: `POST transactions/deposit`
 ("carregamento simulado", usado pelo passageiro para testar sem gateway
