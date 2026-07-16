@@ -2,11 +2,13 @@ import 'package:intl/intl.dart';
 
 /// Ponto único para formatar valores monetários (Kz).
 ///
-/// O backend só devolve valores inteiros hoje (ver BACKEND_PENDING_CHANGES.md,
-/// item 4) — [showDecimals] fica `false` por omissão. Quando o backend
-/// confirmar suporte a fracções de Kz, activar globalmente passa a ser uma
-/// única mudança aqui, em vez de caçar cada `NumberFormat` espalhado pelo
-/// código.
+/// O backend devolve valores monetários como string decimal (ex.
+/// "500.00") desde 2026-07-15, mas os valores em si continuam sempre
+/// inteiros — o parsing para string acontece na camada de modelos/
+/// `ApiService` (que já converte para `int`/`num` antes de chegar aqui).
+/// `decimalsEnabled` fica `false` por omissão porque não há fracções de Kz
+/// em uso; se o backend começar a devolver cêntimos reais, activar
+/// globalmente passa a ser uma única mudança aqui.
 class AppFormatters {
   static const bool decimalsEnabled = false;
 

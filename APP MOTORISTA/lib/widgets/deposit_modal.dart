@@ -88,6 +88,7 @@ class _DepositModalState extends State<DepositModal> {
 
     final result = await _api.initiateDeposit(amount: amount);
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result.isSuccess && result.data != null) {

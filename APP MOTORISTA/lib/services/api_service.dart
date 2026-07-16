@@ -507,6 +507,24 @@ class ApiService {
     }
   }
 
+  /// Cotação de tarifa antes de confirmar um levantamento —
+  /// `GET transactions/quote`.
+  Future<ApiResponse<QuoteResult>> getTransactionQuote({
+    required String type,
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.get('transactions/quote', queryParameters: {
+        'type': type,
+        'amount': amount,
+      });
+      return ApiResponse.success(
+          QuoteResult.fromJson(_payload(response.data)));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Obter saldo disponível
   Future<ApiResponse<int>> getBalance() async {
     try {
@@ -736,10 +754,12 @@ class ApiService {
     return controller.stream;
   }
 
-  /// Fluxo 2 — Motorista escaneia QR do Passageiro e cobra
+  /// Fluxo 2 — Motorista escaneia QR do Passageiro e cobra.
+  /// `passengerPin` (4 dígitos, PIN do cartão) só é obrigatório quando o
+  /// cartão tem `pinRequired == true` — ver `previewPassengerCard()`.
   Future<ApiResponse<PassengerQrPaymentResult>> authorizePassengerQr({
     required String qrData,
-    required String passengerPin,
+    String? passengerPin,
     required String origin,
     required String destination,
     double distanceKm = 0.0,
@@ -750,7 +770,8 @@ class ApiService {
     try {
       final body = <String, dynamic>{
         'qrData': qrData,
-        'passengerPin': passengerPin,
+        if (passengerPin != null && passengerPin.isNotEmpty)
+          'passengerPin': passengerPin,
         'origin': origin,
         'destination': destination,
         if (distanceKm > 0) 'distanceKm': distanceKm,
@@ -764,7 +785,23 @@ class ApiService {
       return ApiResponse.success(
           PassengerQrPaymentResult.fromJson(_payload(response.data)));
     } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
+    }
+  }
+
+  /// Pré-visualiza o cartão virtual lido no QR do passageiro antes de
+  /// cobrar — indica se o cartão exige o código de 4 dígitos
+  /// (`requiresCardPin`), para só mostrar o teclado quando for preciso.
+  Future<ApiResponse<PassengerCardPreviewResult>> previewPassengerCard({
+    required String qrData,
+  }) async {
+    try {
+      final response = await _dio
+          .post('payments/passenger-card/preview', data: {'qrData': qrData});
+      return ApiResponse.success(
+          PassengerCardPreviewResult.fromJson(_payload(response.data)));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
     }
   }
 
@@ -1339,29 +1376,84 @@ class ApiService {
         return 'Erro de comunicação com o servidor. (${e.type})';
     }
   }
+
+  /// Código estável do erro (ex. INSUFFICIENT_FUNDS), quando o backend o
+  /// devolve — ver PaymentErrorMessages.friendly.
+  String? _parseErrorCode(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) return data['errorCode']?.toString();
+    return null;
+  }
 }
 
 // ============ CARTEIRA — TRANSFERÊNCIAS/CARTÃO DE TERCEIROS ============
+
+/// Valores monetários vêm da API como string decimal (ex. "500.00") desde
+/// 2026-07-15. `num.tryParse` aceita tanto string como número, ao
+/// contrário de `int.tryParse`, que falha em qualquer valor com ponto
+/// decimal e devolveria silenciosamente 0.
+int _toInt(dynamic value) =>
+    value == null ? 0 : (num.tryParse(value.toString())?.toInt() ?? 0);
+
+int? _toIntOrNull(dynamic value) =>
+    value == null ? null : num.tryParse(value.toString())?.toInt();
+
+/// Resposta de `GET transactions/quote` — tarifa estimada antes de
+/// confirmar uma transferência/depósito/levantamento.
+class QuoteResult {
+  final String type;
+  final int amount;
+  final num feePercent;
+  final int feeAmount;
+  final int totalDebited;
+  final int netReceived;
+
+  QuoteResult({
+    required this.type,
+    required this.amount,
+    required this.feePercent,
+    required this.feeAmount,
+    required this.totalDebited,
+    required this.netReceived,
+  });
+
+  factory QuoteResult.fromJson(Map<String, dynamic> json) {
+    return QuoteResult(
+      type: json['type']?.toString() ?? '',
+      amount: _toInt(json['amount']),
+      feePercent: num.tryParse(json['feePercent']?.toString() ?? '') ?? 0,
+      feeAmount: _toInt(json['feeAmount']),
+      totalDebited: _toInt(json['totalDebited']),
+      netReceived: _toInt(json['netReceived']),
+    );
+  }
+}
 
 class TransactionResult {
   final String? transactionId;
   final int? amount;
   final int? newBalance;
   final String? message;
+  final int? feeAmount;
+  final int? totalDebited;
 
   TransactionResult({
     this.transactionId,
     this.amount,
     this.newBalance,
     this.message,
+    this.feeAmount,
+    this.totalDebited,
   });
 
   factory TransactionResult.fromJson(Map<String, dynamic> json) {
     return TransactionResult(
       transactionId: json['transactionId'] ?? json['id'],
-      amount: json['amount'],
-      newBalance: json['newBalance'] ?? json['balance'],
+      amount: _toIntOrNull(json['amount']),
+      newBalance: _toIntOrNull(json['newBalance'] ?? json['balance']),
       message: json['message'],
+      feeAmount: _toIntOrNull(json['feeAmount']),
+      totalDebited: _toIntOrNull(json['totalDebited']),
     );
   }
 }
@@ -1392,7 +1484,7 @@ class CardBalanceResult {
 
   factory CardBalanceResult.fromJson(Map<String, dynamic> json) =>
       CardBalanceResult(
-        balance: json['balance'] ?? json['saldo'] ?? 0,
+        balance: _toInt(json['balance'] ?? json['saldo']),
         ownerName: json['ownerName'] ?? json['name'],
         cardName: json['cardName'] ?? json['card']?['name'],
       );
@@ -1434,7 +1526,7 @@ class QrData {
       publicToken: json['publicToken']?.toString() ?? '',
       image: json['image']?.toString() ?? '',
       // API renomeou 'tripPrice' para 'pricePerSeat' — suporta ambos
-      tripPrice: int.tryParse((json['pricePerSeat'] ?? json['tripPrice'])?.toString() ?? '0') ?? 0,
+      tripPrice: _toInt(json['pricePerSeat'] ?? json['tripPrice']),
     );
   }
 }
@@ -1509,8 +1601,7 @@ class SessionSeatsResult {
       active: json['active'] == true,
       parentQrId: json['parentQrId']?.toString(),
       publicToken: json['publicToken']?.toString(),
-      pricePerSeat:
-          int.tryParse(json['pricePerSeat']?.toString() ?? '0') ?? 0,
+      pricePerSeat: _toInt(json['pricePerSeat']),
       totalSeats:
           int.tryParse(json['totalSeats']?.toString() ?? '0') ?? 0,
       // API renomeou 'paidSeats' para 'totalPayments'
@@ -1518,7 +1609,7 @@ class SessionSeatsResult {
           int.tryParse((json['totalPayments'] ?? json['paidSeats'])?.toString() ?? '0') ?? 0,
       availableSeats:
           int.tryParse(json['availableSeats']?.toString() ?? '0') ?? 0,
-      revenue: int.tryParse(json['revenue']?.toString() ?? '0') ?? 0,
+      revenue: _toInt(json['revenue']),
       childQrCount:
           int.tryParse(json['childQrCount']?.toString() ?? '0') ?? 0,
       seats: rawSeats is List
@@ -1527,6 +1618,30 @@ class SessionSeatsResult {
               .map(SeatStatus.fromJson)
               .toList()
           : null,
+    );
+  }
+}
+
+/// Resposta de `POST payments/passenger-card/preview`.
+class PassengerCardPreviewResult {
+  final String? cardName;
+  final String? holderName;
+  final bool isActive;
+  final bool requiresCardPin;
+
+  PassengerCardPreviewResult({
+    this.cardName,
+    this.holderName,
+    this.isActive = true,
+    this.requiresCardPin = false,
+  });
+
+  factory PassengerCardPreviewResult.fromJson(Map<String, dynamic> json) {
+    return PassengerCardPreviewResult(
+      cardName: json['cardName']?.toString(),
+      holderName: json['holderName']?.toString(),
+      isActive: json['isActive'] != false,
+      requiresCardPin: json['requiresCardPin'] == true,
     );
   }
 }
@@ -1553,12 +1668,8 @@ class PassengerQrPaymentResult {
           json['id']?.toString() ??
           '',
       tripId: json['tripId']?.toString(),
-      platformFeeApplied: int.tryParse(
-              json['platformFeeApplied']?.toString() ?? '0') ??
-          0,
-      newBalance: int.tryParse(
-              (json['newBalance'] ?? json['balance'] ?? 0).toString()) ??
-          0,
+      platformFeeApplied: _toInt(json['platformFeeApplied']),
+      newBalance: _toInt(json['newBalance'] ?? json['balance']),
     );
   }
 }
@@ -1581,8 +1692,8 @@ class PaymentResult {
   factory PaymentResult.fromJson(Map<String, dynamic> json) {
     return PaymentResult(
       transactionId: json['transactionId']?.toString() ?? json['id']?.toString() ?? '',
-      amount: int.tryParse(json['amount'].toString()) ?? 0,
-      newBalance: int.tryParse((json['newBalance'] ?? json['balance'] ?? 0).toString()) ?? 0,
+      amount: _toInt(json['amount']),
+      newBalance: _toInt(json['newBalance'] ?? json['balance']),
       status: json['status']?.toString() ?? 'completed',
       message: json['message']?.toString() ?? 'Pagamento recebido com sucesso',
     );
@@ -1593,15 +1704,19 @@ class PaymentResult {
 class ApiResponse<T> {
   final T? data;
   final String? error;
+  // Código estável do erro (ex. INSUFFICIENT_FUNDS, INVALID_PIN) quando o
+  // endpoint o devolve — ver PaymentErrorMessages.friendly.
+  final String? errorCode;
   final bool isSuccess;
 
-  ApiResponse._({this.data, this.error, required this.isSuccess});
+  ApiResponse._(
+      {this.data, this.error, this.errorCode, required this.isSuccess});
 
   factory ApiResponse.success(T? data) =>
       ApiResponse._(data: data, isSuccess: true);
 
-  factory ApiResponse.error(String error) =>
-      ApiResponse._(error: error, isSuccess: false);
+  factory ApiResponse.error(String error, {String? errorCode}) =>
+      ApiResponse._(error: error, errorCode: errorCode, isSuccess: false);
 }
 
 /// Resultado de autenticação
@@ -1639,7 +1754,7 @@ class QrCodePriceResult {
   factory QrCodePriceResult.fromJson(Map<String, dynamic> json) {
     return QrCodePriceResult(
       id: json['id']?.toString() ?? '',
-      amount: int.tryParse(json['amount'].toString()) ?? 0,
+      amount: _toInt(json['amount']),
       description: json['description']?.toString() ?? '',
       qrToken: QrTokenData.fromJson(
         (json['qrToken'] as Map?)?.cast<String, dynamic>() ?? {},
@@ -1696,7 +1811,7 @@ class DriverStaticQrCode {
       publicToken: json['publicToken']?.toString() ?? '',
       qrCodeImage: json['qrCodeImage']?.toString() ?? '',
       driverName: json['driverName']?.toString() ?? '',
-      currentAmount: int.tryParse(json['currentAmount'].toString()) ?? 0,
+      currentAmount: _toInt(json['currentAmount']),
       currency: json['currency']?.toString() ?? 'AOA',
     );
   }

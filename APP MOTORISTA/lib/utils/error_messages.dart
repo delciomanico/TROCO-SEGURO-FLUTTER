@@ -1,11 +1,21 @@
 /// Mapeamento de mensagens de erro de pagamento para texto mais amigável.
 ///
-/// O backend ainda não devolve um código de erro estável (ver
-/// BACKEND_PENDING_CHANGES.md, item 8) — só uma mensagem em texto livre, por
-/// vezes técnica. Este mapa cobre palavras-chave plausíveis encontradas em
-/// mensagens reais da API; qualquer mensagem que não corresponda a nenhuma
-/// entrada é devolvida tal como veio (comportamento actual, inalterado).
+/// Desde 2026-07-15 o backend devolve um campo `errorCode` estável nas
+/// respostas de erro de pagamento/transferência/cartão/sessão (ver
+/// `ApiResponse.errorCode`); `_byCode` cobre esses valores exactos e tem
+/// prioridade sobre `_byKeyword`. Erros sem `errorCode` (outros endpoints
+/// ou validações genéricas) continuam a usar a correspondência por
+/// palavra-chave como aproximação.
 class PaymentErrorMessages {
+  static const Map<String, String> _byCode = {
+    'INSUFFICIENT_FUNDS': 'Saldo insuficiente do passageiro para este pagamento.',
+    'INVALID_PIN': 'PIN incorrecto. Peça ao passageiro para confirmar o PIN.',
+    'QR_EXPIRED': 'O QR do passageiro expirou. Peça para gerar um novo.',
+    'DRIVER_OFFLINE': 'Precisa de estar online para cobrar.',
+    'CARD_INACTIVE': 'Este cartão está inactivo ou bloqueado.',
+    'SEAT_UNAVAILABLE': 'Este assento já foi pago ou não está disponível.',
+  };
+
   static const Map<String, String> _byKeyword = {
     'insufficient': 'Saldo insuficiente do passageiro para este pagamento.',
     'saldo insuficiente': 'Saldo insuficiente do passageiro para este pagamento.',
@@ -18,7 +28,10 @@ class PaymentErrorMessages {
     'assento': 'Este assento já foi pago ou não está disponível.',
   };
 
-  static String friendly(String? rawMessage) {
+  static String friendly(String? rawMessage, {String? errorCode}) {
+    if (errorCode != null && _byCode.containsKey(errorCode)) {
+      return _byCode[errorCode]!;
+    }
     if (rawMessage == null || rawMessage.isEmpty) {
       return 'Pagamento recusado pela API.';
     }

@@ -29,7 +29,8 @@ class Passenger {
       id: json['id'] ?? '',
       name: json['name'] ?? json['fullName'] ?? '',
       phoneNumber: json['phoneNumber'] ?? json['phone'],
-      rating: (json['rating'] ?? json['averageRating'])?.toDouble(),
+      rating: double.tryParse(
+          (json['rating'] ?? json['averageRating'])?.toString() ?? ''),
       photo: json['photo'] ?? json['avatar'],
     );
   }

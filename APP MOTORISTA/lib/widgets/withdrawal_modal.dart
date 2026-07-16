@@ -54,7 +54,9 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
 
   String _withdrawalMethod = 'bank';
   bool _isLoading = false;
+  bool _loadingQuote = false;
   String? _errorMessage;
+  QuoteResult? _quote;
 
   final List<int> _quickAmounts = [5000, 10000, 25000, 50000];
 
@@ -84,14 +86,23 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
 
   void _setQuickAmount(int amount) {
     _amountController.text = _formatCurrency(amount);
-    setState(() => _errorMessage = null);
+    setState(() {
+      _errorMessage = null;
+      _quote = null;
+    });
   }
 
   void _withdrawAll() {
     _amountController.text = _formatCurrency(widget.availableBalance);
-    setState(() => _errorMessage = null);
+    setState(() {
+      _errorMessage = null;
+      _quote = null;
+    });
   }
 
+  /// Primeiro toque: valida e mostra a cotação (Valor/Tarifa/Total) antes
+  /// de confirmar. Segundo toque (com `_quote` já carregado): submete o
+  /// pedido de saque.
   Future<void> _submitWithdrawal() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -111,6 +122,30 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
       return;
     }
 
+    if (_quote == null) {
+      setState(() {
+        _loadingQuote = true;
+        _errorMessage = null;
+      });
+      final quoteResult =
+          await _api.getTransactionQuote(type: 'withdrawal', amount: amount);
+      if (!mounted) return;
+      setState(() {
+        _loadingQuote = false;
+        _quote = quoteResult.isSuccess
+            ? quoteResult.data
+            : QuoteResult(
+                type: 'withdrawal',
+                amount: amount,
+                feePercent: 0,
+                feeAmount: 0,
+                totalDebited: amount,
+                netReceived: amount,
+              );
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -121,6 +156,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
       iban: _accountController.text,
     );
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result.isSuccess) {
@@ -130,6 +166,30 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
       setState(() => _errorMessage = result.error ?? 'Erro ao processar saque');
       widget.onError?.call(result.error ?? 'Erro ao processar saque');
     }
+  }
+
+  Widget _quoteLine(String label, String value, ResponsiveHelper responsive,
+      {bool bold = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(2)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+                color: AppColors.textDark,
+              )),
+          Text(value,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                color: AppColors.textDark,
+              )),
+        ],
+      ),
+    );
   }
 
   @override
@@ -393,8 +453,11 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                           return null;
                         },
                         onChanged: (_) {
-                          if (_errorMessage != null) {
-                            setState(() => _errorMessage = null);
+                          if (_errorMessage != null || _quote != null) {
+                            setState(() {
+                              _errorMessage = null;
+                              _quote = null;
+                            });
                           }
                         },
                       ),
@@ -456,6 +519,33 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                         },
                       ),
 
+                      // Cotação (Valor / Tarifa / Total)
+                      if (_quote != null) ...[
+                        SizedBox(height: responsive.scaledHeight(16)),
+                        Container(
+                          padding: EdgeInsets.all(
+                              responsive.responsivePadding() * 0.8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.primaryGold.withValues(alpha: 0.25)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _quoteLine('Valor', '${_quote!.amount} Kz',
+                                  responsive),
+                              _quoteLine(
+                                  'Tarifa', '${_quote!.feeAmount} Kz', responsive),
+                              _quoteLine('Total a debitar',
+                                  '${_quote!.totalDebited} Kz', responsive,
+                                  bold: true),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       // Error message
                       if (_errorMessage != null) ...[
                         SizedBox(height: responsive.scaledHeight(16)),
@@ -497,7 +587,9 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _submitWithdrawal,
+                          onPressed: (_isLoading || _loadingQuote)
+                              ? null
+                              : _submitWithdrawal,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryGold,
                             padding: EdgeInsets.symmetric(
@@ -508,7 +600,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                             ),
                             elevation: 0,
                           ),
-                          child: _isLoading
+                          child: (_isLoading || _loadingQuote)
                               ? const SizedBox(
                                   width: 24,
                                   height: 24,
@@ -525,7 +617,9 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                                         color: Colors.white),
                                     SizedBox(width: responsive.scaledWidth(8)),
                                     Text(
-                                      'SOLICITAR SAQUE',
+                                      _quote == null
+                                          ? 'VER TARIFA E CONTINUAR'
+                                          : 'CONFIRMAR SAQUE',
                                       style: TextStyle(
                                         fontSize:
                                             responsive.responsiveFontSize(14),

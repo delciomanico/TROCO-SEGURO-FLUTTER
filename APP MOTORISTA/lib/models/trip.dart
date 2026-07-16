@@ -101,11 +101,11 @@ class Trip {
       date: date,
       time: time,
       amount: amount,
-      rating: (json['rating'] as num?)?.toDouble(),
+      rating: double.tryParse(json['rating']?.toString() ?? ''),
       comment: json['comment']?.toString(),
       status: json['status']?.toString() ?? 'completed',
-      distance: (json['distance'] as num?)?.toDouble(),
-      duration: (json['duration'] as num?)?.toInt(),
+      distance: double.tryParse(json['distance']?.toString() ?? ''),
+      duration: double.tryParse(json['duration']?.toString() ?? '')?.toInt(),
       passenger: passengerObj != null
           ? Passenger.fromJson(passengerObj)
           : null,
