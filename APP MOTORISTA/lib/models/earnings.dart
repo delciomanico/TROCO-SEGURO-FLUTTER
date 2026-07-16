@@ -96,7 +96,7 @@ class Earnings {
       totalAmount += amount;
       totalTrips++;
 
-      final rating = (t['rating'] as num?)?.toDouble();
+      final rating = double.tryParse(t['rating']?.toString() ?? '');
       if (rating != null) {
         ratingSum += rating;
         ratingCount++;
@@ -191,8 +191,9 @@ class Earnings {
               ?.toInt() ??
           0,
       totalTrips: data['totalTrips'] ?? 0,
-      averageRating:
-          (data['averageRating'] ?? data['rating'] ?? 0.0).toDouble(),
+      averageRating: double.tryParse(
+              (data['averageRating'] ?? data['rating'])?.toString() ?? '') ??
+          0.0,
       dailyHistory: data['dailyHistory'] != null
           ? (data['dailyHistory'] as List)
               .map((e) => DailyEarning.fromJson(e))
@@ -225,7 +226,7 @@ class DailyEarning {
   factory DailyEarning.fromJson(Map<String, dynamic> json) {
     return DailyEarning(
       date: json['date'] ?? '',
-      amount: json['amount'] ?? 0,
+      amount: double.tryParse(json['amount']?.toString() ?? '0')?.toInt() ?? 0,
       trips: json['trips'] ?? 0,
     );
   }

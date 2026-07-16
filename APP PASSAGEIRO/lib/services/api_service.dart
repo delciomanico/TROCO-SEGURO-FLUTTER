@@ -24,6 +24,13 @@ class ApiService {
     return _instance;
   }
 
+  /// Construtor só para testes — injecta um [Dio] falso (ex.: mocktail)
+  /// para verificar pedidos sem rede real. Não é singleton (cada chamada
+  /// cria uma instância nova) e não altera o construtor por omissão usado
+  /// em produção.
+  @visibleForTesting
+  ApiService.test(Dio dio) : _dio = dio;
+
   String? _accessToken;
   String? _refreshToken;
 
@@ -289,7 +296,10 @@ class ApiService {
     try {
       final response = await _dio.post('auth/forgot-password/verify-otp',
           data: {'phoneNumber': phoneNumber, 'otp': otp});
-      final token = response.data['resetToken'] as String;
+      final token = response.data['resetToken']?.toString();
+      if (token == null || token.isEmpty) {
+        return ApiResponse.error('Código inválido ou expirado');
+      }
       return ApiResponse.success(token);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -406,26 +416,87 @@ class ApiService {
     }
   }
 
-  /// Transferir para outro utilizador (por telefone) ou directamente para um
-  /// motorista já identificado por QR (por receiverId).
+  /// Iniciar um carregamento de saldo via Multicaixa Express.
+  ///
+  /// Substitui o antigo `deposit()`/`transactions/deposit` (endpoint morto
+  /// no ambiente actual — ver BACKEND_PENDING_CHANGES.md, item 10). Devolve
+  /// uma referência de pagamento; o saldo só é creditado depois de o
+  /// pagamento ser confirmado do lado do backend (o endpoint que confirma,
+  /// `payments/webhook/simulate`, é restrito a administradores).
+  Future<ApiResponse<DepositInitiateResult>> initiateDeposit({
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.post('payments/deposit/initiate', data: {
+        'amount': amount,
+      });
+      return ApiResponse.success(DepositInitiateResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Transferir para outro utilizador por telefone. `transactions/transfer`
+  /// só aceita `receiverPhone` — para transferir por ID directo (ex. depois
+  /// de identificar por QR), usar `transferToUser()`.
   Future<ApiResponse<TransactionResult>> transfer({
     required int amount,
-    String? receiverPhone,
-    String? receiverId,
+    required String receiverPhone,
     String? description,
   }) async {
-    assert(receiverPhone != null || receiverId != null,
-        'Informe receiverPhone ou receiverId');
     try {
       final data = <String, dynamic>{
         'amount': amount,
-        if (receiverPhone != null) 'receiverPhone': receiverPhone,
-        if (receiverId != null) 'receiverId': receiverId,
+        'receiverPhone': receiverPhone,
       };
       if (description != null) data['description'] = description;
 
       final response = await _dio.post('transactions/transfer', data: data);
       return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
+    }
+  }
+
+  /// Transferir directamente para um utilizador já identificado (ex. por
+  /// QR), sem precisar do telefone. Ao contrário de `transfer()`
+  /// (`POST transactions/transfer`, só aceita `receiverPhone`), este
+  /// endpoint aceita `targetUserId` e exige o PIN de conta como confirmação
+  /// extra.
+  Future<ApiResponse<TransactionResult>> transferToUser({
+    required int amount,
+    required String pin,
+    String? targetUserId,
+    String? phoneNumber,
+  }) async {
+    assert(targetUserId != null || phoneNumber != null,
+        'Informe targetUserId ou phoneNumber');
+    try {
+      final data = <String, dynamic>{
+        'amount': amount,
+        'pin': pin,
+        if (targetUserId != null) 'targetUserId': targetUserId,
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      };
+      final response = await _dio.post('wallet/transfer-to-user', data: data);
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
+    }
+  }
+
+  /// Cotação de tarifa antes de confirmar uma transferência/depósito/
+  /// levantamento — `GET transactions/quote`.
+  Future<ApiResponse<QuoteResult>> getTransactionQuote({
+    required String type,
+    required int amount,
+  }) async {
+    try {
+      final response = await _dio.get('transactions/quote', queryParameters: {
+        'type': type,
+        'amount': amount,
+      });
+      return ApiResponse.success(QuoteResult.fromJson(response.data));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
@@ -540,7 +611,7 @@ class ApiService {
       });
       return ApiResponse.success(QrValidationResult.fromJson(response.data));
     } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
     }
   }
 
@@ -575,7 +646,7 @@ class ApiService {
       final response = await _dio.post('payments/process', data: payload);
       return ApiResponse.success(PaymentResult.fromJson(response.data));
     } on DioException catch (e) {
-      return ApiResponse.error(_parseError(e));
+      return ApiResponse.error(_parseError(e), errorCode: _parseErrorCode(e));
     }
   }
 
@@ -666,8 +737,8 @@ class ApiService {
     try {
       final response = await _dio.delete('virtual-cards/$cardId');
       return ApiResponse.success(DeleteCardResult(
-        refundedAmount: response.data['refundedAmount'] ?? 0,
-        walletBalance: response.data['walletBalance'] ?? 0,
+        refundedAmount: _toInt(response.data['refundedAmount']),
+        walletBalance: _toInt(response.data['walletBalance']),
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -684,8 +755,8 @@ class ApiService {
         'amount': amount,
       });
       return ApiResponse.success(TopupCardResult(
-        cardBalance: response.data['cardBalance'] ?? 0,
-        walletBalance: response.data['walletBalance'] ?? 0,
+        cardBalance: _toInt(response.data['cardBalance']),
+        walletBalance: _toInt(response.data['walletBalance']),
       ));
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
@@ -716,7 +787,24 @@ class ApiService {
       final response = await _dio.put('virtual-cards/$cardId/limit', data: {
         'dailyLimit': dailyLimit,
       });
-      return ApiResponse.success(response.data['dailyLimit'] ?? dailyLimit);
+      return ApiResponse.success(_toIntOrNull(response.data['dailyLimit']) ?? dailyLimit);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Ligar/desligar a exigência do PIN de 4 dígitos do cartão nas cobranças
+  /// por QR (`payments/authorize-passenger-qr`).
+  Future<ApiResponse<bool>> updateCardPinRequired({
+    required String cardId,
+    required bool pinRequired,
+  }) async {
+    try {
+      final response =
+          await _dio.put('virtual-cards/$cardId/pin-required', data: {
+        'pinRequired': pinRequired,
+      });
+      return ApiResponse.success(response.data['pinRequired'] == true);
     } on DioException catch (e) {
       return ApiResponse.error(_parseError(e));
     }
@@ -771,7 +859,20 @@ class ApiService {
             });
           }
         }
-        return Trip.fromJson(e as Map<String, dynamic>);
+        if (e is Map<String, dynamic>) {
+          return Trip.fromJson(e);
+        }
+        return Trip.fromJson({
+          'id': '',
+          'origin': '',
+          'destination': '',
+          'amount': 0,
+          'date': '',
+          'time': '',
+          'driverName': '',
+          'licensePlate': '',
+          'status': 'pending'
+        });
       }).toList();
 
       return ApiResponse.success(parsed);
@@ -1041,8 +1142,13 @@ class ApiService {
   Future<ApiResponse<List<Complaint>>> getComplaints() async {
     try {
       final response = await _dio.get('complaints');
-      final list = (response.data as List)
-          .map((e) => Complaint.fromJson(e as Map<String, dynamic>))
+      final raw = response.data;
+      final List<dynamic> data = raw is List
+          ? raw
+          : (raw is Map ? (raw['items'] ?? raw['complaints'] ?? []) : []);
+      final list = data
+          .whereType<Map>()
+          .map((e) => Complaint.fromJson(e.cast<String, dynamic>()))
           .toList();
       return ApiResponse.success(list);
     } on DioException catch (e) {
@@ -1106,20 +1212,43 @@ class ApiService {
         return 'Erro de comunicação com o servidor.';
     }
   }
+
+  /// Código estável do erro (ex. INSUFFICIENT_FUNDS), quando o backend o
+  /// devolve — ver PaymentErrorMessages.friendly.
+  String? _parseErrorCode(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) return data['errorCode']?.toString();
+    return null;
+  }
 }
 
 // ============ MODELOS DE RESPOSTA ============
 
+/// Valores monetários vêm da API como string decimal (ex. "500.00") desde
+/// 2026-07-15 (ver BACKEND_PENDING_CHANGES.md, item "valores monetários
+/// como string"). `num.tryParse` aceita tanto string como número, ao
+/// contrário de `int.tryParse`, que falha em qualquer valor com ponto
+/// decimal e devolveria silenciosamente 0.
+int _toInt(dynamic value) =>
+    value == null ? 0 : (num.tryParse(value.toString())?.toInt() ?? 0);
+
+int? _toIntOrNull(dynamic value) =>
+    value == null ? null : num.tryParse(value.toString())?.toInt();
+
 class ApiResponse<T> {
   final T? data;
   final String? error;
+  // Código estável do erro (ex. INSUFFICIENT_FUNDS, INVALID_PIN) quando o
+  // endpoint o devolve — ver PaymentErrorMessages.friendly.
+  final String? errorCode;
   final bool isSuccess;
 
   ApiResponse.success(this.data)
       : error = null,
+        errorCode = null,
         isSuccess = true;
 
-  ApiResponse.error(this.error)
+  ApiResponse.error(this.error, {this.errorCode})
       : data = null,
         isSuccess = false;
 }
@@ -1145,20 +1274,91 @@ class TransactionResult {
   final int? amount;
   final int? newBalance;
   final String? message;
+  final int? feeAmount;
+  final int? totalDebited;
 
   TransactionResult({
     this.transactionId,
     this.amount,
     this.newBalance,
     this.message,
+    this.feeAmount,
+    this.totalDebited,
   });
 
   factory TransactionResult.fromJson(Map<String, dynamic> json) {
     return TransactionResult(
       transactionId: json['transactionId'] ?? json['id'],
-      amount: json['amount'],
-      newBalance: json['newBalance'] ?? json['balance'],
+      amount: _toIntOrNull(json['amount']),
+      newBalance: _toIntOrNull(json['newBalance'] ?? json['balance']),
       message: json['message'],
+      feeAmount: _toIntOrNull(json['feeAmount'] ??
+          json['fee'] ??
+          json['tax'] ??
+          json['platformFeeApplied']),
+      totalDebited: _toIntOrNull(json['totalDebited']),
+    );
+  }
+}
+
+/// Resultado de `POST payments/deposit/initiate` — carregamento de saldo
+/// pendente de confirmação (ver `ApiService.initiateDeposit`).
+class DepositInitiateResult {
+  final String? transactionId;
+  final String? reference;
+  final String? status;
+  final String? message;
+  final int? feeAmount;
+  final int? netAmount;
+
+  DepositInitiateResult({
+    this.transactionId,
+    this.reference,
+    this.status,
+    this.message,
+    this.feeAmount,
+    this.netAmount,
+  });
+
+  factory DepositInitiateResult.fromJson(Map<String, dynamic> json) {
+    return DepositInitiateResult(
+      transactionId: json['transactionId'],
+      reference: json['reference'],
+      status: json['status'],
+      message: json['message'],
+      feeAmount: _toIntOrNull(json['feeAmount']),
+      netAmount: _toIntOrNull(json['netAmount']),
+    );
+  }
+}
+
+/// Resposta de `GET transactions/quote` — tarifa estimada antes de
+/// confirmar uma transferência/depósito/levantamento.
+class QuoteResult {
+  final String type;
+  final int amount;
+  final num feePercent;
+  final int feeAmount;
+  final int totalDebited;
+  final int netReceived;
+
+  QuoteResult({
+    required this.type,
+    required this.amount,
+    required this.feePercent,
+    required this.feeAmount,
+    required this.totalDebited,
+    required this.netReceived,
+  });
+
+  factory QuoteResult.fromJson(Map<String, dynamic> json) {
+    return QuoteResult(
+      type: json['type']?.toString() ?? '',
+      amount: _toInt(json['amount']),
+      feePercent: num.tryParse(json['feePercent']?.toString() ?? '') ?? 0,
+      feeAmount: _toInt(json['feeAmount']),
+      totalDebited: _toInt(json['totalDebited']),
+      netReceived: _toInt(json['netReceived']),
     );
   }
 }
@@ -1193,8 +1393,9 @@ class QrValidationResult {
       driverId: driver?['id'] ?? json['driverId'],
       driverName: driver?['name'] ?? json['driverName'],
       licensePlate: driver?['licensePlate'] ?? json['licensePlate'],
-      rating: (driver?['rating'] ?? json['rating'])?.toDouble(),
-      amount: json['amount'],
+      rating: double.tryParse(
+          (driver?['rating'] ?? json['rating'])?.toString() ?? ''),
+      amount: _toIntOrNull(json['amount']),
       seatLabel: json['seatLabel'],
       sessionToken: json['sessionToken'] ?? json['paymentToken'],
       paymentToken: json['paymentToken'] ?? json['sessionToken'],
@@ -1209,6 +1410,7 @@ class PaymentResult {
   final String status;
   final String message;
   final String? tripId;
+  final int? feeAmount;
 
   PaymentResult({
     required this.transactionId,
@@ -1217,16 +1419,21 @@ class PaymentResult {
     required this.status,
     required this.message,
     this.tripId,
+    this.feeAmount,
   });
 
   factory PaymentResult.fromJson(Map<String, dynamic> json) {
     return PaymentResult(
       transactionId: json['transactionId'] ?? json['id'] ?? '',
-      amount: json['amount'] ?? 0,
-      newBalance: json['newBalance'] ?? json['balance'] ?? 0,
+      amount: _toInt(json['amount']),
+      newBalance: _toInt(json['newBalance'] ?? json['balance']),
       status: json['status'] ?? 'completed',
       message: json['message'] ?? 'Pagamento realizado com sucesso',
       tripId: json['tripId'],
+      feeAmount: _toIntOrNull(json['feeAmount'] ??
+          json['fee'] ??
+          json['tax'] ??
+          json['platformFeeApplied']),
     );
   }
 }
@@ -1359,7 +1566,7 @@ class CardBalanceResult {
 
   factory CardBalanceResult.fromJson(Map<String, dynamic> json) =>
       CardBalanceResult(
-        balance: json['balance'] ?? json['saldo'] ?? 0,
+        balance: _toInt(json['balance'] ?? json['saldo']),
         ownerName: json['ownerName'] ?? json['name'],
         cardName: json['cardName'] ?? json['card']?['name'],
       );

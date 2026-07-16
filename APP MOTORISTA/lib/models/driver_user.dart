@@ -176,13 +176,13 @@ class DriverUser {
           userData['avatar'] ??
           json['photo'] ??
           json['avatar'],
-      rating: (stats['rating'] ??
+      rating: double.tryParse((stats['rating'] ??
               stats['averageRating'] ??
               userData['rating'] ??
               userData['averageRating'] ??
               json['rating'] ??
               json['averageRating'])
-          ?.toDouble(),
+          ?.toString() ?? ''),
       isVerified: userData['isVerified'] ??
           userData['verified'] ??
           json['isVerified'] ??

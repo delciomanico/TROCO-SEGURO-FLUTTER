@@ -16,6 +16,7 @@ import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart' show AppNotification;
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/utils/formatters.dart';
 import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -700,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     showBalance
-                        ? NumberFormat('#,##0', 'pt_AO').format(user?.balance ?? 0)
+                        ? AppFormatters.currency(user?.balance ?? 0)
                         : '••••••',
                     style: TextStyle(
                       fontSize: responsive.responsiveFontSize(34),
@@ -938,10 +939,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (normalized.startsWith('data:image')) {
       final base64Data = normalized.split(',').last;
-      return Image.memory(
-        base64Decode(base64Data),
-        fit: BoxFit.contain,
-      );
+      try {
+        return Image.memory(
+          base64Decode(base64Data),
+          fit: BoxFit.contain,
+        );
+      } catch (_) {
+        return const Icon(Icons.qr_code_2_rounded, size: 140);
+      }
     }
 
     if (normalized.startsWith('http')) {
@@ -1134,9 +1139,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      _showTransferToDriverSheet(
-                        driverId: validation.driverId!,
-                        driverName: validation.driverName ?? 'Motorista',
+                      _transferToDriver(
+                        validation.driverId!,
+                        validation.driverName,
                       );
                     },
                     icon: const Icon(Icons.send_rounded, size: 18),
@@ -1155,19 +1160,107 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showTransferToDriverSheet({
-    required String driverId,
-    required String driverName,
-  }) async {
-    await showModalBottomSheet(
+  /// Transferência directa a um utilizador já identificado por ID (ex.
+  /// motorista lido por QR) — usa `wallet/transfer-to-user`, que exige o
+  /// PIN de conta como confirmação extra.
+  Future<void> _transferToDriver(String driverId, String? driverName) async {
+    final amountController = TextEditingController();
+    final pinController = TextEditingController();
+    String? dialogError;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _DriverTransferSheet(
-        driverId: driverId,
-        driverName: driverName,
-      ),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text('Transferir para ${driverName ?? 'motorista'}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Valor (Kz)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN de conta',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(dialogError!, style: const TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final amount = int.tryParse(amountController.text.trim());
+                    final pin = pinController.text.trim();
+                    if (amount == null || amount <= 0) {
+                      setDialogState(() => dialogError = 'Valor inválido');
+                      return;
+                    }
+                    if (pin.length != 6) {
+                      setDialogState(
+                          () => dialogError = 'PIN deve ter 6 dígitos');
+                      return;
+                    }
+                    final isValid = await PinGuard.validatePin(
+                      scope: 'transfer_to_user',
+                      enteredPin: pin,
+                      readExpectedPin: () => SecureStorageService().readPin(),
+                    );
+                    if (!dialogContext.mounted) return;
+                    if (!isValid) {
+                      setDialogState(() => dialogError = 'PIN incorrecto');
+                      return;
+                    }
+                    Navigator.pop(dialogContext, true);
+                  },
+                  child: const Text('Transferir'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+
+    if (confirmed != true || !mounted) return;
+
+    final amount = int.tryParse(amountController.text.trim()) ?? 0;
+    final pin = pinController.text.trim();
+    final provider = context.read<AppProvider>();
+    final result = await provider.transferToUser(
+      targetUserId: driverId,
+      amount: amount,
+      pin: pin,
+    );
+
+    if (!mounted) return;
+    if (result != null) {
+      FeedbackService.showSuccess(context,
+          message: 'Transferência realizada com sucesso!');
+    } else {
+      FeedbackService.showError(context,
+          message: provider.error ?? 'Erro ao realizar transferência');
+    }
   }
 
   Future<void> _handlePayWithQr() async {
@@ -1524,160 +1617,6 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Transferência directa para um motorista identificado por QR
-// ---------------------------------------------------------------------------
-
-class _DriverTransferSheet extends StatefulWidget {
-  final String driverId;
-  final String driverName;
-
-  const _DriverTransferSheet({required this.driverId, required this.driverName});
-
-  @override
-  State<_DriverTransferSheet> createState() => _DriverTransferSheetState();
-}
-
-class _DriverTransferSheetState extends State<_DriverTransferSheet> {
-  final _amountCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  String? _error;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _amountCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final amount = int.tryParse(_amountCtrl.text.trim());
-    if (amount == null || amount <= 0) {
-      setState(() => _error = 'Informe um montante válido.');
-      return;
-    }
-    setState(() {
-      _error = null;
-      _loading = true;
-    });
-    final provider = context.read<AppProvider>();
-    final ok = await provider.transfer(
-      receiverId: widget.driverId,
-      amount: amount,
-      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-    );
-    if (!mounted) return;
-    if (ok) {
-      Navigator.of(context).pop();
-      FeedbackService.showSuccess(context,
-          message: 'Transferência para ${widget.driverName} realizada com sucesso!');
-      return;
-    }
-    setState(() {
-      _loading = false;
-      _error = provider.error ?? 'Erro ao realizar transferência.';
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final onSurface = isDark ? Colors.white : AppColors.textDark;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Transferir para ${widget.driverName}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onSurface)),
-            const SizedBox(height: 4),
-            Text('O valor sai da sua carteira Troco Seguro',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.5)
-                        : Colors.black.withValues(alpha: 0.45))),
-            const SizedBox(height: 20),
-            if (_error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Valor',
-                suffixText: 'Kz',
-                prefixIcon: const Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              decoration: InputDecoration(
-                labelText: 'Descrição (opcional)',
-                prefixIcon: const Icon(Icons.notes_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentOf(context),
-                  foregroundColor: isDark ? Colors.black : Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Text('Confirmar Transferência',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Notifications fullscreen sheet
 // ---------------------------------------------------------------------------
 
@@ -1723,6 +1662,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
   Future<void> _markRead(String id) async {
     final api = context.read<AppProvider>().apiService;
     await api.markNotificationRead(id);
+    if (!mounted) return;
     setState(() {
       _notifications = _notifications
           .map((n) => n.id == id ? _copyRead(n) : n)
@@ -1733,6 +1673,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
   Future<void> _markAllRead() async {
     final api = context.read<AppProvider>().apiService;
     await api.markAllNotificationsRead();
+    if (!mounted) return;
     setState(() {
       _notifications = _notifications.map(_copyRead).toList();
     });

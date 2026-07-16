@@ -262,12 +262,37 @@ class _AppControllerState extends State<AppController>
       return;
     }
 
+    // Re-sincronizar o estado "online" com o backend. O `isOnline` local
+    // vem só do cache (SharedPreferences) e nunca é reenviado ao backend no
+    // arranque — se o backend tiver esquecido esse estado entretanto
+    // (reinício, expiração de sessão, etc.), a app continuaria a mostrar
+    // "ONLINE" apesar de o backend recusar pagamentos com "motorista não
+    // está online". Reenviar aqui elimina essa divergência; se o backend
+    // recusar, reverter localmente em vez de manter uma promessa falsa.
+    if (isOnline) {
+      final statusResult = await _api.updateDriverStatus(isOnline: true);
+      if (!statusResult.isSuccess) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('ts_driver_online', false);
+        if (mounted) setState(() => isOnline = false);
+      }
+    }
+
     // Buscar perfil atualizado
     final profileResult = await _api.getProfile();
     if (profileResult.isSuccess && profileResult.data != null) {
       setState(() => driver = profileResult.data!);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ts_driver', json.encode(driver!.toJson()));
+
+      // O backend recusa sempre {"isOnline": true} para contas não
+      // verificadas (ver item 11 do histórico) — sem este lembrete, o
+      // motorista só descobre isso ao tentar ficar online e ver o toggle
+      // reverter. Mostrar aqui, em cada login/reabertura da app, evita
+      // essa surpresa e leva-o directamente à verificação.
+      if (driver!.isVerified != true && mounted) {
+        _showVerificationReminder();
+      }
     }
 
     // Buscar transações
@@ -381,17 +406,46 @@ class _AppControllerState extends State<AppController>
         isOnline = true;
         activeVehicleId = selectedId;
       });
-      await _api.updateDriverStatus(isOnline: true);
+      final result = await _api.updateDriverStatus(isOnline: true);
+      if (!result.isSuccess) {
+        // O backend recusou — reverter para não deixar a app a afirmar
+        // "online" enquanto os pagamentos continuariam a ser recusados.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result.error ?? 'Não foi possível ficar online.'),
+        ));
+        await prefs.remove('ts_active_vehicle_id');
+        await prefs.setBool('ts_driver_online', false);
+        setState(() {
+          isOnline = false;
+          activeVehicleId = null;
+        });
+      }
     } else {
       // Ao desativar: limpar veículo ativo
       final prefs = await SharedPreferences.getInstance();
+      final previousVehicleId = activeVehicleId;
       await prefs.remove('ts_active_vehicle_id');
       await prefs.setBool('ts_driver_online', false);
       setState(() {
         isOnline = false;
         activeVehicleId = null;
       });
-      await _api.updateDriverStatus(isOnline: false);
+      final result = await _api.updateDriverStatus(isOnline: false);
+      if (!result.isSuccess) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result.error ?? 'Não foi possível ficar offline.'),
+        ));
+        if (previousVehicleId != null) {
+          await prefs.setString('ts_active_vehicle_id', previousVehicleId);
+        }
+        await prefs.setBool('ts_driver_online', true);
+        setState(() {
+          isOnline = true;
+          activeVehicleId = previousVehicleId;
+        });
+      }
     }
   }
 
@@ -437,6 +491,110 @@ class _AppControllerState extends State<AppController>
         subtitle: message,
         primaryButtonLabel: 'OK',
         onPrimaryPressed: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  /// Lembrete mostrado em cada login/reabertura da app enquanto a conta
+  /// não estiver verificada — o backend recusa sempre ficar online sem
+  /// isto, e sem este aviso o motorista só descobre ao tentar.
+  void _showVerificationReminder() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Container(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(32),
+            topRight: Radius.circular(32),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.verified_user_outlined,
+                color: AppColors.primaryGold, size: 40),
+            const SizedBox(height: 16),
+            const Text(
+              'Verifique a sua conta',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Para ficar online e receber pagamentos precisa de verificar '
+              'a sua identidade com o QR do BI. Sem isto, o pedido para '
+              'ficar online é sempre recusado.',
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(sheetCtx);
+                  _startBiVerificationFromReminder();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('VERIFICAR AGORA',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(sheetCtx),
+                child: const Text('Agora não'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startBiVerificationFromReminder() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (scannerCtx) => BiScannerModal(
+        onCancel: () {},
+        onScanned: (qrData) async {
+          Navigator.pop(scannerCtx);
+          final result = await ApiService().verifyBiQr(qrData);
+          if (!mounted) return;
+          final messenger = ScaffoldMessenger.of(context);
+          if (result.isSuccess) {
+            final verifiedName = result.data?['fullName']?.toString() ??
+                result.data?['name']?.toString();
+            await _markIdentityVerified(verifiedName);
+            messenger.showSnackBar(const SnackBar(
+              content: Text('Identidade verificada com sucesso!'),
+              backgroundColor: Colors.green,
+            ));
+          } else {
+            messenger.showSnackBar(SnackBar(
+              content: Text(result.error ??
+                  'Não foi possível verificar o BI. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        },
       ),
     );
   }

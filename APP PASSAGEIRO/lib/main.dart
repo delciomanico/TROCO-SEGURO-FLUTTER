@@ -1128,6 +1128,7 @@ class _SecurityModalState extends State<_SecurityModal> {
                             setSheet(() => busy = true);
                             final res = await _api.changePassword(
                                 currentPassword: cur, newPassword: nw);
+                            if (!ctx.mounted) return;
                             setSheet(() => busy = false);
                             if (res.isSuccess) {
                               await SecureStorageService().savePin(nw);
@@ -1555,6 +1556,7 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
                       }
                       setSheet(() => busy = true);
                       final res = await _api.addEmergencyContact(name: name, phoneNumber: phone);
+                      if (!ctx.mounted) return;
                       setSheet(() => busy = false);
                       if (res.isSuccess && res.data != null) {
                         if (ctx.mounted) Navigator.pop(ctx);

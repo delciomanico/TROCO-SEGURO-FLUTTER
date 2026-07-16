@@ -758,6 +758,7 @@ class _CardsScreenState extends State<CardsScreen> {
     bool isCreating = false;
     bool showUserPin = false;
     bool showCardPin = false;
+    bool pinRequired = false;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -963,6 +964,29 @@ class _CardsScreenState extends State<CardsScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: groupColor,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: SwitchListTile(
+                          value: pinRequired,
+                          onChanged: (v) => setSheet(() => pinRequired = v),
+                          title: Text(
+                            'Exigir PIN do cartão para cobrar',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: onSurface,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Se desligado, o motorista pode cobrar este cartão por QR sem pedir o código de 4 dígitos.',
+                            style: TextStyle(fontSize: 12, color: muted),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 22),
                       SizedBox(
                         width: double.infinity,
@@ -990,6 +1014,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                       dailyLimit: limit,
                                       userPin: userPinCtrl.text.trim(),
                                       cardPin: cardPinCtrl.text.trim(),
+                                      pinRequired: pinRequired,
                                     );
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);

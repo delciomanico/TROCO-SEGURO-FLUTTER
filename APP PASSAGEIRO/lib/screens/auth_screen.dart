@@ -95,6 +95,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (isLogin) {
       final result =
           await _api.login(phoneNumber: phone, password: pinController.text);
+      if (!mounted) return;
       setState(() => isLoading = false);
 
       if (result.isSuccess) {
@@ -119,6 +120,7 @@ class _AuthScreenState extends State<AuthScreen> {
         phoneNumber: phone,
         password: pinController.text,
       );
+      if (!mounted) return;
       setState(() => isLoading = false);
 
       if (result.isSuccess) {
@@ -141,6 +143,7 @@ class _AuthScreenState extends State<AuthScreen> {
       phoneNumber: _pendingPhone!,
       otpCode: otpController.text,
     );
+    if (!mounted) return;
     setState(() => isLoading = false);
 
     if (result.isSuccess) {
@@ -164,6 +167,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _handleResendOtp() async {
     setState(() { isLoading = true; errorMessage = null; });
     final result = await _api.resendOtp(_pendingPhone!);
+    if (!mounted) return;
     setState(() => isLoading = false);
     if (!result.isSuccess) {
       setState(() => errorMessage = result.error ?? 'Erro ao reenviar código');
@@ -1094,6 +1098,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     _formattedPhone = phone;
     setState(() => _busy = true);
     final res = await _api.forgotPassword(phone);
+    if (!mounted) return;
     setState(() => _busy = false);
     if (res.isSuccess) {
       setState(() => _step = 2);
@@ -1108,6 +1113,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     setState(() => _busy = true);
     final res = await _api.verifyForgotPasswordOtp(
         phoneNumber: _formattedPhone, otp: otp);
+    if (!mounted) return;
     setState(() => _busy = false);
     if (res.isSuccess && res.data != null) {
       _resetToken = res.data;
@@ -1124,6 +1130,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     if (pin != cfm) { _err('PINs não coincidem'); return; }
     setState(() => _busy = true);
     final res = await _api.resetPassword(resetToken: _resetToken!, newPassword: pin);
+    if (!mounted) return;
     setState(() => _busy = false);
     if (res.isSuccess) {
       if (mounted) Navigator.pop(context);

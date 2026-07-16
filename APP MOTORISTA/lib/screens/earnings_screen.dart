@@ -38,12 +38,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
     setState(() => isLoading = true);
 
     await _api.loadTokens();
+    if (!mounted) return;
 
     // Tenta obter estatísticas do endpoint dedicado
     final statsResult = await _api.getTripStats();
+    if (!mounted) return;
     if (statsResult.isSuccess && statsResult.data != null) {
       final s = statsResult.data!;
       final earningsResult = await _api.getEarnings();
+      if (!mounted) return;
       if (earningsResult.isSuccess && earningsResult.data != null) {
         final base = earningsResult.data!;
         setState(() {
@@ -67,6 +70,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     }
 
     final result = await _api.getEarnings();
+    if (!mounted) return;
     if (result.isSuccess && result.data != null) {
       setState(() {
         earnings = result.data!;

@@ -7,6 +7,7 @@ import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
+import 'package:troco_seguro/services/api_service.dart';
 import 'dart:convert';
 
 class TransferModal extends StatefulWidget {
@@ -31,6 +32,8 @@ class _TransferModalState extends State<TransferModal> {
   final descriptionController = TextEditingController();
   String? error;
   bool isLoading = false;
+  QuoteResult? quote;
+  bool loadingQuote = false;
 
   void _scanQrCode() async {
     final result = await showModalBottomSheet<String>(
@@ -74,6 +77,23 @@ class _TransferModalState extends State<TransferModal> {
     }
   }
 
+  Widget _quoteRow(String label, int? value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+          Text('${value ?? 0} Kz',
+              style: TextStyle(
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showPinDialog() async {
     final pinController = TextEditingController();
     String enteredPin = '';
@@ -88,6 +108,13 @@ class _TransferModalState extends State<TransferModal> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (quote != null) ...[
+                    _quoteRow('Valor', quote!.amount),
+                    _quoteRow('Tarifa', quote!.feeAmount),
+                    _quoteRow('Total a debitar', quote!.totalDebited,
+                        bold: true),
+                    const SizedBox(height: 12),
+                  ],
                   const Text('Digite seu PIN para confirmar'),
                   const SizedBox(height: 16),
                   TextField(
@@ -148,18 +175,18 @@ class _TransferModalState extends State<TransferModal> {
 
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     
-    final success = await appProvider.transfer(
+    final result = await appProvider.transfer(
       receiverPhone: receiverPhoneController.text.trim(),
       amount: int.parse(amountController.text),
-      description: descriptionController.text.isNotEmpty 
-          ? descriptionController.text 
+      description: descriptionController.text.isNotEmpty
+          ? descriptionController.text
           : 'Transferência P2P',
     );
 
     if (mounted) {
       setState(() => isLoading = false);
-      
-      if (success) {
+
+      if (result != null) {
         widget.onClose();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -191,6 +218,15 @@ class _TransferModalState extends State<TransferModal> {
       setState(() => error = 'Saldo insuficiente');
       return;
     }
+
+    setState(() => loadingQuote = true);
+    final quoteResult =
+        await ApiService().getTransactionQuote(type: 'transfer', amount: amount);
+    if (!mounted) return;
+    setState(() {
+      quote = quoteResult.isSuccess ? quoteResult.data : null;
+      loadingQuote = false;
+    });
 
     // Mostrar diálogo de PIN
     await _showPinDialog();
@@ -309,7 +345,7 @@ class _TransferModalState extends State<TransferModal> {
               controller: descriptionController,
             ),
             SizedBox(height: responsive.scaledHeight(24)),
-            if (isLoading)
+            if (isLoading || loadingQuote)
               const CircularProgressIndicator()
             else
               Row(
