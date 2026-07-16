@@ -137,10 +137,10 @@ class Trip {
       date: date,
       time: time,
       amount: parsedAmount,
-      rating: (json['rating'] as num?)?.toDouble(),
+      rating: double.tryParse(json['rating']?.toString() ?? ''),
       comment: json['comment']?.toString(),
-      distance: (json['distance'] as num?)?.toDouble(),
-      duration: (json['duration'] as num?)?.toInt(),
+      distance: double.tryParse(json['distance']?.toString() ?? ''),
+      duration: double.tryParse(json['duration']?.toString() ?? '')?.toInt(),
       status: rawStatus.isEmpty ? 'pending' : rawStatus,
     );
   }

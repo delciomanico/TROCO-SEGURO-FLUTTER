@@ -7,6 +7,9 @@ class CreateCardPayload {
   final int dailyLimit;
   final String userPin;  // 6-digit account PIN for identity proof
   final String cardPin;  // 4-digit card PIN for purchases
+  // Exigir o cardPin nas cobranças por QR (payments/authorize-passenger-qr).
+  // Omisso = false no backend (cobrança dispensa o código por omissão).
+  final bool pinRequired;
 
   const CreateCardPayload({
     required this.name,
@@ -14,6 +17,7 @@ class CreateCardPayload {
     required this.dailyLimit,
     required this.userPin,
     required this.cardPin,
+    this.pinRequired = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -22,6 +26,7 @@ class CreateCardPayload {
     'dailyLimit': dailyLimit,
     'userPin': userPin,
     'cardPin': cardPin,
+    'pinRequired': pinRequired,
   };
 }
 
@@ -50,6 +55,7 @@ class VirtualCardResponse {
   final String expiryDate;
   final String status;   // 'ACTIVE' | 'FROZEN'
   final int balance;
+  final bool pinRequired;
 
   const VirtualCardResponse({
     required this.id,
@@ -59,6 +65,7 @@ class VirtualCardResponse {
     required this.expiryDate,
     required this.status,
     required this.balance,
+    this.pinRequired = false,
   });
 
   factory VirtualCardResponse.fromJson(Map<String, dynamic> json) {
@@ -70,14 +77,15 @@ class VirtualCardResponse {
       expiryDate: json['expiryDate']?.toString() ?? '',
       status:     json['status']?.toString() ?? 'ACTIVE',
       balance:    _parseInt(json['balance']),
+      pinRequired: json['pinRequired'] == true,
     );
   }
 
   static int _parseInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
-    if (v is double) return v.toInt();
-    if (v is String) return int.tryParse(v) ?? 0;
+    if (v is num) return v.toInt();
+    if (v is String) return num.tryParse(v.replaceAll(',', '.'))?.toInt() ?? 0;
     return 0;
   }
 
@@ -93,6 +101,7 @@ class VirtualCardResponse {
         status:    status.toUpperCase() == 'FROZEN'
                        ? CardStatus.frozen
                        : CardStatus.active,
+        pinRequired: pinRequired,
       ),
       cardNumber: cardNumber,
       cvv:        cvv,
@@ -111,6 +120,8 @@ class VirtualCard {
   final CardStatus status; // active, frozen, blocked
   final String? qrToken; // Unique token for QR generation
   final String? lastModified;
+  // Se true, payments/authorize-passenger-qr exige o cardPin de 4 dígitos.
+  final bool pinRequired;
 
   VirtualCard({
     required this.id,
@@ -122,6 +133,7 @@ class VirtualCard {
     this.status = CardStatus.active,
     this.qrToken,
     this.lastModified,
+    this.pinRequired = false,
   });
 
   bool get isFrozen => status == CardStatus.frozen;
@@ -137,6 +149,7 @@ class VirtualCard {
     CardStatus? status,
     String? qrToken,
     String? lastModified,
+    bool? pinRequired,
   }) {
     return VirtualCard(
       id: id ?? this.id,
@@ -148,6 +161,7 @@ class VirtualCard {
       status: status ?? this.status,
       qrToken: qrToken ?? this.qrToken,
       lastModified: lastModified ?? this.lastModified,
+      pinRequired: pinRequired ?? this.pinRequired,
     );
   }
 
@@ -162,6 +176,7 @@ class VirtualCard {
       'status': status.toString().split('.').last,
       'qrToken': qrToken,
       'lastModified': lastModified,
+      'pinRequired': pinRequired,
     };
   }
 
@@ -176,8 +191,9 @@ class VirtualCard {
       status: _parseStatus(json['status']?.toString()),
       qrToken: json['qrToken']?.toString(),
       lastModified: json['lastModified']?.toString(),
+      pinRequired: json['pinRequired'] == true,
     );
-    
+
     return card;
   }
 

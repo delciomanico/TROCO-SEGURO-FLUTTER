@@ -128,7 +128,8 @@ class PaymentService {
           FeedbackService.showError(
             context,
             message: PaymentErrorMessages.friendly(response.error,
-                fallback: 'Erro ao validar QR Code'),
+                fallback: 'Erro ao validar QR Code',
+                errorCode: response.errorCode),
           );
         }
         return null;
@@ -195,7 +196,8 @@ class PaymentService {
           FeedbackService.showError(
             context,
             message: PaymentErrorMessages.friendly(response.error,
-                fallback: 'Erro ao processar pagamento'),
+                fallback: 'Erro ao processar pagamento',
+                errorCode: response.errorCode),
             duration: const Duration(seconds: 4),
           );
         }

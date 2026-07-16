@@ -344,6 +344,7 @@ class AppProvider extends ChangeNotifier {
     required int dailyLimit,
     required String userPin,
     required String cardPin,
+    bool pinRequired = false,
   }) async {
     _isLoadingCards = true;
     notifyListeners();
@@ -358,6 +359,7 @@ class AppProvider extends ChangeNotifier {
         dailyLimit:     dailyLimit,
         userPin:        userPin,
         cardPin:        cardPin,
+        pinRequired:    pinRequired,
       );
 
       final result = await _api.createVirtualCard(payload);
@@ -621,13 +623,11 @@ class AppProvider extends ChangeNotifier {
     _registerFcmToken();
   }
 
-  /// Transferir para outro usuário (P2P)
-  /// Devolve o [TransactionResult] em caso de sucesso (inclui `feeAmount`,
-  /// hoje sempre nulo até o backend o expor — ver
-  /// BACKEND_PENDING_CHANGES.md, item 3) ou `null` em caso de erro.
+  /// Transferir para outro usuário por telefone (P2P).
+  /// Devolve o [TransactionResult] em caso de sucesso (inclui `feeAmount`/
+  /// `totalDebited`) ou `null` em caso de erro.
   Future<TransactionResult?> transfer({
-    String? receiverPhone,
-    String? receiverId,
+    required String receiverPhone,
     required int amount,
     String? description,
   }) async {
@@ -637,7 +637,6 @@ class AppProvider extends ChangeNotifier {
       final result = await _api.transfer(
         amount: amount,
         receiverPhone: receiverPhone,
-        receiverId: receiverId,
         description: description,
       );
 
@@ -672,6 +671,58 @@ class AppProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Erro ao transferir: $e');
+      _error = 'Erro ao realizar transferência';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Transferir directamente para um utilizador já identificado por ID (ex.
+  /// motorista identificado por QR), sem precisar do telefone — usa
+  /// `POST wallet/transfer-to-user`, que exige o PIN de conta como
+  /// confirmação extra.
+  Future<TransactionResult?> transferToUser({
+    required String targetUserId,
+    required int amount,
+    required String pin,
+  }) async {
+    _error = null;
+
+    try {
+      final result = await _api.transferToUser(
+        targetUserId: targetUserId,
+        amount: amount,
+        pin: pin,
+      );
+
+      if (result.isSuccess && result.data != null) {
+        if (result.data!.newBalance != null) {
+          updateUserBalance(result.data!.newBalance!);
+        } else if (_user != null) {
+          updateUserBalance(_user!.balance - amount);
+        }
+
+        addTransaction(Transaction(
+          id: result.data!.transactionId ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
+          type: 'payment',
+          description: 'Transferência directa',
+          amount: -amount,
+          date: DateTime.now().toString().split(' ')[0],
+          time:
+              '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+        ));
+
+        invalidate(AppDomain.transactions);
+
+        return result.data;
+      } else {
+        _error = result.error ?? 'Erro ao realizar transferência';
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erro ao transferir para utilizador: $e');
       _error = 'Erro ao realizar transferência';
       notifyListeners();
       return null;

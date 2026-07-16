@@ -1005,6 +1005,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             newPassword: newPin,
                           );
 
+                          if (!mounted) return;
                           setState(() => isChangingPassword = false);
 
                           if (result.isSuccess) {

@@ -116,24 +116,22 @@ void main() {
   });
 
   test(
-      '6. [canário] transferência por receiverId ainda é rejeitada pelo backend real — '
-      'reactivar o botão "Transferir para este motorista" (removido do UI) só depois '
-      'deste teste passar a ter sucesso', () async {
+      '6. transferToUser (wallet/transfer-to-user) transfere directamente por '
+      'targetUserId — endpoint que resolve a mesma necessidade de '
+      'transferir sem telefone (confirmado resolvido em 2026-07-15)',
+      () async {
     expect(driverId, isNotNull,
         reason: 'depende do teste 4 (verifyTransferRecipient) ter corrido antes');
-    final result = await api.transfer(
+    final result = await api.transferToUser(
       amount: 100,
-      receiverId: driverId!,
-      description: 'Teste automatizado — receiverId',
+      targetUserId: driverId!,
+      pin: _passengerPin,
     );
-    // Confirmado em 2026-07-13 contra trocoseguro.wemof.tech: o backend
-    // rejeita receiverId ("property receiverId should not exist"). Ver
-    // BACKEND_PENDING_CHANGES.md, item 9. Este teste falhar (i.e. passar a
-    // ter sucesso) é o sinal de que já é seguro reactivar a funcionalidade
-    // no APP PASSAGEIRO/lib/screens/home_screen.dart (_handleIdentifyQr).
-    expect(result.isSuccess, isFalse,
-        reason: 'O backend passou a aceitar receiverId — reactivar a UI removida.');
-    expect(result.error, contains('receiverId'));
+    if (!result.isSuccess) {
+      expect(result.error, contains('nsuficiente'),
+          reason: 'Esperado apenas falha de saldo; qualquer outro erro indica '
+              'um problema real no pedido: ${result.error}');
+    }
   });
 
   test(

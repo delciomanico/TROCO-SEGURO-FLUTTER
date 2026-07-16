@@ -27,7 +27,7 @@ void main() {
   });
 
   group('ApiService.transfer', () {
-    test('sends only receiverPhone when receiverId is not provided', () async {
+    test('sends receiverPhone to transactions/transfer', () async {
       await api.transfer(amount: 500, receiverPhone: '+244900000011');
 
       final captured = verify(
@@ -36,19 +36,6 @@ void main() {
 
       expect(captured['amount'], 500);
       expect(captured['receiverPhone'], '+244900000011');
-      expect(captured.containsKey('receiverId'), isFalse);
-    });
-
-    test('sends only receiverId when transferring directly to a driver', () async {
-      await api.transfer(amount: 500, receiverId: 'driver-123');
-
-      final captured = verify(
-        () => mockDio.post('transactions/transfer', data: captureAny(named: 'data')),
-      ).captured.single as Map<String, dynamic>;
-
-      expect(captured['amount'], 500);
-      expect(captured['receiverId'], 'driver-123');
-      expect(captured.containsKey('receiverPhone'), isFalse);
     });
 
     test('includes description only when provided', () async {
@@ -61,19 +48,34 @@ void main() {
       expect(captured['description'], 'Táxi');
     });
 
-    test('asserts when neither receiverPhone nor receiverId is given', () {
-      expect(
-        () => api.transfer(amount: 500),
-        throwsA(isA<AssertionError>()),
-      );
-    });
-
     test('parses the successful response into a TransactionResult', () async {
       final result = await api.transfer(amount: 500, receiverPhone: '+244900000011');
 
       expect(result.isSuccess, isTrue);
       expect(result.data?.transactionId, 'tx-1');
       expect(result.data?.newBalance, 900);
+    });
+  });
+
+  group('ApiService.transferToUser', () {
+    test('sends targetUserId and pin to wallet/transfer-to-user', () async {
+      await api.transferToUser(amount: 500, targetUserId: 'driver-123', pin: '482915');
+
+      final captured = verify(
+        () => mockDio.post('wallet/transfer-to-user', data: captureAny(named: 'data')),
+      ).captured.single as Map<String, dynamic>;
+
+      expect(captured['amount'], 500);
+      expect(captured['targetUserId'], 'driver-123');
+      expect(captured['pin'], '482915');
+      expect(captured.containsKey('phoneNumber'), isFalse);
+    });
+
+    test('asserts when neither targetUserId nor phoneNumber is given', () {
+      expect(
+        () => api.transferToUser(amount: 500, pin: '482915'),
+        throwsA(isA<AssertionError>()),
+      );
     });
   });
 }

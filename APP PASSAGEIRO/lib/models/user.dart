@@ -98,7 +98,8 @@ class User {
       isLoggedIn: json['isLoggedIn'] ?? true,
       role: json['role'],
       photo: json['photo'] ?? json['avatar'],
-      rating: (json['rating'] ?? json['averageRating'])?.toDouble(),
+      rating: double.tryParse(
+          (json['rating'] ?? json['averageRating'])?.toString() ?? ''),
       isVerified: json['isVerified'] ?? json['verified'],
     );
   }

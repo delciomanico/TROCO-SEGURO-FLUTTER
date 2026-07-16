@@ -939,10 +939,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (normalized.startsWith('data:image')) {
       final base64Data = normalized.split(',').last;
-      return Image.memory(
-        base64Decode(base64Data),
-        fit: BoxFit.contain,
-      );
+      try {
+        return Image.memory(
+          base64Decode(base64Data),
+          fit: BoxFit.contain,
+        );
+      } catch (_) {
+        return const Icon(Icons.qr_code_2_rounded, size: 140);
+      }
     }
 
     if (normalized.startsWith('http')) {
@@ -1134,20 +1138,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (validation.driverId != null)
                   TextButton.icon(
                     onPressed: () {
-                      // Confirmado contra o backend real (staging) que
-                      // POST transactions/transfer rejeita `receiverId`
-                      // ("property receiverId should not exist") — só
-                      // aceita receiverPhone, que não temos aqui (a
-                      // identificação por QR não devolve o telefone do
-                      // motorista). Ver BACKEND_PENDING_CHANGES.md, item 9.
-                      // Mantém o botão visível (não descartar o trabalho já
-                      // feito) mas explica a limitação em vez de tentar uma
-                      // transferência que sabemos que vai falhar.
                       Navigator.pop(context);
-                      FeedbackService.showInfo(
-                        context,
-                        message:
-                            'Transferência directa ao motorista ainda depende de uma actualização do backend. Use "Transferir" na Carteira com o número de telefone por agora.',
+                      _transferToDriver(
+                        validation.driverId!,
+                        validation.driverName,
                       );
                     },
                     icon: const Icon(Icons.send_rounded, size: 18),
@@ -1164,6 +1158,109 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// Transferência directa a um utilizador já identificado por ID (ex.
+  /// motorista lido por QR) — usa `wallet/transfer-to-user`, que exige o
+  /// PIN de conta como confirmação extra.
+  Future<void> _transferToDriver(String driverId, String? driverName) async {
+    final amountController = TextEditingController();
+    final pinController = TextEditingController();
+    String? dialogError;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text('Transferir para ${driverName ?? 'motorista'}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Valor (Kz)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN de conta',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(dialogError!, style: const TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final amount = int.tryParse(amountController.text.trim());
+                    final pin = pinController.text.trim();
+                    if (amount == null || amount <= 0) {
+                      setDialogState(() => dialogError = 'Valor inválido');
+                      return;
+                    }
+                    if (pin.length != 6) {
+                      setDialogState(
+                          () => dialogError = 'PIN deve ter 6 dígitos');
+                      return;
+                    }
+                    final isValid = await PinGuard.validatePin(
+                      scope: 'transfer_to_user',
+                      enteredPin: pin,
+                      readExpectedPin: () => SecureStorageService().readPin(),
+                    );
+                    if (!dialogContext.mounted) return;
+                    if (!isValid) {
+                      setDialogState(() => dialogError = 'PIN incorrecto');
+                      return;
+                    }
+                    Navigator.pop(dialogContext, true);
+                  },
+                  child: const Text('Transferir'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final amount = int.tryParse(amountController.text.trim()) ?? 0;
+    final pin = pinController.text.trim();
+    final provider = context.read<AppProvider>();
+    final result = await provider.transferToUser(
+      targetUserId: driverId,
+      amount: amount,
+      pin: pin,
+    );
+
+    if (!mounted) return;
+    if (result != null) {
+      FeedbackService.showSuccess(context,
+          message: 'Transferência realizada com sucesso!');
+    } else {
+      FeedbackService.showError(context,
+          message: provider.error ?? 'Erro ao realizar transferência');
+    }
   }
 
   Future<void> _handlePayWithQr() async {
@@ -1565,6 +1662,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
   Future<void> _markRead(String id) async {
     final api = context.read<AppProvider>().apiService;
     await api.markNotificationRead(id);
+    if (!mounted) return;
     setState(() {
       _notifications = _notifications
           .map((n) => n.id == id ? _copyRead(n) : n)
@@ -1575,6 +1673,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
   Future<void> _markAllRead() async {
     final api = context.read<AppProvider>().apiService;
     await api.markAllNotificationsRead();
+    if (!mounted) return;
     setState(() {
       _notifications = _notifications.map(_copyRead).toList();
     });

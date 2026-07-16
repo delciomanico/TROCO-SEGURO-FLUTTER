@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:troco_seguro/providers/app_provider.dart';
+import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
@@ -25,6 +26,7 @@ class _TopupModalState extends State<TopupModal> {
   bool _loading = false;
   String? _error;
   String? _reference;
+  QuoteResult? _quote;
 
   @override
   void dispose() {
@@ -42,6 +44,12 @@ class _TopupModalState extends State<TopupModal> {
       _error = null;
       _loading = true;
     });
+
+    final quoteResult =
+        await ApiService().getTransactionQuote(type: 'deposit', amount: amount);
+    if (!mounted) return;
+    if (quoteResult.isSuccess) _quote = quoteResult.data;
+
     final provider = context.read<AppProvider>();
     final result = await provider.deposit(amount);
     if (!mounted) return;
@@ -199,6 +207,17 @@ class _TopupModalState extends State<TopupModal> {
                         color: Theme.of(context).colorScheme.onSurface.withAlpha((0.7 * 255).round()),
                       ),
                     ),
+                    if (_quote != null) ...[
+                      SizedBox(height: responsive.scaledHeight(8)),
+                      Text(
+                        'Tarifa: ${_quote!.feeAmount} Kz · Total a pagar: ${_quote!.totalDebited} Kz',
+                        style: TextStyle(
+                          fontSize: responsive.responsiveFontSize(11),
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
