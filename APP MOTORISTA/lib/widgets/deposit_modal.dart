@@ -110,10 +110,10 @@ class _DepositModalState extends State<DepositModal> {
       ),
       child: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.darkCard,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
+            topLeft: Radius.circular(AppRadius.lg),
+            topRight: Radius.circular(AppRadius.lg),
           ),
         ),
         child: SingleChildScrollView(
@@ -127,8 +127,8 @@ class _DepositModalState extends State<DepositModal> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -152,7 +152,7 @@ class _DepositModalState extends State<DepositModal> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primaryGold.withValues(alpha: 0.3),
@@ -176,14 +176,14 @@ class _DepositModalState extends State<DepositModal> {
                               style: TextStyle(
                                 fontSize: responsive.responsiveFontSize(18),
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
+                                color: AppColors.textLight,
                               ),
                             ),
                             Text(
                               'Via Multicaixa Express',
                               style: TextStyle(
                                 fontSize: responsive.responsiveFontSize(12),
-                                color: Colors.grey.shade600,
+                                color: Colors.white.withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -195,12 +195,12 @@ class _DepositModalState extends State<DepositModal> {
                       icon: Container(
                         padding: EdgeInsets.all(responsive.scaledWidth(6)),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: Colors.white.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.close,
-                          color: Colors.grey.shade600,
+                          color: Colors.white70,
                           size: 18,
                         ),
                       ),
@@ -216,19 +216,9 @@ class _DepositModalState extends State<DepositModal> {
                 ),
                 padding: EdgeInsets.all(responsive.responsivePadding()),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.darkBackground, AppColors.darkSurface],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.darkBackground.withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  color: AppColors.darkCardElevated,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.25)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +273,7 @@ class _DepositModalState extends State<DepositModal> {
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(14),
               fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
+              color: AppColors.textLight,
             ),
           ),
           SizedBox(height: responsive.scaledHeight(10)),
@@ -293,12 +283,12 @@ class _DepositModalState extends State<DepositModal> {
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(22),
               fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+              color: AppColors.textLight,
             ),
             decoration: InputDecoration(
               hintText: '0 Kz',
               hintStyle: TextStyle(
-                color: Colors.grey.shade400,
+                color: Colors.white.withValues(alpha: 0.35),
                 fontWeight: FontWeight.w600,
               ),
               prefixIcon: Container(
@@ -310,13 +300,13 @@ class _DepositModalState extends State<DepositModal> {
                 ),
               ),
               filled: true,
-              fillColor: const Color(0xFFF5F7FA),
+              fillColor: Colors.white.withValues(alpha: 0.06),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 borderSide:
                     const BorderSide(color: AppColors.primaryGold, width: 2),
               ),
@@ -347,16 +337,16 @@ class _DepositModalState extends State<DepositModal> {
                           vertical: responsive.scaledHeight(8),
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5F7FA),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade200),
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                         ),
                         child: Text(
                           _formatCurrency(amount),
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(12),
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
+                            color: AppColors.textLight,
                           ),
                         ),
                       ),
@@ -370,7 +360,7 @@ class _DepositModalState extends State<DepositModal> {
               padding: EdgeInsets.all(responsive.responsivePadding() * 0.8),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -403,7 +393,7 @@ class _DepositModalState extends State<DepositModal> {
                   vertical: responsive.scaledHeight(16),
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 elevation: 0,
               ),
@@ -446,7 +436,7 @@ class _DepositModalState extends State<DepositModal> {
           padding: EdgeInsets.all(responsive.responsivePadding()),
           decoration: BoxDecoration(
             color: AppColors.primaryGold.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(color: AppColors.primaryGold),
           ),
           child: Column(
@@ -456,7 +446,7 @@ class _DepositModalState extends State<DepositModal> {
                 'Referência de pagamento',
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(12),
-                  color: Colors.grey.shade700,
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
               SizedBox(height: responsive.scaledHeight(4)),
@@ -473,7 +463,7 @@ class _DepositModalState extends State<DepositModal> {
                 'Pague este valor num Multicaixa Express ou ATM usando esta referência. O saldo é creditado após a confirmação do pagamento.',
                 style: TextStyle(
                   fontSize: responsive.responsiveFontSize(11),
-                  color: Colors.grey.shade700,
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -487,7 +477,7 @@ class _DepositModalState extends State<DepositModal> {
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(16)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               side: const BorderSide(color: AppColors.primaryGold),
             ),

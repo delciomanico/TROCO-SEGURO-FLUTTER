@@ -87,7 +87,7 @@ class SeatsGridScreen extends StatelessWidget {
                 vertical: responsive.scaledHeight(20),
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(color: accent.withValues(alpha: 0.5)),
               ),
               child: Column(
@@ -122,7 +122,7 @@ class SeatsGridScreen extends StatelessWidget {
                               : (isDark
                                   ? Colors.white.withValues(alpha: 0.06)
                                   : Colors.black.withValues(alpha: 0.05)),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           border: seat.paid
                               ? null
                               : Border.all(
@@ -164,7 +164,7 @@ class SeatsGridScreen extends StatelessWidget {
               padding: EdgeInsets.all(responsive.responsivePadding()),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkCard : AppColors.lightCard,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Row(
                 children: [
@@ -213,7 +213,7 @@ class SeatsGridScreen extends StatelessWidget {
           height: responsive.scaledWidth(20),
           decoration: BoxDecoration(
             color: filled ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: filled ? null : Border.all(color: color, width: 1.5),
           ),
         ),

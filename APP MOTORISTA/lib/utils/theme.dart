@@ -30,7 +30,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.darkCard,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -38,13 +38,13 @@ class AppTheme {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             borderSide: const BorderSide(color: Colors.transparent)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             borderSide:
                 const BorderSide(color: AppColors.primaryGold, width: 2)),
       ),
@@ -54,13 +54,13 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.darkCard,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.darkCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
       ),
       navigationBarTheme: const NavigationBarThemeData(
@@ -100,7 +100,7 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
       ),

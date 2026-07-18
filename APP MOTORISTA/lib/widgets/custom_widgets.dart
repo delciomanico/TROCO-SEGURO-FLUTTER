@@ -25,7 +25,7 @@ class DriverBrandingHeader extends StatelessWidget {
       padding: EdgeInsets.all(responsive.responsivePadding()),
       decoration: BoxDecoration(
         color: AppColors.darkBlue,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: [
@@ -34,7 +34,7 @@ class DriverBrandingHeader extends StatelessWidget {
               padding: EdgeInsets.all(responsive.scaledWidth(12)),
               decoration: BoxDecoration(
                 color: AppColors.accent.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Icon(
                 icon ?? Icons.local_taxi_rounded,
@@ -111,7 +111,7 @@ class CustomButton extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             side: BorderSide(color: buttonColor, width: 2),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
           ),
           child: _buildChild(responsive, buttonColor),
@@ -130,7 +130,7 @@ class CustomButton extends StatelessWidget {
           disabledBackgroundColor: buttonColor.withValues(alpha: 0.5),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
         child: _buildChild(responsive, Colors.white),
@@ -306,11 +306,11 @@ class _CustomInputState extends State<CustomInput> {
                 ? Colors.white.withValues(alpha: 0.1)
                 : AppColors.background,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               borderSide: BorderSide(color: widget.textColor ?? AppColors.cardBorder),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               borderSide: BorderSide(
                 color: widget.textColor != null
                     ? Colors.white.withValues(alpha: 0.3)
@@ -318,14 +318,14 @@ class _CustomInputState extends State<CustomInput> {
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               borderSide: BorderSide(
                 color: AppColors.adaptiveAccent(context),
                 width: 2,
               ),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               borderSide: const BorderSide(color: AppColors.error),
             ),
             contentPadding: EdgeInsets.symmetric(
@@ -436,7 +436,7 @@ class _PinInputState extends State<PinInput> {
                       ? AppColors.error.withValues(alpha: 0.1)
                       : AppColors.background,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: widget.errorText != null
                           ? AppColors.error
@@ -444,7 +444,7 @@ class _PinInputState extends State<PinInput> {
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: AppColors.adaptiveAccent(context),
                       width: 2,
@@ -520,7 +520,7 @@ class StatCard extends StatelessWidget {
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -536,7 +536,7 @@ class StatCard extends StatelessWidget {
               padding: EdgeInsets.all(responsive.scaledWidth(8)),
               decoration: BoxDecoration(
                 color: cardColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Icon(icon,
                   color: cardColor, size: responsive.scaledWidth(20)),
@@ -598,7 +598,7 @@ class StatusBadge extends StatelessWidget {
               : const LinearGradient(
                   colors: [AppColors.statusOffline, Color(0xFFDC2626)],
                 ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(
               color:
@@ -680,7 +680,7 @@ class TransactionCard extends StatelessWidget {
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -755,7 +755,7 @@ class SkeletonLoader extends StatefulWidget {
     super.key,
     required this.width,
     required this.height,
-    this.borderRadius = 8,
+    this.borderRadius = AppRadius.sm,
   });
 
   @override
@@ -924,8 +924,8 @@ class CustomBottomSheet extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(32),
-          topRight: Radius.circular(32),
+          topLeft: Radius.circular(AppRadius.lg),
+          topRight: Radius.circular(AppRadius.lg),
         ),
       ),
       child: Column(
@@ -937,7 +937,7 @@ class CustomBottomSheet extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
           SizedBox(height: responsive.scaledHeight(20)),
@@ -949,7 +949,7 @@ class CustomBottomSheet extends StatelessWidget {
                   padding: EdgeInsets.all(responsive.scaledWidth(10)),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Icon(icon, color: AppColors.accent, size: 24),
                 ),
@@ -1020,7 +1020,7 @@ class GradientCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(borderRadius ?? 24),
+        borderRadius: BorderRadius.circular(borderRadius ?? AppRadius.lg),
         boxShadow: [
           BoxShadow(
             color: (colors?.first ?? AppColors.accent).withValues(alpha: 0.3),

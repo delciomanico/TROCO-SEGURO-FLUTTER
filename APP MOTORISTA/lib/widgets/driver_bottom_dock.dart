@@ -131,7 +131,7 @@ class DriverBottomDock extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: dockBg,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: dockBorder),
       ),
       child: Row(

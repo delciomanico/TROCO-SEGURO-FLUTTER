@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:intl/intl.dart';
 
@@ -215,11 +216,11 @@ class _SuccessModalState extends State<SuccessModal>
             child: Container(
               margin: EdgeInsets.all(responsive.scaledWidth(16)),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(32),
+                color: AppColors.darkCard,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -234,8 +235,8 @@ class _SuccessModalState extends State<SuccessModal>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
 
@@ -256,7 +257,7 @@ class _SuccessModalState extends State<SuccessModal>
                           style: TextStyle(
                             fontSize: responsive.responsiveFontSize(22),
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0D2137),
+                            color: AppColors.textLight,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -278,7 +279,7 @@ class _SuccessModalState extends State<SuccessModal>
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
                               border: Border.all(
                                 color: iconColor.withValues(alpha: 0.3),
                               ),
@@ -301,7 +302,7 @@ class _SuccessModalState extends State<SuccessModal>
                             widget.subtitle!,
                             style: TextStyle(
                               fontSize: responsive.responsiveFontSize(14),
-                              color: Colors.grey.shade600,
+                              color: Colors.white.withValues(alpha: 0.6),
                               height: 1.4,
                             ),
                             textAlign: TextAlign.center,
@@ -383,7 +384,7 @@ class _SuccessModalState extends State<SuccessModal>
             vertical: responsive.scaledHeight(16),
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           elevation: 0,
         ),
@@ -408,9 +409,9 @@ class _SuccessModalState extends State<SuccessModal>
           padding: EdgeInsets.symmetric(
             vertical: responsive.scaledHeight(16),
           ),
-          side: BorderSide(color: Colors.grey.shade300),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
         child: Text(
@@ -418,7 +419,7 @@ class _SuccessModalState extends State<SuccessModal>
           style: TextStyle(
             fontSize: responsive.responsiveFontSize(14),
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF0D2137),
+            color: AppColors.textLight,
           ),
         ),
       ),

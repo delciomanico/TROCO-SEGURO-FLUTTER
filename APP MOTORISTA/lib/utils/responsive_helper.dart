@@ -42,9 +42,9 @@ class ResponsiveHelper {
   }
 
   double responsiveBorderRadius() {
-    if (isMobile) return 16;
-    if (isTablet) return 20;
-    return 24;
+    if (isMobile) return 6;
+    if (isTablet) return 8;
+    return 8;
   }
 
   EdgeInsets responsiveHorizontalPadding() {

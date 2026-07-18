@@ -162,7 +162,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
       height: MediaQuery.of(context).size.height * 0.92,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Column(
         children: [
@@ -175,7 +175,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.15)
                   : Colors.black.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
 
@@ -193,7 +193,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                   padding: EdgeInsets.all(responsive.scaledWidth(10)),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Icon(
                     Icons.event_seat_rounded,
@@ -241,7 +241,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
               padding: EdgeInsets.all(responsive.responsivePadding()),
               decoration: BoxDecoration(
                 color: AppColors.darkBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(
                   color: AppColors.darkBlue.withValues(alpha: 0.2),
                 ),
@@ -317,7 +317,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                     padding: EdgeInsets.symmetric(
                         vertical: responsive.scaledHeight(16)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     elevation: 0,
                   ),
@@ -368,7 +368,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.07)
@@ -401,7 +401,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -445,7 +445,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
             padding: EdgeInsets.all(responsive.scaledWidth(16)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: AppColors.accent.withValues(alpha: 0.2),
                 width: 2,
@@ -613,7 +613,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
           ),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: isLoading
               ? Center(

@@ -195,7 +195,7 @@ class TermsAndConditionsScreen extends StatelessWidget {
           padding: EdgeInsets.all(responsive.scaledWidth(14)),
           decoration: BoxDecoration(
             color: cardBg,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Text(
             content,

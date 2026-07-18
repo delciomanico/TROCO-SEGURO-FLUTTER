@@ -199,7 +199,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
           return Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.06)
@@ -309,7 +309,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: const EdgeInsets.all(24),
       child: Form(
@@ -397,7 +397,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
                       : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(AppRadius.md)),
                 ),
                 onPressed: _isSubmitting ? null : _submit,
                 child: _isSubmitting
@@ -485,7 +485,7 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: const EdgeInsets.all(24),
       child: Form(
@@ -573,7 +573,7 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
                       : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(AppRadius.md)),
                 ),
                 onPressed: _isSubmitting ? null : _submit,
                 child: _isSubmitting

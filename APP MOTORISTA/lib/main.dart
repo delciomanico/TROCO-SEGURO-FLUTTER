@@ -513,8 +513,8 @@ class _AppControllerState extends State<AppController>
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
+            topLeft: Radius.circular(AppRadius.lg),
+            topRight: Radius.circular(AppRadius.lg),
           ),
         ),
         child: Column(
@@ -547,7 +547,7 @@ class _AppControllerState extends State<AppController>
                   backgroundColor: AppColors.primaryGold,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(AppRadius.md)),
                 ),
                 child: const Text('VERIFICAR AGORA',
                     style: TextStyle(color: Colors.white)),
@@ -825,7 +825,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                 decoration: BoxDecoration(
                   color: cardBg,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   boxShadow: isDark
                       ? []
                       : [
@@ -877,7 +877,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                   : const Color(0xFFF2F2F7),
                               contentPadding: EdgeInsets.zero,
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: isDark
                                       ? const Color(0xFF3A3A3C)
@@ -886,7 +886,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: isDark
                                       ? const Color(0xFF3A3A3C)
@@ -895,14 +895,14 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: accent,
                                   width: 2.5,
                                 ),
                               ),
                               errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: const BorderSide(
                                   color: Color(0xFFFF3B30),
                                   width: 2,
@@ -996,7 +996,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: accent,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1024,7 +1024,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: cardBg,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color: isDark
                             ? const Color(0xFF3A3A3C)
@@ -1453,7 +1453,7 @@ class _MenuModalState extends State<_MenuModal> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
                       color: Colors.red.withValues(alpha: 0.22), width: 1.0),
                 ),
@@ -1677,7 +1677,7 @@ class _ProfileModal extends StatelessWidget {
       builder: (ctx) => Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1692,7 +1692,7 @@ class _ProfileModal extends StatelessWidget {
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.15)
                       : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
@@ -1746,14 +1746,14 @@ class _ProfileModal extends StatelessWidget {
       {VoidCallback? onTap, bool verified = false}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isDark
               ? Colors.white.withValues(alpha: 0.05)
               : Colors.black.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.1)
@@ -1806,7 +1806,7 @@ class _ProfileModal extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1821,7 +1821,7 @@ class _ProfileModal extends StatelessWidget {
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.15)
                         : Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -1847,9 +1847,9 @@ class _ProfileModal extends StatelessWidget {
                           color: Colors.green, size: 18)
                       : null,
                   border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.15)
@@ -1857,7 +1857,7 @@ class _ProfileModal extends StatelessWidget {
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide:
                         const BorderSide(color: AppColors.primaryGold, width: 1.5),
                   ),
@@ -1897,7 +1897,7 @@ class _ProfileModal extends StatelessWidget {
                     foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: const Text(
@@ -2205,7 +2205,7 @@ class _SecurityModalState extends State<_SecurityModal> {
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -2220,7 +2220,7 @@ class _SecurityModalState extends State<_SecurityModal> {
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.15)
                           : Colors.black.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -2307,7 +2307,7 @@ class _SecurityModalState extends State<_SecurityModal> {
                       foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
                       elevation: 0,
                     ),
                     child: busy
@@ -2344,9 +2344,9 @@ class _SecurityModalState extends State<_SecurityModal> {
         counterText: '',
         prefixIcon:
             const Icon(Icons.lock_outline, color: AppColors.primaryGold),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.15)
@@ -2354,7 +2354,7 @@ class _SecurityModalState extends State<_SecurityModal> {
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
         ),
         filled: true,
@@ -2639,7 +2639,7 @@ class _PanicButtonState extends State<_PanicButton> {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: _active ? Colors.red.shade700 : Colors.red,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2715,7 +2715,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -2730,7 +2730,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.15)
                         : Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -2778,7 +2778,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                     foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: const Text('Adicionar',
@@ -2804,9 +2804,9 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
         prefixIcon:
             Icon(icon, color: AppColors.primaryGold),
         border:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.15)
@@ -2814,7 +2814,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(
               color: AppColors.primaryGold, width: 1.5),
         ),
@@ -2903,7 +2903,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                                 color: isDark
                                     ? Colors.white.withValues(alpha: 0.05)
                                     : Colors.black.withValues(alpha: 0.03),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 border: Border.all(
                                   color: isDark
                                       ? Colors.white.withValues(alpha: 0.08)
@@ -2986,7 +2986,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                               padding:
                                   const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(AppRadius.md)),
                               elevation: 0,
                             ),
                           ),
@@ -3215,7 +3215,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                                     ? Colors.white.withValues(alpha: 0.03)
                                     : Colors.black.withValues(alpha: 0.02))
                                 : accent.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             border: Border.all(
                               color: n.isRead
                                   ? (isDark
@@ -3487,7 +3487,7 @@ class _SettingsModalState extends State<_SettingsModal> {
                   decoration: InputDecoration(
                     hintText: 'IBAN (ex: AO06...)',
                     hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
@@ -3692,7 +3692,7 @@ class _VehicleSelectionModal extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: EdgeInsets.fromLTRB(
         24,
@@ -3710,7 +3710,7 @@ class _VehicleSelectionModal extends StatelessWidget {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.15)
                   : Colors.black.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
           const SizedBox(height: 24),
@@ -3785,7 +3785,7 @@ class _VehicleSelectionModal extends StatelessWidget {
                   final v = vehicles[i];
                   return InkWell(
                     onTap: () => Navigator.pop(ctx, v.id),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 14, horizontal: 4),
@@ -3796,7 +3796,7 @@ class _VehicleSelectionModal extends StatelessWidget {
                             height: 44,
                             decoration: BoxDecoration(
                               color: AppColors.primaryGold.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: const Icon(Icons.directions_car_rounded,
                                 color: AppColors.primaryGold, size: 22),

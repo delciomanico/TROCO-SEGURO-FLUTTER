@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:troco_seguro_pro/utils/constants.dart';
 
 /// Código de país para preenchimento do número de telefone.
 class CountryCode {
@@ -62,7 +63,7 @@ class CountryCodeSelector extends StatelessWidget {
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: borderColor, width: 1.2),
         ),
         child: Row(
@@ -101,7 +102,7 @@ class _CountryPickerSheet extends StatelessWidget {
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1B1B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -112,7 +113,7 @@ class _CountryPickerSheet extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: isDark ? Colors.white24 : Colors.black12,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
           Padding(

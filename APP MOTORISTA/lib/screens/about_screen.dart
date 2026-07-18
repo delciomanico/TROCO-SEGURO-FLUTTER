@@ -81,7 +81,7 @@ class AboutScreen extends StatelessWidget {
               padding: EdgeInsets.all(responsive.scaledWidth(16)),
               decoration: BoxDecoration(
                 color: cardBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Text(
                 'Troco Seguro é uma plataforma inovadora que conecta motoristas a passageiros de forma segura e eficiente. '
@@ -169,7 +169,7 @@ class AboutScreen extends StatelessWidget {
               padding: EdgeInsets.all(responsive.scaledWidth(16)),
               decoration: BoxDecoration(
                 color: cardBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,7 +249,7 @@ class AboutScreen extends StatelessWidget {
       padding: EdgeInsets.all(responsive.scaledWidth(16)),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
