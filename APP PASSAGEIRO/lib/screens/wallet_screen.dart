@@ -258,7 +258,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 11),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.12)
@@ -266,14 +266,14 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: AppColors.accentOf(context).withValues(alpha: 0.7),
                             width: 1.2,
                           ),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),
@@ -364,7 +364,7 @@ class _WalletScreenState extends State<WalletScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -696,7 +696,7 @@ class _WalletScreenState extends State<WalletScreen> {
               : (isDark
                   ? Colors.white.withValues(alpha: 0.07)
                   : Colors.black.withValues(alpha: 0.04)),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: isActive
                 ? AppColors.accentOf(context)
@@ -762,7 +762,7 @@ class _WalletScreenState extends State<WalletScreen> {
       padding: EdgeInsets.all(responsive.scaledWidth(14)),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.06)
@@ -1076,7 +1076,7 @@ class _ExternalCardSheetState extends State<_ExternalCardSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.green.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Row(
                 children: [
@@ -1315,7 +1315,7 @@ class _TransferSheetState extends State<_TransferSheet> {
                   horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.green.withAlpha(20),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 children: [
@@ -1496,7 +1496,7 @@ class _BottomSheetWrapper extends StatelessWidget {
                 ? Theme.of(context).cardColor
                 : AppColors.lightCard,
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -1525,7 +1525,7 @@ class _BottomSheetWrapper extends StatelessWidget {
                           .colorScheme
                           .outline
                           .withAlpha((0.3 * 255).round()),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -1577,7 +1577,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.red.withAlpha((0.08 * 255).round()),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Text(message,
           style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -1693,7 +1693,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
         child: Column(
@@ -1708,7 +1708,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.15)
                       : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
@@ -1752,13 +1752,13 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                 labelText: 'Valor a levantar',
                 suffixText: 'Kz',
                 prefixIcon: const Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
@@ -1775,13 +1775,13 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                 prefixIcon: Icon(_method == 'bank'
                     ? Icons.credit_score_rounded
                     : Icons.phone_android_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
@@ -1793,7 +1793,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.orange.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -1820,7 +1820,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                   backgroundColor: AppColors.accentOf(context),
                   foregroundColor: isDark ? Colors.black : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   elevation: 0,
                 ),
                 child: _busy
@@ -1870,7 +1870,7 @@ class _WithdrawalMethodOption extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected ? accent.withValues(alpha: 0.12) : unselectedBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isSelected ? accent : unselectedBorder,
             width: isSelected ? 2 : 1,

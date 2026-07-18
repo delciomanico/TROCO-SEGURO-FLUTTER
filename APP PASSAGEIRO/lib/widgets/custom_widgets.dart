@@ -63,7 +63,7 @@ class AppBrandingHeader extends StatelessWidget {
           padding: EdgeInsets.all(responsive.scaledWidth(compact ? 8 : 12)),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(compact ? 10 : 14),
+            borderRadius: BorderRadius.circular(compact ? AppRadius.sm : AppRadius.md),
             border: Border.all(
               color: AppColors.accentOf(context).withValues(alpha: 0.6),
               width: 2,

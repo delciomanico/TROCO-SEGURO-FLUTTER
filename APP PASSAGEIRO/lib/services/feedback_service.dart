@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:troco_seguro/utils/constants.dart';
 
 enum FeedbackPosition { top, bottom, center }
 
@@ -124,7 +125,7 @@ class FeedbackService {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: colors['background'],
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: [
                     BoxShadow(
                       color: (colors['shadow'] as Color).withValues(alpha: 0.4),
@@ -144,7 +145,7 @@ class FeedbackService {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: (colors['icon'] as Color).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                       child: Icon(
                         icon,

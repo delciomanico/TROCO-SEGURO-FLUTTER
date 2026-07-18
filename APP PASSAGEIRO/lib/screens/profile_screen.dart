@@ -325,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: Colors.grey.withValues(alpha: 0.1),
           width: 0.5,
@@ -391,7 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         decoration: BoxDecoration(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
@@ -499,7 +499,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         decoration: BoxDecoration(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: Colors.grey.withValues(alpha: 0.1),
             width: 0.5,
@@ -556,8 +556,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
+              topLeft: Radius.circular(AppRadius.lg),
+              topRight: Radius.circular(AppRadius.lg),
             ),
             border: Border.all(
               color: Theme.of(context)
@@ -587,7 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         .colorScheme
                         .onSurface
                         .withAlpha((0.25 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -620,7 +620,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   prefixIcon: Icon(Icons.person_outline,
                       color: Theme.of(context).colorScheme.primary),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -629,7 +629,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -638,7 +638,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context).colorScheme.primary,
                       width: 2,
@@ -672,7 +672,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   prefixIcon: Icon(Icons.phone_outlined,
                       color: Theme.of(context).colorScheme.primary),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -681,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   disabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -690,7 +690,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context)
                           .colorScheme
@@ -699,7 +699,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: Theme.of(context).colorScheme.primary,
                       width: 2,
@@ -735,7 +735,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: EdgeInsets.symmetric(
                         vertical: responsive.scaledHeight(16)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     elevation: 0,
                   ),
@@ -765,7 +765,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             context: context,
             builder: (context) => AlertDialog(
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(AppRadius.lg)),
               title: const Text(
                 'Sair da conta?',
                 style: TextStyle(
@@ -804,7 +804,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(16)),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkBackground : Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1),
             boxShadow: [
               BoxShadow(
@@ -915,8 +915,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(
             color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
+              topLeft: Radius.circular(AppRadius.lg),
+              topRight: Radius.circular(AppRadius.lg),
             ),
             border: Border.all(
               color: Theme.of(ctx)
@@ -946,7 +946,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         .colorScheme
                         .onSurface
                         .withAlpha((0.25 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -1024,7 +1024,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: EdgeInsets.symmetric(
                         vertical: responsive.scaledHeight(16)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     elevation: 0,
                     disabledBackgroundColor:
@@ -1086,7 +1086,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             prefixIcon: Icon(Icons.lock_outline,
                 color: Theme.of(context).colorScheme.primary),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(
                 color: Theme.of(context)
                     .colorScheme
@@ -1095,7 +1095,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(
                 color: Theme.of(context)
                     .colorScheme
@@ -1104,7 +1104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(
                 color: Theme.of(context).colorScheme.primary,
                 width: 2,
@@ -1182,7 +1182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
@@ -1226,7 +1226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       padding: EdgeInsets.symmetric(
                           vertical: responsive.scaledHeight(14)),
@@ -1333,7 +1333,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                               ),
                               padding: EdgeInsets.symmetric(
                                 vertical: responsive.scaledHeight(14),

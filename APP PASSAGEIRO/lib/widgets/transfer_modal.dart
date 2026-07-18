@@ -241,7 +241,7 @@ class _TransferModalState extends State<TransferModal> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border.all(
           color: Theme.of(context).colorScheme.onSurface.withAlpha((0.08 * 255).round()),
         ),
@@ -270,7 +270,7 @@ class _TransferModalState extends State<TransferModal> {
               height: 4,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.outline.withAlpha((0.3 * 255).round()),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             SizedBox(height: responsive.scaledHeight(24)),
@@ -321,7 +321,7 @@ class _TransferModalState extends State<TransferModal> {
                 Container(
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: IconButton(
                     icon: const Icon(Icons.qr_code_scanner, color: Colors.white),

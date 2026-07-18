@@ -109,7 +109,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border.all(
           color: Theme.of(context)
               .colorScheme
@@ -144,7 +144,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
                     .colorScheme
                     .outline
                     .withAlpha((0.3 * 255).round()),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             SizedBox(height: responsive.scaledHeight(24)),
@@ -273,7 +273,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
                               .withAlpha((0.18 * 255).round()),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: Text(
@@ -298,7 +298,7 @@ class _CardTransferModalState extends State<CardTransferModal> {
                           vertical: responsive.scaledHeight(14),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),

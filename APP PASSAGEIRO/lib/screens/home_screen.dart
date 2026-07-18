@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               .withAlpha((0.18 * 255).round()),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: Text(
@@ -195,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: responsive.scaledHeight(14),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -235,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -270,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -333,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               .withAlpha((0.18 * 255).round()),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: Text(
@@ -358,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: responsive.scaledHeight(14),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -636,7 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -998,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -1025,7 +1025,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -1045,10 +1045,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.all(responsive.scaledWidth(16)),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   child: Center(
                     child: _buildQrCodePreview(qrCode),
                   ),
@@ -1509,7 +1509,7 @@ class _HomeScreenState extends State<HomeScreen> {
               EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.06)
@@ -1760,7 +1760,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                             decoration: BoxDecoration(
                               color: AppColors.accentOf(context)
                                   .withValues(alpha: isDark ? 0.15 : 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
                               border: Border.all(
                                 color:
                                     AppColors.accentOf(context).withValues(alpha: 0.4),
@@ -1870,7 +1870,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                                     .withValues(alpha: 0.08)
                                                 : AppColors.accentOf(context)
                                                     .withValues(alpha: 0.05),
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(AppRadius.md),
                                         border: Border.all(
                                           color: n.read
                                               ? (isDark

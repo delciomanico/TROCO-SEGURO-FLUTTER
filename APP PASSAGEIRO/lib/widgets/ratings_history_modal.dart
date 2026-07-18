@@ -63,7 +63,7 @@ class _RatingsHistoryModalState extends State<RatingsHistoryModal> {
       constraints: BoxConstraints(maxHeight: maxH),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkBackground : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border.all(
           color: Theme.of(context)
               .colorScheme
@@ -85,7 +85,7 @@ class _RatingsHistoryModalState extends State<RatingsHistoryModal> {
                     .colorScheme
                     .outline
                     .withAlpha((0.3 * 255).round()),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
           ),
@@ -118,7 +118,7 @@ class _RatingsHistoryModalState extends State<RatingsHistoryModal> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.accentOf(context).withAlpha(30),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     child: Text(
                       '${_ratings.length}',
@@ -249,7 +249,7 @@ class _RatingsHistoryModalState extends State<RatingsHistoryModal> {
         padding: EdgeInsets.all(responsive.scaledWidth(14)),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.08)
@@ -273,7 +273,7 @@ class _RatingsHistoryModalState extends State<RatingsHistoryModal> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.accentOf(context).withAlpha(28),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     rating.scoreLabel,

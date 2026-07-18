@@ -196,7 +196,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 11),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.12)
@@ -204,7 +204,7 @@ class _TripsScreenState extends State<TripsScreen> {
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color:
                                 AppColors.accentOf(context).withValues(alpha: 0.7),
@@ -212,7 +212,7 @@ class _TripsScreenState extends State<TripsScreen> {
                           ),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),
@@ -324,7 +324,7 @@ class _TripsScreenState extends State<TripsScreen> {
       ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.08)
@@ -526,7 +526,7 @@ class _TripsScreenState extends State<TripsScreen> {
             padding: EdgeInsets.all(responsive.scaledWidth(14)),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.08)
@@ -576,7 +576,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     _statusLabel(trip.status),
@@ -646,7 +646,7 @@ class _TripsScreenState extends State<TripsScreen> {
             BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -659,7 +659,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             Padding(
@@ -682,7 +682,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Text(
                       statusLabel,
@@ -753,7 +753,7 @@ class _TripsScreenState extends State<TripsScreen> {
                             side: BorderSide(color: AppColors.accentOf(context)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(AppRadius.md)),
                           ),
                         ),
                       ),

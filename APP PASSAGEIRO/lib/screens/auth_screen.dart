@@ -417,7 +417,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       backgroundColor: primaryGold,
                       foregroundColor: isDark ? Colors.black : Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
                       elevation: 0,
                     ),
                     child: isLoading
@@ -491,7 +491,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 width: double.infinity,
                 height: r.scaledHeight(56),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: [
                     // Sombra inferior (profundidade)
                     BoxShadow(
@@ -533,7 +533,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     foregroundColor: primaryGold,
                     side: BorderSide(color: primaryGold, width: 2),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: Text('Criar conta',
@@ -548,7 +548,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 width: double.infinity,
                 height: r.scaledHeight(56),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: [
                     // Sombra inferior (profundidade)
                     BoxShadow(
@@ -589,7 +589,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     backgroundColor: primaryGold,
                     foregroundColor: isDark ? Colors.black : Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: Text('Entrar',
@@ -780,19 +780,19 @@ class _AuthScreenState extends State<AuthScreen> {
                         horizontal: r.scaledWidth(16),
                         vertical: r.scaledHeight(14)),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                           color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
                           width: 1.2),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                           color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
                           width: 1.2),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: primaryGold, width: 1.6),
                     ),
                   ),
@@ -813,7 +813,7 @@ class _AuthScreenState extends State<AuthScreen> {
               horizontal: r.scaledWidth(12), vertical: r.scaledHeight(8)),
           decoration: BoxDecoration(
             color: primaryGold.withAlpha((0.10 * 255).round()),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Text(
             '+244 ${phoneController.text}',
@@ -918,19 +918,19 @@ class _AuthScreenState extends State<AuthScreen> {
               contentPadding: EdgeInsets.symmetric(
                   horizontal: r.scaledWidth(16), vertical: r.scaledHeight(14)),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(
                     color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
                     width: 1.2),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(
                     color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
                     width: 1.2),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: primaryGold, width: 1.6),
               ),
             ),
@@ -945,7 +945,7 @@ class _AuthScreenState extends State<AuthScreen> {
       padding: EdgeInsets.all(r.scaledWidth(12)),
       decoration: BoxDecoration(
         color: Colors.red.shade900.withAlpha((0.25 * 255).round()),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         children: [
@@ -971,7 +971,7 @@ class _AuthScreenState extends State<AuthScreen> {
       width: double.infinity,
       height: r.scaledHeight(56),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: [
           // Sombra inferior (profundidade)
           BoxShadow(
@@ -1008,7 +1008,7 @@ class _AuthScreenState extends State<AuthScreen> {
           backgroundColor: primaryGold,
           foregroundColor: isDark ? Colors.black : Colors.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           elevation: 0,
         ),
         child: isLoading
@@ -1210,7 +1210,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
                     margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
                     decoration: BoxDecoration(
                       color: active ? gold : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.1)),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ));
                 }),
@@ -1262,11 +1262,11 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
                 hintText: '9XX XXX XXX',
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(color: gold, width: 1.6)),
               ),
             ),
@@ -1352,11 +1352,11 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
                 : null,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, width: 1.2)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: gold, width: 1.6)),
           ),
         ),
@@ -1373,7 +1373,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
           backgroundColor: gold,
           foregroundColor: isDark ? Colors.black : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           elevation: 0,
         ),
         child: _busy

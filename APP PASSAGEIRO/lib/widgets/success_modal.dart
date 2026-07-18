@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
+import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 
 class SuccessModal extends StatelessWidget {
@@ -24,7 +25,7 @@ class SuccessModal extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? Theme.of(context).cardColor : Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border.all(
           color: Theme.of(context).colorScheme.onSurface.withAlpha((0.08 * 255).round()),
         ),
@@ -47,7 +48,7 @@ class SuccessModal extends StatelessWidget {
               height: 4,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.outline.withAlpha((0.3 * 255).round()),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
           ),

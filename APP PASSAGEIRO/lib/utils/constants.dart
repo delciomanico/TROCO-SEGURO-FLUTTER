@@ -85,6 +85,15 @@ class AppColors {
   }
 }
 
+/// Escala de raio de borda alinhada ao design do site (trocoseguro.wemof.tech),
+/// que usa cantos quase rectos (~2-6px) em vez do arredondado tradicional mobile.
+class AppRadius {
+  static const double xs = 2;
+  static const double sm = 4;
+  static const double md = 6;
+  static const double lg = 8;
+}
+
 class Constants {
   // URL base da API
   static const String apiBaseUrl = 'https://trocoseguro.wemof.tech';

@@ -188,7 +188,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: selected ? bgSelected : bgUnselected,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: selected ? borderSelected : borderUnselected,
               width: selected ? 1.5 : 1,
@@ -261,7 +261,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           border: Border.all(
             color: Theme.of(context)
                 .colorScheme
@@ -294,7 +294,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                   decoration: BoxDecoration(
                     color:
                         Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
@@ -322,7 +322,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
                           color: AppColors.accentOf(context).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
                           border: Border.all(color: AppColors.accentOf(context).withValues(alpha: 0.4)),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -383,7 +383,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                     padding: EdgeInsets.all(responsive.responsiveSpacing()),
                     decoration: BoxDecoration(
                         color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(AppRadius.sm)),
                     child: Text(_pinError!,
                         style: TextStyle(
                             color: Colors.red.shade700,
@@ -411,7 +411,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
                             border: Border.all(
                                 color: Theme.of(context).colorScheme.outline,
                                 width: 2),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             color: Theme.of(context)
                                 .colorScheme
                                 .surfaceContainerHighest,
