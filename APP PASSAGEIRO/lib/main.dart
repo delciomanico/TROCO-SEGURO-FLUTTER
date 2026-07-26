@@ -376,15 +376,80 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showPaymentConfirmationFlow(QrValidationResult driverInfo) {
+  Future<void> _showPaymentConfirmationFlow(QrValidationResult driverInfo) async {
+    int amount = driverInfo.amount ?? 0;
+    String origin = 'Origem';
+    String destination = 'Destino';
+
+    // Se o QR não trouxer o valor (ex.: QR antigo sem preço embutido),
+    // pedir os detalhes manualmente em vez de assumir um valor fixo.
+    if (amount == 0) {
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) {
+          final amountController = TextEditingController();
+          final originController = TextEditingController();
+          final destinationController = TextEditingController();
+          return AlertDialog(
+            title: const Text('Detalhes do Pagamento'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Valor (Kz)'),
+                ),
+                TextField(
+                  controller: originController,
+                  decoration: const InputDecoration(labelText: 'Origem'),
+                ),
+                TextField(
+                  controller: destinationController,
+                  decoration: const InputDecoration(labelText: 'Destino'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar')),
+              ElevatedButton(
+                onPressed: () {
+                  final a = int.tryParse(amountController.text) ?? 0;
+                  Navigator.pop(context, {
+                    'amount': a,
+                    'origin': originController.text.trim(),
+                    'destination': destinationController.text.trim(),
+                  });
+                },
+                child: const Text('Continuar'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted) return;
+      if (result == null) return;
+      amount = (result['amount'] as int?) ?? 0;
+      origin = (result['origin'] as String?)?.isNotEmpty == true
+          ? result['origin'] as String
+          : origin;
+      destination = (result['destination'] as String?)?.isNotEmpty == true
+          ? result['destination'] as String
+          : destination;
+    }
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => PaymentConfirmationModal(
         driverInfo: driverInfo,
-        amount: 2500, // Valor padrão da viagem
-        origin: 'Aeroporto',
-        destination: 'Hotel',
+        amount: amount,
+        origin: origin,
+        destination: destination,
         pinValidator: (entered) async {
           // Validar PIN com PinGuard
           return PinGuard.validatePin(
@@ -1542,20 +1607,26 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
                 const SizedBox(height: 20),
                 _field('Nome', nameCtrl, isDark, Icons.person_outline),
                 const SizedBox(height: 12),
-                _field('Telefone (+244...)', phoneCtrl, isDark, Icons.phone_outlined, type: TextInputType.phone),
+                _field('Telefone', phoneCtrl, isDark, Icons.phone_outlined,
+                    type: TextInputType.phone,
+                    prefixText: '+244 ',
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(9),
+                    ]),
                 const SizedBox(height: 22),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: busy ? null : () async {
                       final name = nameCtrl.text.trim();
-                      final phone = phoneCtrl.text.trim();
-                      if (name.isEmpty || phone.isEmpty) {
+                      final digits = phoneCtrl.text.trim();
+                      if (name.isEmpty || digits.length != 9) {
                         FeedbackService.showError(context, message: 'Preencha todos os campos');
                         return;
                       }
                       setSheet(() => busy = true);
-                      final res = await _api.addEmergencyContact(name: name, phoneNumber: phone);
+                      final res = await _api.addEmergencyContact(name: name, phoneNumber: '+244$digits');
                       if (!ctx.mounted) return;
                       setSheet(() => busy = false);
                       if (res.isSuccess && res.data != null) {
@@ -1586,11 +1657,16 @@ class _EmergencyContactsPageState extends State<_EmergencyContactsPage> {
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl, bool isDark, IconData icon, {TextInputType type = TextInputType.text}) {
+  Widget _field(String label, TextEditingController ctrl, bool isDark, IconData icon,
+      {TextInputType type = TextInputType.text,
+      List<TextInputFormatter>? inputFormatters,
+      String? prefixText}) {
     return TextField(
       controller: ctrl, keyboardType: type,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
+        prefixText: prefixText,
         prefixIcon: Icon(icon, color: AppColors.accentOf(context)),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md),

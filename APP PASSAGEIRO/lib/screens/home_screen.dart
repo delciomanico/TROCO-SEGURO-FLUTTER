@@ -14,7 +14,8 @@ import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
-import 'package:troco_seguro/services/api_service.dart' show AppNotification;
+import 'package:troco_seguro/services/api_service.dart'
+    show AppNotification, ApiService;
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/formatters.dart';
 import 'package:geolocator/geolocator.dart';
@@ -44,6 +45,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool showBalance = false;
   bool _isPanicLoading = false;
+  int _unreadNotifications = 0;
 
   // Panic mode state
   bool _isPanicActive = false;
@@ -51,6 +53,20 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _panicStartTime;
   static const _panicInterval = Duration(seconds: 30);
   static const _panicMaxDuration = Duration(hours: 5);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadNotificationsCount();
+  }
+
+  Future<void> _loadUnreadNotificationsCount() async {
+    final result = await ApiService().getNotifications();
+    if (!mounted) return;
+    if (result.isSuccess) {
+      setState(() => _unreadNotifications = result.data?.unreadCount ?? 0);
+    }
+  }
 
   @override
   void dispose() {
@@ -592,6 +608,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: _showNotificationsModal,
                 isDark: isDark,
                 responsive: responsive,
+                badgeCount: _unreadNotifications,
               ),
             ],
           ),
@@ -600,8 +617,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showNotificationsModal() {
-    showGeneralDialog(
+  Future<void> _showNotificationsModal() async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
@@ -618,6 +635,8 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+    if (!mounted) return;
+    _loadUnreadNotificationsCount();
   }
 
   Widget _buildBalanceCard(ResponsiveHelper responsive, User? user) {
@@ -1441,25 +1460,59 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback? onTap,
     required bool isDark,
     required ResponsiveHelper responsive,
+    int badgeCount = 0,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: responsive.scaledWidth(38),
-        height: responsive.scaledWidth(38),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.05),
-        ),
-        child: Icon(
-          icon,
-          size: responsive.scaledWidth(20),
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.85)
-              : AppColors.textDark.withValues(alpha: 0.7),
-        ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: responsive.scaledWidth(38),
+            height: responsive.scaledWidth(38),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
+            ),
+            child: Icon(
+              icon,
+              size: responsive.scaledWidth(20),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : AppColors.textDark.withValues(alpha: 0.7),
+            ),
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.black : Colors.white,
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  badgeCount > 9 ? '9+' : '$badgeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

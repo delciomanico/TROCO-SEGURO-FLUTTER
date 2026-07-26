@@ -652,7 +652,11 @@ class AppProvider extends ChangeNotifier {
         addTransaction(Transaction(
           id: result.data!.transactionId ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'payment',
+          // O backend classifica isto como "transfer" (ver
+          // API_ENDPOINTS.md) — usar o mesmo tipo aqui para a transacção
+          // optimista não "saltar" de categoria assim que a lista real é
+          // recarregada.
+          type: 'transfer',
           description: description ?? 'Transferência P2P',
           amount: -amount,
           date: DateTime.now().toString().split(' ')[0],
@@ -705,7 +709,13 @@ class AppProvider extends ChangeNotifier {
         addTransaction(Transaction(
           id: result.data!.transactionId ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'payment',
+          // Backend classifica como "transfer" — ver nota em transfer()
+          // acima. A descrição "Transferência directa" é o que permite ao
+          // filtro "Pagamentos" da Carteira reconhecer que isto é, do
+          // ponto de vista do utilizador, o pagamento de uma viagem (o
+          // motorista foi identificado por QR), não uma transferência
+          // genérica entre passageiros.
+          type: 'transfer',
           description: 'Transferência directa',
           amount: -amount,
           date: DateTime.now().toString().split(' ')[0],

@@ -5,7 +5,7 @@ import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/widgets/otp_box_input.dart';
-import 'package:troco_seguro/widgets/country_code_field.dart';
+import 'package:troco_seguro/widgets/fixed_country_code_badge.dart';
 
 enum AuthMode { choice, login, register, otp }
 
@@ -45,7 +45,6 @@ class _AuthScreenState extends State<AuthScreen> {
   late bool isDark;
 
   AuthMode _mode = AuthMode.choice;
-  CountryCode _selectedCountry = kCountryCodes.first;
 
   @override
   void dispose() {
@@ -65,19 +64,19 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isRoleMismatch(String? role) =>
       role != null && role.toUpperCase() != 'PASSENGER';
 
+  /// Todos os números nesta app são angolanos — o utilizador só introduz
+  /// os 9 dígitos, o indicativo +244 é sempre fixo.
   String _formatPhone(String phone) {
     final cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    return cleaned.startsWith(_selectedCountry.dialCode)
-        ? '+$cleaned'
-        : '+${_selectedCountry.dialCode}$cleaned';
+    return '+244$cleaned';
   }
 
   Future<void> _handleContinue() async {
     setState(() => errorMessage = null);
 
     // Single-screen flow: validate inputs then call login or register
-    if (phoneController.text.replaceAll(RegExp(r'[^0-9]'), '').length < 9) {
-      setState(() => errorMessage = 'Digite um número válido');
+    if (phoneController.text.replaceAll(RegExp(r'[^0-9]'), '').length != 9) {
+      setState(() => errorMessage = 'Digite os 9 dígitos do seu número');
       return;
     }
     if (!isLogin && nameController.text.isEmpty) {
@@ -755,17 +754,16 @@ class _AuthScreenState extends State<AuthScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CountryCodeSelector(
-                selected: _selectedCountry,
-                isDark: isDark,
-                onChanged: (c) => setState(() => _selectedCountry = c),
-              ),
+              FixedCountryCodeBadge(isDark: isDark),
               SizedBox(width: r.scaledWidth(10)),
               Expanded(
                 child: TextField(
                   controller: phoneController,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
                   style: TextStyle(
                     fontSize: r.responsiveFontSize(15),
                     fontWeight: FontWeight.w500,
@@ -1068,7 +1066,6 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
   final ApiService _api = ApiService();
   int _step = 1;
   bool _busy = false;
-  CountryCode _selectedCountry = kCountryCodes.first;
   String _formattedPhone = '';
 
   final _phoneCtrl = TextEditingController();
@@ -1091,10 +1088,8 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
 
   Future<void> _step1() async {
     final digits = _phoneCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) { _err('Insira o número de telefone'); return; }
-    final phone = digits.startsWith(_selectedCountry.dialCode)
-        ? '+$digits'
-        : '+${_selectedCountry.dialCode}$digits';
+    if (digits.length != 9) { _err('Digite os 9 dígitos do seu número'); return; }
+    final phone = '+244$digits';
     _formattedPhone = phone;
     setState(() => _busy = true);
     final res = await _api.forgotPassword(phone);
@@ -1247,17 +1242,16 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CountryCodeSelector(
-            selected: _selectedCountry,
-            isDark: isDark,
-            onChanged: (c) => setState(() => _selectedCountry = c),
-          ),
+          FixedCountryCodeBadge(isDark: isDark),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(9),
+              ],
               decoration: InputDecoration(
                 hintText: '9XX XXX XXX',
                 isDense: true,

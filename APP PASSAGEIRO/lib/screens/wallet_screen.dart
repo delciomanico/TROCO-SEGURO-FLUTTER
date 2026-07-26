@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
@@ -42,12 +43,29 @@ class _WalletScreenState extends State<WalletScreen> {
     super.dispose();
   }
 
+  /// `wallet/transfer-to-user` (pagar um motorista identificado por QR) é
+  /// tecnicamente uma transferência para o backend (`type: "transfer"`,
+  /// ver BACKEND_PENDING_CHANGES.md), mas do ponto de vista do utilizador
+  /// é o pagamento de uma viagem — por isso aparecia como "nenhuma
+  /// transação" no separador "Pagamentos". Reconhecemos pela descrição
+  /// que esse fluxo usa (ver `AppProvider.transferToUser`), já que é a
+  /// única forma disponível no cliente de distinguir das transferências
+  /// P2P genéricas (que devem continuar em "Transferências").
+  bool _isRidePaymentTransfer(Transaction tx) {
+    final desc = tx.description.toLowerCase();
+    return desc.startsWith('transferência directa') ||
+        desc.startsWith('transferência para');
+  }
+
   List<Transaction> getFilteredTransactions(List<Transaction> transactions) {
     return transactions.where((tx) {
       final type = tx.type.toLowerCase();
       final matchesType = activeFilter == 'all' ||
           type == activeFilter ||
-          (activeFilter == 'topup' && type == 'deposit');
+          (activeFilter == 'topup' && type == 'deposit') ||
+          (activeFilter == 'payment' &&
+              type == 'transfer' &&
+              _isRidePaymentTransfer(tx));
       final matchesSearch =
           tx.description.toLowerCase().contains(searchQuery.toLowerCase()) ||
               (tx.driver?.toLowerCase().contains(searchQuery.toLowerCase()) ??
@@ -1161,7 +1179,7 @@ class _TransferSheetState extends State<_TransferSheet> {
       final phone = decoded['phoneNumber'] ?? decoded['phone'] ?? decoded['receiverPhone'];
       if (phone != null) {
         setState(() {
-          _phoneCtrl.text = phone.toString();
+          _phoneCtrl.text = _stripCountryCode(phone.toString());
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -1174,6 +1192,15 @@ class _TransferSheetState extends State<_TransferSheet> {
     }
   }
 
+  /// O QR devolve o número completo (`+244XXXXXXXXX`), mas o campo só
+  /// guarda os 9 dígitos locais — o indicativo é fixo e mostrado à parte.
+  String _stripCountryCode(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.startsWith('244') && digits.length > 9
+        ? digits.substring(digits.length - 9)
+        : digits;
+  }
+
   @override
   void dispose() {
     _phoneCtrl.dispose();
@@ -1183,11 +1210,12 @@ class _TransferSheetState extends State<_TransferSheet> {
   }
 
   Future<void> _verify() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Informe o número de telefone.');
+    final digits = _phoneCtrl.text.trim();
+    if (digits.length != 9) {
+      setState(() => _error = 'Informe os 9 dígitos do número.');
       return;
     }
+    final phone = '+244$digits';
     setState(() {
       _error = null;
       _loading = true;
@@ -1224,7 +1252,7 @@ class _TransferSheetState extends State<_TransferSheet> {
     final provider = context.read<AppProvider>();
     final result = await provider.transfer(
       amount: amount,
-      receiverPhone: _phoneCtrl.text.trim(),
+      receiverPhone: '+244${_phoneCtrl.text.trim()}',
       description: _descCtrl.text.trim().isEmpty
           ? null
           : _descCtrl.text.trim(),
@@ -1266,9 +1294,14 @@ class _TransferSheetState extends State<_TransferSheet> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   enabled: !_verified,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Nº de telefone',
-                    hintText: '+244 9XX XXX XXX',
+                    hintText: '9XX XXX XXX',
+                    prefixText: '+244 ',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -1658,11 +1691,11 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
       FeedbackService.showError(context, message: 'IBAN inválido (deve começar por AO06)');
       return;
     }
-    if (_method == 'mcx_express' && account.isEmpty) {
-      FeedbackService.showError(context, message: 'Informe o número de telefone');
+    if (_method == 'mcx_express' && account.length != 9) {
+      FeedbackService.showError(context, message: 'Informe os 9 dígitos do número');
       return;
     }
-    final iban = account;
+    final iban = _method == 'mcx_express' ? '+244$account' : account;
 
     setState(() => _busy = true);
     final provider = context.read<AppProvider>();
@@ -1728,7 +1761,10 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     icon: Icons.account_balance_rounded,
                     isSelected: _method == 'bank',
                     isDark: isDark,
-                    onTap: () => setState(() => _method = 'bank'),
+                    onTap: () => setState(() {
+                      _method = 'bank';
+                      _ibanCtrl.clear();
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1739,7 +1775,10 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     icon: Icons.flash_on_rounded,
                     isSelected: _method == 'mcx_express',
                     isDark: isDark,
-                    onTap: () => setState(() => _method = 'mcx_express'),
+                    onTap: () => setState(() {
+                      _method = 'mcx_express';
+                      _ibanCtrl.clear();
+                    }),
                   ),
                 ),
               ],
@@ -1769,12 +1808,19 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
             TextField(
               controller: _ibanCtrl,
               keyboardType: _method == 'bank' ? TextInputType.text : TextInputType.phone,
+              inputFormatters: _method == 'bank'
+                  ? null
+                  : [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(9),
+                    ],
               decoration: InputDecoration(
                 labelText: _method == 'bank' ? 'IBAN (AO06...)' : 'Número de telefone',
                 hintText: _method == 'bank' ? null : '9XX XXX XXX',
-                prefixIcon: Icon(_method == 'bank'
-                    ? Icons.credit_score_rounded
-                    : Icons.phone_android_rounded),
+                prefixText: _method == 'bank' ? null : '+244 ',
+                prefixIcon: _method == 'bank'
+                    ? const Icon(Icons.credit_score_rounded)
+                    : null,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.md),
