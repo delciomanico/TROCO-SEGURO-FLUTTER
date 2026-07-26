@@ -1283,8 +1283,24 @@ class _MenuModal extends StatefulWidget {
 }
 
 class _MenuModalState extends State<_MenuModal> {
-  void _openSubModal(Widget modal) {
-    showGeneralDialog(
+  int _unreadNotifications = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final result = await ApiService().getNotifications();
+    if (!mounted) return;
+    if (result.isSuccess) {
+      setState(() => _unreadNotifications = result.data?.unreadCount ?? 0);
+    }
+  }
+
+  Future<void> _openSubModal(Widget modal) async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
@@ -1299,6 +1315,8 @@ class _MenuModalState extends State<_MenuModal> {
         );
       },
     );
+    if (!mounted) return;
+    _loadUnreadCount();
   }
 
   @override
@@ -1431,6 +1449,7 @@ class _MenuModalState extends State<_MenuModal> {
               'Notificações',
               'Alertas e mensagens',
               () => _openSubModal(const _NotificationsModal()),
+              badgeCount: _unreadNotifications,
             ),
             _navTile(
               isDark,
@@ -1481,19 +1500,49 @@ class _MenuModalState extends State<_MenuModal> {
   }
 
   Widget _navTile(bool isDark, IconData icon, String title, String subtitle,
-      VoidCallback onTap) {
+      VoidCallback onTap,
+      {int badgeCount = 0}) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.55)
-                  : Colors.black.withValues(alpha: 0.45),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeCount > 9 ? '9+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -2747,19 +2796,24 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
               _field('Nome', nameCtrl, isDark, Icons.person_outline),
               const SizedBox(height: 12),
               _field('Telefone', phoneCtrl, isDark, Icons.phone_outlined,
-                  type: TextInputType.phone),
+                  type: TextInputType.phone,
+                  prefixText: '+244 ',
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ]),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
                     final name = nameCtrl.text.trim();
-                    final phone = phoneCtrl.text.trim();
-                    if (name.isEmpty || phone.isEmpty) return;
+                    final digits = phoneCtrl.text.trim();
+                    if (name.isEmpty || digits.length != 9) return;
                     Navigator.pop(ctx);
                     final result = await _api.addEmergencyContact(
                       name: name,
-                      phoneNumber: phone,
+                      phoneNumber: '+244$digits',
                     );
                     if (result.isSuccess && result.data != null) {
                       if (mounted) {
@@ -2795,14 +2849,17 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
 
   Widget _field(String label, TextEditingController ctrl, bool isDark,
       IconData icon,
-      {TextInputType type = TextInputType.text}) {
+      {TextInputType type = TextInputType.text,
+      List<TextInputFormatter>? inputFormatters,
+      String? prefixText}) {
     return TextField(
       controller: ctrl,
       keyboardType: type,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon:
-            Icon(icon, color: AppColors.primaryGold),
+        prefixText: prefixText,
+        prefixIcon: Icon(icon, color: AppColors.primaryGold),
         border:
             OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(
@@ -3096,6 +3153,42 @@ class _NotificationsModalState extends State<_NotificationsModal> {
     }
   }
 
+  /// Abre o texto completo da notificação — antes, tocar num item só
+  /// marcava como lida (e nem isso, se já estivesse lida) e o corpo
+  /// truncado a 2 linhas não tinha forma nenhuma de ser lido por inteiro.
+  Future<void> _openDetail(AppNotification n) async {
+    if (!n.isRead) await _markOne(n);
+    if (!mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        title: Text(
+          n.title,
+          style: TextStyle(color: isDark ? Colors.white : AppColors.textDark),
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            n.body,
+            style: TextStyle(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.75)
+                  : Colors.black.withValues(alpha: 0.7),
+              height: 1.4,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -3206,7 +3299,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                           ? AppColors.primaryGold
                           : AppColors.primaryOrange;
                       return GestureDetector(
-                        onTap: n.isRead ? null : () => _markOne(n),
+                        onTap: () => _openDetail(n),
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(

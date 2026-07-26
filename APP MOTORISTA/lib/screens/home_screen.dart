@@ -1175,15 +1175,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Lotação — sessão activa',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(11),
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.5)
-                              : Colors.black.withValues(alpha: 0.45),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Lotação — sessão activa',
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(11),
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.5)
+                                  : Colors.black.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          SizedBox(width: responsive.scaledWidth(4)),
+                          Icon(
+                            Icons.unfold_more_rounded,
+                            size: responsive.responsiveFontSize(13),
+                            color: accent,
+                          ),
+                        ],
                       ),
                       SizedBox(height: responsive.scaledHeight(3)),
                       Text(
@@ -1302,6 +1312,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     .toList(),
               ),
             ],
+            SizedBox(height: responsive.scaledHeight(10)),
+            Center(
+              child: Text(
+                'Toque para expandir',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(10),
+                  fontWeight: FontWeight.w600,
+                  color: accent.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
           ],
         ),
       ),

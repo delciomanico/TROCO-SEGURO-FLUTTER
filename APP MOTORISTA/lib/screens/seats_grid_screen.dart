@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
@@ -6,13 +8,48 @@ import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 /// Grelha de lugares da sessão activa — mostra quais assentos já foram
 /// pagos e quais continuam disponíveis, com a mesma disposição física do
 /// veículo (frente/trás).
-class SeatsGridScreen extends StatelessWidget {
+class SeatsGridScreen extends StatefulWidget {
   final List<SeatStatus> seats;
 
   const SeatsGridScreen({super.key, required this.seats});
 
   static Route<void> route(List<SeatStatus> seats) {
     return MaterialPageRoute(builder: (_) => SeatsGridScreen(seats: seats));
+  }
+
+  @override
+  State<SeatsGridScreen> createState() => _SeatsGridScreenState();
+}
+
+class _SeatsGridScreenState extends State<SeatsGridScreen> {
+  final ApiService _api = ApiService();
+  late List<SeatStatus> _seats;
+  StreamSubscription<SessionSeatsResult>? _sseSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _seats = widget.seats;
+    // O painel pequeno em home_screen.dart já recebe estes eventos ao
+    // vivo; este ecrã fica aberto enquanto o motorista conduz, por isso
+    // precisa da sua própria ligação SSE em vez de mostrar só o
+    // snapshot com que foi aberto.
+    _sseSubscription = _api.streamSessionSeats().listen(
+      (result) {
+        if (!mounted) return;
+        final seats = result.seats;
+        if (seats != null && seats.isNotEmpty) {
+          setState(() => _seats = seats);
+        }
+      },
+      onError: (e) => debugPrint('SSE error (SeatsGridScreen): $e'),
+    );
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    super.dispose();
   }
 
   String _seatNumber(String label, int index) {
@@ -105,7 +142,7 @@ class SeatsGridScreen extends StatelessWidget {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: seats.length,
+                    itemCount: _seats.length,
                     gridDelegate:
                         SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
@@ -114,7 +151,7 @@ class SeatsGridScreen extends StatelessWidget {
                       childAspectRatio: 1,
                     ),
                     itemBuilder: (context, index) {
-                      final seat = seats[index];
+                      final seat = _seats[index];
                       return Container(
                         decoration: BoxDecoration(
                           color: seat.paid

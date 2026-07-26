@@ -8,6 +8,11 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 
+/// Valores monetários vêm da API como string decimal (ex. "0.00") — ver
+/// BACKEND_PENDING_CHANGES.md, item "valores monetários como string".
+int _statInt(dynamic value) =>
+    value == null ? 0 : (num.tryParse(value.toString())?.toInt() ?? 0);
+
 class TripsScreen extends StatefulWidget {
   final bool showBottomDock;
 
@@ -332,8 +337,14 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Widget _buildStatsRow(ResponsiveHelper responsive, bool isDark) {
-    final total = _stats?['total'] ?? _stats?['totalTrips'] ?? 0;
-    final earned = _stats?['totalEarned'] ?? _stats?['earned'] ?? _stats?['revenue'] ?? 0;
+    final total = _statInt(_stats?['total'] ?? _stats?['totalTrips']);
+    // Campo real confirmado ao vivo em GET trips/stats: `monthSpent`
+    // (string decimal) — os nomes antigos nunca bateram certo com a
+    // resposta real, por isso "recebido" ficava sempre em 0 Kz.
+    final earned = _statInt(_stats?['monthSpent'] ??
+        _stats?['totalEarned'] ??
+        _stats?['earned'] ??
+        _stats?['revenue']);
     final fmt = NumberFormat('#,##0', 'pt_AO');
     return Padding(
       padding: EdgeInsets.fromLTRB(

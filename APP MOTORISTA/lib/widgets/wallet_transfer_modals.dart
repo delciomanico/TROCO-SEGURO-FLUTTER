@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
@@ -163,10 +164,14 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-InputDecoration _fieldDecoration(String label, {String? hint, Widget? prefixIcon, Widget? suffixIcon}) {
+InputDecoration _fieldDecoration(String label,
+    {String? hint, Widget? prefixIcon, Widget? suffixIcon, String? prefixText}) {
   return InputDecoration(
     labelText: label,
     hintText: hint,
+    prefixText: prefixText,
+    prefixStyle: const TextStyle(
+        color: AppColors.textLight, fontWeight: FontWeight.w600),
     prefixIcon: prefixIcon,
     suffixIcon: suffixIcon,
     filled: true,
@@ -400,6 +405,15 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
     super.dispose();
   }
 
+  /// O QR devolve o número completo (`+244XXXXXXXXX`), mas o campo só
+  /// guarda os 9 dígitos locais — o indicativo é fixo e mostrado à parte.
+  String _stripCountryCode(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.startsWith('244') && digits.length > 9
+        ? digits.substring(digits.length - 9)
+        : digits;
+  }
+
   Future<void> _scanRecipient() async {
     final qrData = await _scanQr(context);
     if (qrData == null || !mounted) return;
@@ -408,7 +422,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       final phone = decoded['phoneNumber'] ?? decoded['phone'] ?? decoded['receiverPhone'];
       if (phone != null) {
         setState(() {
-          _phoneCtrl.text = phone.toString();
+          _phoneCtrl.text = _stripCountryCode(phone.toString());
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -422,11 +436,12 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
   }
 
   Future<void> _verify() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Informe o número de telefone.');
+    final digits = _phoneCtrl.text.trim();
+    if (digits.length != 9) {
+      setState(() => _error = 'Informe os 9 dígitos do número.');
       return;
     }
+    final phone = '+244$digits';
     setState(() {
       _error = null;
       _loading = true;
@@ -460,7 +475,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
     });
     final result = await ApiService().transfer(
       amount: amount,
-      receiverPhone: _phoneCtrl.text.trim(),
+      receiverPhone: '+244${_phoneCtrl.text.trim()}',
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
     );
     if (!mounted) return;
@@ -495,8 +510,13 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   enabled: !_verified,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
                   style: const TextStyle(color: AppColors.textLight),
-                  decoration: _fieldDecoration('Nº de telefone', hint: '+244 9XX XXX XXX'),
+                  decoration: _fieldDecoration('Nº de telefone',
+                      hint: '9XX XXX XXX', prefixText: '+244 '),
                 ),
               ),
               SizedBox(width: responsive.scaledWidth(8)),
@@ -633,7 +653,13 @@ class _CardBalanceModalState extends State<CardBalanceModal> {
     String qrId = widget.qrData;
     try {
       final decoded = jsonDecode(widget.qrData);
-      qrId = decoded['qrId'] ?? decoded['id'] ?? decoded['cardId'] ?? widget.qrData;
+      // O QR real de um cartão virtual (`VIRTUAL_CARD_TRANSFER`) só traz
+      // `cardNumber` — não `qrId`/`id`/`cardId`, apesar do nome do campo.
+      qrId = decoded['cardNumber'] ??
+          decoded['qrId'] ??
+          decoded['id'] ??
+          decoded['cardId'] ??
+          widget.qrData;
     } catch (_) {}
 
     final result = await ApiService().getWalletBalanceByQr(qrId);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 
@@ -96,8 +97,8 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
       setState(() => _errorMessage = 'IBAN inválido (deve começar por AO06)');
       return;
     }
-    if (_method == 'mcx_express' && account.isEmpty) {
-      setState(() => _errorMessage = 'Informe o número de telefone');
+    if (_method == 'mcx_express' && account.length != 9) {
+      setState(() => _errorMessage = 'Informe os 9 dígitos do número');
       return;
     }
 
@@ -130,7 +131,10 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
       _errorMessage = null;
     });
 
-    final result = await _api.requestWithdrawal(amount: amount, iban: account);
+    final result = await _api.requestWithdrawal(
+      amount: amount,
+      iban: _method == 'mcx_express' ? '+244$account' : account,
+    );
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -213,7 +217,10 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       icon: Icons.account_balance_rounded,
                       isSelected: _method == 'bank',
                       onTap: () {
-                        setState(() => _method = 'bank');
+                        setState(() {
+                          _method = 'bank';
+                          _ibanCtrl.clear();
+                        });
                         _resetQuote();
                       },
                     ),
@@ -226,7 +233,10 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       icon: Icons.flash_on_rounded,
                       isSelected: _method == 'mcx_express',
                       onTap: () {
-                        setState(() => _method = 'mcx_express');
+                        setState(() {
+                          _method = 'mcx_express';
+                          _ibanCtrl.clear();
+                        });
                         _resetQuote();
                       },
                     ),
@@ -260,15 +270,20 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                 controller: _ibanCtrl,
                 keyboardType:
                     _method == 'bank' ? TextInputType.text : TextInputType.phone,
+                inputFormatters: _method == 'bank'
+                    ? null
+                    : [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(9),
+                      ],
                 decoration: InputDecoration(
                   labelText: _method == 'bank' ? 'IBAN (AO06...)' : 'Número de telefone',
                   hintText: _method == 'bank' ? null : '9XX XXX XXX',
-                  prefixIcon: Icon(
-                    _method == 'bank'
-                        ? Icons.credit_score_rounded
-                        : Icons.phone_android_rounded,
-                    color: Colors.white.withValues(alpha: 0.4),
-                  ),
+                  prefixText: _method == 'bank' ? null : '+244 ',
+                  prefixIcon: _method == 'bank'
+                      ? Icon(Icons.credit_score_rounded,
+                          color: Colors.white.withValues(alpha: 0.4))
+                      : null,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadius.md),
