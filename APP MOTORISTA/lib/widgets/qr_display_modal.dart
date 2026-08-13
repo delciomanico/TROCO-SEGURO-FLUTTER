@@ -177,7 +177,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -194,7 +194,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
             height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
 
@@ -210,7 +210,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                       padding: EdgeInsets.all(responsive.scaledWidth(8)),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Icon(
                         Icons.qr_code_rounded,
@@ -389,7 +389,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             border: Border.all(
                               color: AppColors.accent.withValues(alpha: 0.3),
                               width: 3,
@@ -470,7 +470,7 @@ class _QrDisplayModalState extends State<QrDisplayModal>
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.darkBlue,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

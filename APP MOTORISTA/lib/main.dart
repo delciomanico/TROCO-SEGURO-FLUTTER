@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_pro/utils/theme.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
-import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
 import 'package:troco_seguro_pro/models/transaction.dart';
 import 'package:troco_seguro_pro/models/vehicle.dart';
@@ -513,8 +512,8 @@ class _AppControllerState extends State<AppController>
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
+            topLeft: Radius.circular(AppRadius.lg),
+            topRight: Radius.circular(AppRadius.lg),
           ),
         ),
         child: Column(
@@ -547,7 +546,7 @@ class _AppControllerState extends State<AppController>
                   backgroundColor: AppColors.primaryGold,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(AppRadius.md)),
                 ),
                 child: const Text('VERIFICAR AGORA',
                     style: TextStyle(color: Colors.white)),
@@ -825,7 +824,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                 decoration: BoxDecoration(
                   color: cardBg,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   boxShadow: isDark
                       ? []
                       : [
@@ -877,7 +876,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                   : const Color(0xFFF2F2F7),
                               contentPadding: EdgeInsets.zero,
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: isDark
                                       ? const Color(0xFF3A3A3C)
@@ -886,7 +885,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: isDark
                                       ? const Color(0xFF3A3A3C)
@@ -895,14 +894,14 @@ class _ReauthScreenState extends State<ReauthScreen> {
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
                                   color: accent,
                                   width: 2.5,
                                 ),
                               ),
                               errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 borderSide: const BorderSide(
                                   color: Color(0xFFFF3B30),
                                   width: 2,
@@ -996,7 +995,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: accent,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1024,7 +1023,7 @@ class _ReauthScreenState extends State<ReauthScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: cardBg,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color: isDark
                             ? const Color(0xFF3A3A3C)
@@ -1163,7 +1162,6 @@ class _MainNavigationState extends State<_MainNavigation> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor:
@@ -1283,8 +1281,24 @@ class _MenuModal extends StatefulWidget {
 }
 
 class _MenuModalState extends State<_MenuModal> {
-  void _openSubModal(Widget modal) {
-    showGeneralDialog(
+  int _unreadNotifications = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final result = await ApiService().getNotifications();
+    if (!mounted) return;
+    if (result.isSuccess) {
+      setState(() => _unreadNotifications = result.data?.unreadCount ?? 0);
+    }
+  }
+
+  Future<void> _openSubModal(Widget modal) async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
@@ -1299,6 +1313,8 @@ class _MenuModalState extends State<_MenuModal> {
         );
       },
     );
+    if (!mounted) return;
+    _loadUnreadCount();
   }
 
   @override
@@ -1431,6 +1447,7 @@ class _MenuModalState extends State<_MenuModal> {
               'Notificações',
               'Alertas e mensagens',
               () => _openSubModal(const _NotificationsModal()),
+              badgeCount: _unreadNotifications,
             ),
             _navTile(
               isDark,
@@ -1453,7 +1470,7 @@ class _MenuModalState extends State<_MenuModal> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
                       color: Colors.red.withValues(alpha: 0.22), width: 1.0),
                 ),
@@ -1481,19 +1498,49 @@ class _MenuModalState extends State<_MenuModal> {
   }
 
   Widget _navTile(bool isDark, IconData icon, String title, String subtitle,
-      VoidCallback onTap) {
+      VoidCallback onTap,
+      {int badgeCount = 0}) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.55)
-                  : Colors.black.withValues(alpha: 0.45),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeCount > 9 ? '9+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1677,7 +1724,7 @@ class _ProfileModal extends StatelessWidget {
       builder: (ctx) => Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1692,7 +1739,7 @@ class _ProfileModal extends StatelessWidget {
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.15)
                       : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
@@ -1746,14 +1793,14 @@ class _ProfileModal extends StatelessWidget {
       {VoidCallback? onTap, bool verified = false}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isDark
               ? Colors.white.withValues(alpha: 0.05)
               : Colors.black.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.1)
@@ -1806,7 +1853,7 @@ class _ProfileModal extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1821,7 +1868,7 @@ class _ProfileModal extends StatelessWidget {
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.15)
                         : Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -1847,9 +1894,9 @@ class _ProfileModal extends StatelessWidget {
                           color: Colors.green, size: 18)
                       : null,
                   border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.15)
@@ -1857,7 +1904,7 @@ class _ProfileModal extends StatelessWidget {
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide:
                         const BorderSide(color: AppColors.primaryGold, width: 1.5),
                   ),
@@ -1897,7 +1944,7 @@ class _ProfileModal extends StatelessWidget {
                     foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: const Text(
@@ -2205,7 +2252,7 @@ class _SecurityModalState extends State<_SecurityModal> {
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -2220,7 +2267,7 @@ class _SecurityModalState extends State<_SecurityModal> {
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.15)
                           : Colors.black.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -2307,7 +2354,7 @@ class _SecurityModalState extends State<_SecurityModal> {
                       foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
                       elevation: 0,
                     ),
                     child: busy
@@ -2344,9 +2391,9 @@ class _SecurityModalState extends State<_SecurityModal> {
         counterText: '',
         prefixIcon:
             const Icon(Icons.lock_outline, color: AppColors.primaryGold),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.15)
@@ -2354,7 +2401,7 @@ class _SecurityModalState extends State<_SecurityModal> {
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
         ),
         filled: true,
@@ -2639,7 +2686,7 @@ class _PanicButtonState extends State<_PanicButton> {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: _active ? Colors.red.shade700 : Colors.red,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2715,7 +2762,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -2730,7 +2777,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.15)
                         : Colors.black.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -2747,19 +2794,24 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
               _field('Nome', nameCtrl, isDark, Icons.person_outline),
               const SizedBox(height: 12),
               _field('Telefone', phoneCtrl, isDark, Icons.phone_outlined,
-                  type: TextInputType.phone),
+                  type: TextInputType.phone,
+                  prefixText: '+244 ',
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ]),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
                     final name = nameCtrl.text.trim();
-                    final phone = phoneCtrl.text.trim();
-                    if (name.isEmpty || phone.isEmpty) return;
+                    final digits = phoneCtrl.text.trim();
+                    if (name.isEmpty || digits.length != 9) return;
                     Navigator.pop(ctx);
                     final result = await _api.addEmergencyContact(
                       name: name,
-                      phoneNumber: phone,
+                      phoneNumber: '+244$digits',
                     );
                     if (result.isSuccess && result.data != null) {
                       if (mounted) {
@@ -2778,7 +2830,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                     foregroundColor: isDark ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     elevation: 0,
                   ),
                   child: const Text('Adicionar',
@@ -2795,18 +2847,21 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
 
   Widget _field(String label, TextEditingController ctrl, bool isDark,
       IconData icon,
-      {TextInputType type = TextInputType.text}) {
+      {TextInputType type = TextInputType.text,
+      List<TextInputFormatter>? inputFormatters,
+      String? prefixText}) {
     return TextField(
       controller: ctrl,
       keyboardType: type,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon:
-            Icon(icon, color: AppColors.primaryGold),
+        prefixText: prefixText,
+        prefixIcon: Icon(icon, color: AppColors.primaryGold),
         border:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.15)
@@ -2814,7 +2869,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(
               color: AppColors.primaryGold, width: 1.5),
         ),
@@ -2903,7 +2958,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                                 color: isDark
                                     ? Colors.white.withValues(alpha: 0.05)
                                     : Colors.black.withValues(alpha: 0.03),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                                 border: Border.all(
                                   color: isDark
                                       ? Colors.white.withValues(alpha: 0.08)
@@ -2986,7 +3041,7 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                               padding:
                                   const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(AppRadius.md)),
                               elevation: 0,
                             ),
                           ),
@@ -3094,6 +3149,42 @@ class _NotificationsModalState extends State<_NotificationsModal> {
         }
       });
     }
+  }
+
+  /// Abre o texto completo da notificação — antes, tocar num item só
+  /// marcava como lida (e nem isso, se já estivesse lida) e o corpo
+  /// truncado a 2 linhas não tinha forma nenhuma de ser lido por inteiro.
+  Future<void> _openDetail(AppNotification n) async {
+    if (!n.isRead) await _markOne(n);
+    if (!mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        title: Text(
+          n.title,
+          style: TextStyle(color: isDark ? Colors.white : AppColors.textDark),
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            n.body,
+            style: TextStyle(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.75)
+                  : Colors.black.withValues(alpha: 0.7),
+              height: 1.4,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -3206,7 +3297,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                           ? AppColors.primaryGold
                           : AppColors.primaryOrange;
                       return GestureDetector(
-                        onTap: n.isRead ? null : () => _markOne(n),
+                        onTap: () => _openDetail(n),
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
@@ -3215,7 +3306,7 @@ class _NotificationsModalState extends State<_NotificationsModal> {
                                     ? Colors.white.withValues(alpha: 0.03)
                                     : Colors.black.withValues(alpha: 0.02))
                                 : accent.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             border: Border.all(
                               color: n.isRead
                                   ? (isDark
@@ -3342,22 +3433,6 @@ class _SettingsModalState extends State<_SettingsModal> {
   bool _notifications = true;
   final ApiService _api = ApiService();
 
-  void _openFullscreen(Widget page) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (ctx, animation, _) => SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-        child: page,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -3454,6 +3529,8 @@ class _SettingsModalState extends State<_SettingsModal> {
       }
     } catch (_) {}
 
+    if (!mounted) return;
+
     final ibanCtrl = TextEditingController();
 
     final confirmed = await showDialog<bool>(
@@ -3487,7 +3564,7 @@ class _SettingsModalState extends State<_SettingsModal> {
                   decoration: InputDecoration(
                     hintText: 'IBAN (ex: AO06...)',
                     hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
@@ -3692,7 +3769,7 @@ class _VehicleSelectionModal extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: EdgeInsets.fromLTRB(
         24,
@@ -3710,7 +3787,7 @@ class _VehicleSelectionModal extends StatelessWidget {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.15)
                   : Colors.black.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
           const SizedBox(height: 24),
@@ -3785,7 +3862,7 @@ class _VehicleSelectionModal extends StatelessWidget {
                   final v = vehicles[i];
                   return InkWell(
                     onTap: () => Navigator.pop(ctx, v.id),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 14, horizontal: 4),
@@ -3796,7 +3873,7 @@ class _VehicleSelectionModal extends StatelessWidget {
                             height: 44,
                             decoration: BoxDecoration(
                               color: AppColors.primaryGold.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: const Icon(Icons.directions_car_rounded,
                                 color: AppColors.primaryGold, size: 22),

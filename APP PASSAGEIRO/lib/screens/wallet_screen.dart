@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/models/transaction.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
@@ -42,12 +43,29 @@ class _WalletScreenState extends State<WalletScreen> {
     super.dispose();
   }
 
+  /// `wallet/transfer-to-user` (pagar um motorista identificado por QR) é
+  /// tecnicamente uma transferência para o backend (`type: "transfer"`,
+  /// ver BACKEND_PENDING_CHANGES.md), mas do ponto de vista do utilizador
+  /// é o pagamento de uma viagem — por isso aparecia como "nenhuma
+  /// transação" no separador "Pagamentos". Reconhecemos pela descrição
+  /// que esse fluxo usa (ver `AppProvider.transferToUser`), já que é a
+  /// única forma disponível no cliente de distinguir das transferências
+  /// P2P genéricas (que devem continuar em "Transferências").
+  bool _isRidePaymentTransfer(Transaction tx) {
+    final desc = tx.description.toLowerCase();
+    return desc.startsWith('transferência directa') ||
+        desc.startsWith('transferência para');
+  }
+
   List<Transaction> getFilteredTransactions(List<Transaction> transactions) {
     return transactions.where((tx) {
       final type = tx.type.toLowerCase();
       final matchesType = activeFilter == 'all' ||
           type == activeFilter ||
-          (activeFilter == 'topup' && type == 'deposit');
+          (activeFilter == 'topup' && type == 'deposit') ||
+          (activeFilter == 'payment' &&
+              type == 'transfer' &&
+              _isRidePaymentTransfer(tx));
       final matchesSearch =
           tx.description.toLowerCase().contains(searchQuery.toLowerCase()) ||
               (tx.driver?.toLowerCase().contains(searchQuery.toLowerCase()) ??
@@ -258,7 +276,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 11),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.12)
@@ -266,14 +284,14 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: AppColors.accentOf(context).withValues(alpha: 0.7),
                             width: 1.2,
                           ),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),
@@ -364,7 +382,7 @@ class _WalletScreenState extends State<WalletScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -619,7 +637,7 @@ class _WalletScreenState extends State<WalletScreen> {
             height: responsive.scaledWidth(58),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [AppColors.primaryGold, AppColors.secondaryGold],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -696,7 +714,7 @@ class _WalletScreenState extends State<WalletScreen> {
               : (isDark
                   ? Colors.white.withValues(alpha: 0.07)
                   : Colors.black.withValues(alpha: 0.04)),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: isActive
                 ? AppColors.accentOf(context)
@@ -762,7 +780,7 @@ class _WalletScreenState extends State<WalletScreen> {
       padding: EdgeInsets.all(responsive.scaledWidth(14)),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.06)
@@ -1076,7 +1094,7 @@ class _ExternalCardSheetState extends State<_ExternalCardSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.green.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Row(
                 children: [
@@ -1161,7 +1179,7 @@ class _TransferSheetState extends State<_TransferSheet> {
       final phone = decoded['phoneNumber'] ?? decoded['phone'] ?? decoded['receiverPhone'];
       if (phone != null) {
         setState(() {
-          _phoneCtrl.text = phone.toString();
+          _phoneCtrl.text = _stripCountryCode(phone.toString());
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -1174,6 +1192,15 @@ class _TransferSheetState extends State<_TransferSheet> {
     }
   }
 
+  /// O QR devolve o número completo (`+244XXXXXXXXX`), mas o campo só
+  /// guarda os 9 dígitos locais — o indicativo é fixo e mostrado à parte.
+  String _stripCountryCode(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.startsWith('244') && digits.length > 9
+        ? digits.substring(digits.length - 9)
+        : digits;
+  }
+
   @override
   void dispose() {
     _phoneCtrl.dispose();
@@ -1183,11 +1210,12 @@ class _TransferSheetState extends State<_TransferSheet> {
   }
 
   Future<void> _verify() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Informe o número de telefone.');
+    final digits = _phoneCtrl.text.trim();
+    if (digits.length != 9) {
+      setState(() => _error = 'Informe os 9 dígitos do número.');
       return;
     }
+    final phone = '+244$digits';
     setState(() {
       _error = null;
       _loading = true;
@@ -1224,7 +1252,7 @@ class _TransferSheetState extends State<_TransferSheet> {
     final provider = context.read<AppProvider>();
     final result = await provider.transfer(
       amount: amount,
-      receiverPhone: _phoneCtrl.text.trim(),
+      receiverPhone: '+244${_phoneCtrl.text.trim()}',
       description: _descCtrl.text.trim().isEmpty
           ? null
           : _descCtrl.text.trim(),
@@ -1266,9 +1294,14 @@ class _TransferSheetState extends State<_TransferSheet> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   enabled: !_verified,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Nº de telefone',
-                    hintText: '+244 9XX XXX XXX',
+                    hintText: '9XX XXX XXX',
+                    prefixText: '+244 ',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -1315,7 +1348,7 @@ class _TransferSheetState extends State<_TransferSheet> {
                   horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.green.withAlpha(20),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 children: [
@@ -1496,7 +1529,7 @@ class _BottomSheetWrapper extends StatelessWidget {
                 ? Theme.of(context).cardColor
                 : AppColors.lightCard,
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -1525,7 +1558,7 @@ class _BottomSheetWrapper extends StatelessWidget {
                           .colorScheme
                           .outline
                           .withAlpha((0.3 * 255).round()),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -1577,7 +1610,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.red.withAlpha((0.08 * 255).round()),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Text(message,
           style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -1658,11 +1691,11 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
       FeedbackService.showError(context, message: 'IBAN inválido (deve começar por AO06)');
       return;
     }
-    if (_method == 'mcx_express' && account.isEmpty) {
-      FeedbackService.showError(context, message: 'Informe o número de telefone');
+    if (_method == 'mcx_express' && account.length != 9) {
+      FeedbackService.showError(context, message: 'Informe os 9 dígitos do número');
       return;
     }
-    final iban = account;
+    final iban = _method == 'mcx_express' ? '+244$account' : account;
 
     setState(() => _busy = true);
     final provider = context.read<AppProvider>();
@@ -1693,7 +1726,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
         child: Column(
@@ -1708,7 +1741,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.15)
                       : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
@@ -1728,7 +1761,10 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     icon: Icons.account_balance_rounded,
                     isSelected: _method == 'bank',
                     isDark: isDark,
-                    onTap: () => setState(() => _method = 'bank'),
+                    onTap: () => setState(() {
+                      _method = 'bank';
+                      _ibanCtrl.clear();
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1739,7 +1775,10 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     icon: Icons.flash_on_rounded,
                     isSelected: _method == 'mcx_express',
                     isDark: isDark,
-                    onTap: () => setState(() => _method = 'mcx_express'),
+                    onTap: () => setState(() {
+                      _method = 'mcx_express';
+                      _ibanCtrl.clear();
+                    }),
                   ),
                 ),
               ],
@@ -1752,13 +1791,13 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                 labelText: 'Valor a levantar',
                 suffixText: 'Kz',
                 prefixIcon: const Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
@@ -1769,19 +1808,26 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
             TextField(
               controller: _ibanCtrl,
               keyboardType: _method == 'bank' ? TextInputType.text : TextInputType.phone,
+              inputFormatters: _method == 'bank'
+                  ? null
+                  : [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(9),
+                    ],
               decoration: InputDecoration(
                 labelText: _method == 'bank' ? 'IBAN (AO06...)' : 'Número de telefone',
                 hintText: _method == 'bank' ? null : '9XX XXX XXX',
-                prefixIcon: Icon(_method == 'bank'
-                    ? Icons.credit_score_rounded
-                    : Icons.phone_android_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixText: _method == 'bank' ? null : '+244 ',
+                prefixIcon: _method == 'bank'
+                    ? const Icon(Icons.credit_score_rounded)
+                    : null,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: AppColors.accentOf(context), width: 1.5),
                 ),
                 filled: true,
@@ -1793,7 +1839,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.orange.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -1820,7 +1866,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                   backgroundColor: AppColors.accentOf(context),
                   foregroundColor: isDark ? Colors.black : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   elevation: 0,
                 ),
                 child: _busy
@@ -1870,7 +1916,7 @@ class _WithdrawalMethodOption extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected ? accent.withValues(alpha: 0.12) : unselectedBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isSelected ? accent : unselectedBorder,
             width: isSelected ? 2 : 1,

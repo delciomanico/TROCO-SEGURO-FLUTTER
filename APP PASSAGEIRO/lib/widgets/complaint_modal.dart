@@ -166,7 +166,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
         child: switch (_view) {
@@ -268,7 +268,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
         _selected = c;
         _view = _ComplaintView.detail;
       }),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
@@ -308,7 +308,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: catColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Text(
                 c.categoryLabel,
@@ -384,7 +384,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: catColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: Text(
                   c.categoryLabel,
@@ -418,7 +418,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.05)
                   : Colors.black.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.1)
@@ -534,7 +534,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
                       color: selected
                           ? AppColors.accentOf(context).withValues(alpha: 0.15)
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color:
                             selected ? AppColors.accentOf(context) : borderColor,
@@ -568,13 +568,13 @@ class _ComplaintModalState extends State<ComplaintModal> {
                     : 'ID da viagem (opcional)',
                 prefixIcon: const Icon(Icons.tag_rounded),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(AppRadius.md)),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(
                       color: AppColors.accentOf(context), width: 1.5),
                 ),
@@ -597,13 +597,13 @@ class _ComplaintModalState extends State<ComplaintModal> {
                 child: Icon(Icons.description_outlined),
               ),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: borderColor),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(
                     color: AppColors.accentOf(context), width: 1.5),
               ),
@@ -621,7 +621,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
                 foregroundColor: isDark ? Colors.black : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(AppRadius.md)),
                 elevation: 0,
               ),
               child: _busy
@@ -651,7 +651,7 @@ class _ComplaintModalState extends State<ComplaintModal> {
           color: isDark
               ? Colors.white.withValues(alpha: 0.15)
               : Colors.black.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: BorderRadius.circular(AppRadius.xs),
         ),
       ),
     );

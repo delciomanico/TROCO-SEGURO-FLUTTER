@@ -14,7 +14,8 @@ import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
-import 'package:troco_seguro/services/api_service.dart' show AppNotification;
+import 'package:troco_seguro/services/api_service.dart'
+    show AppNotification, ApiService;
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/utils/formatters.dart';
 import 'package:geolocator/geolocator.dart';
@@ -44,6 +45,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool showBalance = false;
   bool _isPanicLoading = false;
+  int _unreadNotifications = 0;
 
   // Panic mode state
   bool _isPanicActive = false;
@@ -51,6 +53,20 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _panicStartTime;
   static const _panicInterval = Duration(seconds: 30);
   static const _panicMaxDuration = Duration(hours: 5);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadNotificationsCount();
+  }
+
+  Future<void> _loadUnreadNotificationsCount() async {
+    final result = await ApiService().getNotifications();
+    if (!mounted) return;
+    if (result.isSuccess) {
+      setState(() => _unreadNotifications = result.data?.unreadCount ?? 0);
+    }
+  }
 
   @override
   void dispose() {
@@ -72,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -107,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -170,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               .withAlpha((0.18 * 255).round()),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: Text(
@@ -195,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: responsive.scaledHeight(14),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -235,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -270,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -333,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               .withAlpha((0.18 * 255).round()),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: Text(
@@ -358,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: responsive.scaledHeight(14),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -592,6 +608,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: _showNotificationsModal,
                 isDark: isDark,
                 responsive: responsive,
+                badgeCount: _unreadNotifications,
               ),
             ],
           ),
@@ -600,8 +617,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showNotificationsModal() {
-    showGeneralDialog(
+  Future<void> _showNotificationsModal() async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
@@ -618,6 +635,8 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+    if (!mounted) return;
+    _loadUnreadNotificationsCount();
   }
 
   Widget _buildBalanceCard(ResponsiveHelper responsive, User? user) {
@@ -636,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -998,7 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? Theme.of(context).cardColor : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             border: Border.all(
               color: Theme.of(context)
                   .colorScheme
@@ -1025,7 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         .colorScheme
                         .outline
                         .withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -1045,10 +1064,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.all(responsive.scaledWidth(16)),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   child: Center(
                     child: _buildQrCodePreview(qrCode),
                   ),
@@ -1393,7 +1412,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: responsive.scaledWidth(58),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [AppColors.primaryGold, AppColors.secondaryGold],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -1441,25 +1460,59 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback? onTap,
     required bool isDark,
     required ResponsiveHelper responsive,
+    int badgeCount = 0,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: responsive.scaledWidth(38),
-        height: responsive.scaledWidth(38),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.05),
-        ),
-        child: Icon(
-          icon,
-          size: responsive.scaledWidth(20),
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.85)
-              : AppColors.textDark.withValues(alpha: 0.7),
-        ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: responsive.scaledWidth(38),
+            height: responsive.scaledWidth(38),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
+            ),
+            child: Icon(
+              icon,
+              size: responsive.scaledWidth(20),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : AppColors.textDark.withValues(alpha: 0.7),
+            ),
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.black : Colors.white,
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  badgeCount > 9 ? '9+' : '$badgeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1509,7 +1562,7 @@ class _HomeScreenState extends State<HomeScreen> {
               EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.06)
@@ -1760,7 +1813,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                             decoration: BoxDecoration(
                               color: AppColors.accentOf(context)
                                   .withValues(alpha: isDark ? 0.15 : 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
                               border: Border.all(
                                 color:
                                     AppColors.accentOf(context).withValues(alpha: 0.4),
@@ -1870,7 +1923,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                                     .withValues(alpha: 0.08)
                                                 : AppColors.accentOf(context)
                                                     .withValues(alpha: 0.05),
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(AppRadius.md),
                                         border: Border.all(
                                           color: n.read
                                               ? (isDark

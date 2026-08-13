@@ -26,21 +26,18 @@ class AppProvider extends ChangeNotifier {
   // Estado dos cartões virtuais
   List<VirtualCard> _virtualCards = [];
   bool _isLoadingCards = false;
-  DateTime? _cardsLastFetch;
 
   // Estado das transações
   List<Transaction> _transactions = [];
   bool _isLoadingTransactions = false;
-  DateTime? _transactionsLastFetch;
 
   // Estado das viagens
   List<Trip> _trips = [];
   bool _isLoadingTrips = false;
-  DateTime? _tripsLastFetch;
+  String? _tripsError;
+  int _ratingsRevision = 0;
 
   // Duração do cache (5 minutos)
-  static const Duration _cacheDuration = Duration(minutes: 5);
-
   // Aviso de tentativas de PIN restantes (ex: durante compra com cartão)
   String? _pinAttemptsWarning;
   String? get pinAttemptsWarning => _pinAttemptsWarning;
@@ -64,6 +61,8 @@ class AppProvider extends ChangeNotifier {
 
   List<Trip> get trips => _trips;
   bool get isLoadingTrips => _isLoadingTrips;
+  String? get tripsError => _tripsError;
+  int get ratingsRevision => _ratingsRevision;
 
   // Expor API Service para chamadas diretas quando necessário
   ApiService get apiService => _api;
@@ -205,7 +204,6 @@ class AppProvider extends ChangeNotifier {
 
       if (result.isSuccess && result.data != null) {
         _virtualCards = result.data!;
-        _cardsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_cards',
           json.encode(_virtualCards.map((c) => c.toJson()).toList()),
@@ -237,7 +235,6 @@ class AppProvider extends ChangeNotifier {
       final result = await _api.getTransactionHistory();
       if (result.isSuccess && result.data != null) {
         _transactions = result.data!;
-        _transactionsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_transactions',
           json.encode(_transactions.map((t) => t.toJson()).toList()),
@@ -261,19 +258,23 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
     }
 
+    _tripsError = null;
+
     try {
       final result = await _api.getTrips();
       if (result.isSuccess && result.data != null) {
         _trips = result.data!;
-        _tripsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_trips',
           json.encode(_trips.map((t) => t.toJson()).toList()),
         );
         if (showLoading) notifyListeners();
+      } else {
+        _tripsError = result.error ?? 'Erro ao carregar viagens.';
       }
     } catch (e) {
       debugPrint('Erro ao buscar viagens: $e');
+      _tripsError = 'Erro ao carregar viagens.';
     } finally {
       if (showLoading) {
         _isLoadingTrips = false;
@@ -283,11 +284,6 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Verificar se o cache está válido
-  bool _isCacheValid(DateTime? lastFetch) {
-    if (lastFetch == null) return false;
-    return DateTime.now().difference(lastFetch) < _cacheDuration;
-  }
-
   /// Refresh manual dos dados do usuário
   Future<void> refreshUserData() async {
     await _fetchUserFromApi(showLoading: true);
@@ -306,6 +302,53 @@ class AppProvider extends ChangeNotifier {
   /// Refresh manual das viagens
   Future<void> refreshTrips() async {
     await _fetchTripsFromApi(showLoading: true);
+  }
+
+  /// Avaliar viagem e refletir o novo estado imediatamente na lista local.
+  Future<bool> rateTrip(
+    String tripId,
+    int stars, {
+    String? comment,
+  }) async {
+    final result = await _api.rateTrip(
+      tripId: tripId,
+      stars: stars,
+      comment: comment,
+    );
+
+    if (!result.isSuccess) {
+      return false;
+    }
+
+    final tripIndex = _trips.indexWhere((trip) => trip.id == tripId);
+    if (tripIndex != -1) {
+      final oldTrip = _trips[tripIndex];
+      _trips[tripIndex] = Trip(
+        id: oldTrip.id,
+        driverName: oldTrip.driverName,
+        licensePlate: oldTrip.licensePlate,
+        vehicleModel: oldTrip.vehicleModel,
+        vehicleColor: oldTrip.vehicleColor,
+        origin: oldTrip.origin,
+        destination: oldTrip.destination,
+        date: oldTrip.date,
+        time: oldTrip.time,
+        amount: oldTrip.amount,
+        rating: stars.toDouble(),
+        comment: comment ?? oldTrip.comment,
+        distance: oldTrip.distance,
+        duration: oldTrip.duration,
+        status: oldTrip.status,
+      );
+      await _prefs?.setString(
+        'ts_trips',
+        json.encode(_trips.map((t) => t.toJson()).toList()),
+      );
+    }
+
+    _ratingsRevision++;
+    notifyListeners();
+    return true;
   }
 
   /// Invalida o cache de um domínio e dispara um fetch em background (sem
@@ -652,7 +695,11 @@ class AppProvider extends ChangeNotifier {
         addTransaction(Transaction(
           id: result.data!.transactionId ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'payment',
+          // O backend classifica isto como "transfer" (ver
+          // API_ENDPOINTS.md) — usar o mesmo tipo aqui para a transacção
+          // optimista não "saltar" de categoria assim que a lista real é
+          // recarregada.
+          type: 'transfer',
           description: description ?? 'Transferência P2P',
           amount: -amount,
           date: DateTime.now().toString().split(' ')[0],
@@ -705,7 +752,13 @@ class AppProvider extends ChangeNotifier {
         addTransaction(Transaction(
           id: result.data!.transactionId ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'payment',
+          // Backend classifica como "transfer" — ver nota em transfer()
+          // acima. A descrição "Transferência directa" é o que permite ao
+          // filtro "Pagamentos" da Carteira reconhecer que isto é, do
+          // ponto de vista do utilizador, o pagamento de uma viagem (o
+          // motorista foi identificado por QR), não uma transferência
+          // genérica entre passageiros.
+          type: 'transfer',
           description: 'Transferência directa',
           amount: -amount,
           date: DateTime.now().toString().split(' ')[0],
@@ -797,6 +850,8 @@ class AppProvider extends ChangeNotifier {
     _cardsLastFetch = null;
     _transactionsLastFetch = null;
     _tripsLastFetch = null;
+    _tripsError = null;
+    _ratingsRevision = 0;
 
     // Limpar cache
     await _prefs?.remove('ts_user');
@@ -819,6 +874,8 @@ class AppProvider extends ChangeNotifier {
     _cardsLastFetch = null;
     _transactionsLastFetch = null;
     _tripsLastFetch = null;
+    _tripsError = null;
+    _ratingsRevision = 0;
 
     await _prefs?.remove('ts_user');
     await _prefs?.remove('ts_cards');

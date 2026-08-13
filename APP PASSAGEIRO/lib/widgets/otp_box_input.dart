@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:troco_seguro/utils/constants.dart';
 
 /// Input de código OTP em caixas segmentadas (uma por dígito), ligado a um
 /// [TextEditingController] normal — mantém-se compatível com toda a lógica
@@ -78,10 +79,10 @@ class _OtpBoxInputState extends State<OtpBoxInput> {
                   return Container(
                     width: boxWidth,
                     height: boxHeight,
-                    margin: EdgeInsets.symmetric(horizontal: spacing / 2),
+                    margin: const EdgeInsets.symmetric(horizontal: spacing / 2),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color: isCurrent || filled
                             ? widget.accentColor

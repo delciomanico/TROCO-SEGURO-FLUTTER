@@ -83,6 +83,10 @@ class _TripsScreenState extends State<TripsScreen> {
     }
   }
 
+  bool _needsRating(Trip trip) {
+    return trip.status == 'completed' && (trip.rating == null || trip.rating! <= 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
@@ -90,6 +94,7 @@ class _TripsScreenState extends State<TripsScreen> {
     final trips = provider.trips;
     final isLoading = provider.isLoadingTrips;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tripsError = provider.tripsError;
 
     final filtered = _filtered(trips);
     final completed = _apiStats?.totalTrips ?? trips.where((t) => t.status == 'completed').length;
@@ -123,11 +128,23 @@ class _TripsScreenState extends State<TripsScreen> {
                         children: [
                           _buildStatsRow(isDark, responsive, completed,
                               totalSpent),
+                          if (tripsError != null) ...[
+                            SizedBox(height: responsive.scaledHeight(12)),
+                            _buildTripsErrorBanner(
+                              context,
+                              isDark,
+                              responsive,
+                              tripsError,
+                            ),
+                          ],
                           SizedBox(height: responsive.scaledHeight(24)),
                           _buildSectionLabel(isDark, responsive),
                           SizedBox(height: responsive.scaledHeight(12)),
                           filtered.isEmpty
-                              ? _buildEmptyState(isDark, responsive)
+                              ? (tripsError != null && trips.isEmpty
+                                  ? _buildTripsErrorState(
+                                      context, isDark, responsive, tripsError)
+                                  : _buildEmptyState(isDark, responsive))
                               : _buildTripsList(isDark, responsive, filtered),
                         ],
                       ),
@@ -196,7 +213,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 11),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.12)
@@ -204,7 +221,7 @@ class _TripsScreenState extends State<TripsScreen> {
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide(
                             color:
                                 AppColors.accentOf(context).withValues(alpha: 0.7),
@@ -212,7 +229,7 @@ class _TripsScreenState extends State<TripsScreen> {
                           ),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),
@@ -324,7 +341,7 @@ class _TripsScreenState extends State<TripsScreen> {
       ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.08)
@@ -471,6 +488,115 @@ class _TripsScreenState extends State<TripsScreen> {
     );
   }
 
+  Widget _buildTripsErrorBanner(
+    BuildContext context,
+    bool isDark,
+    ResponsiveHelper responsive,
+    String message,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: responsive.scaledWidth(14),
+        vertical: responsive.scaledHeight(12),
+      ),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: isDark ? 0.14 : 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: Colors.red.shade400),
+          SizedBox(width: responsive.scaledWidth(10)),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : AppColors.textDark,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await context.read<AppProvider>().refreshTrips();
+              await _loadStats();
+            },
+            child: const Text('Tentar novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripsErrorState(
+    BuildContext context,
+    bool isDark,
+    ResponsiveHelper responsive,
+    String message,
+  ) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(60)),
+      child: Center(
+        child: Column(
+          children: [
+            Container(
+              width: responsive.scaledWidth(72),
+              height: responsive.scaledWidth(72),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04),
+                border: Border.all(
+                  color: Colors.red.withValues(alpha: 0.35),
+                  width: 1.2,
+                ),
+              ),
+              child: Icon(
+                Icons.cloud_off_rounded,
+                size: responsive.scaledWidth(32),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.45)
+                    : Colors.black.withValues(alpha: 0.35),
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(16)),
+            Text(
+              'Não foi possível carregar',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(16),
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.textDark,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(6)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(12),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : Colors.black.withValues(alpha: 0.38),
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(16)),
+            OutlinedButton(
+              onPressed: () async {
+                await context.read<AppProvider>().refreshTrips();
+                await _loadStats();
+              },
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Trips list ──────────────────────────────────────────────────────────────
   Widget _buildTripsList(
       bool isDark, ResponsiveHelper responsive, List<Trip> trips) {
@@ -490,6 +616,7 @@ class _TripsScreenState extends State<TripsScreen> {
   }) {
     final statusColor = _statusColor(trip.status);
     final textPrimary = isDark ? Colors.white : AppColors.textDark;
+    final needsRating = _needsRating(trip);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,14 +646,14 @@ class _TripsScreenState extends State<TripsScreen> {
         // Card
         Expanded(
           child: GestureDetector(
-          onTap: () => _showTripDetail(trip, isDark),
+          onTap: () => needsRating ? _rateTrip(context, trip) : _showTripDetail(trip, isDark),
           child: Container(
             margin:
                 EdgeInsets.only(bottom: responsive.scaledHeight(12)),
             padding: EdgeInsets.all(responsive.scaledWidth(14)),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.08)
@@ -576,7 +703,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     _statusLabel(trip.status),
@@ -619,6 +746,47 @@ class _TripsScreenState extends State<TripsScreen> {
                     ],
                   ],
                 ),
+                if (needsRating) ...[
+                  SizedBox(height: responsive.scaledHeight(10)),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: () => _rateTrip(context, trip),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.scaledWidth(10),
+                          vertical: responsive.scaledHeight(5),
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentOf(context).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          border: Border.all(
+                            color: AppColors.accentOf(context).withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_outline_rounded,
+                              size: responsive.scaledWidth(12),
+                              color: AppColors.accentOf(context),
+                            ),
+                            SizedBox(width: responsive.scaledWidth(4)),
+                            Text(
+                              'Avaliar',
+                              style: TextStyle(
+                                fontSize: responsive.responsiveFontSize(10),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.accentOf(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -646,7 +814,7 @@ class _TripsScreenState extends State<TripsScreen> {
             BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -659,7 +827,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             Padding(
@@ -682,7 +850,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Text(
                       statusLabel,
@@ -753,7 +921,7 @@ class _TripsScreenState extends State<TripsScreen> {
                             side: BorderSide(color: AppColors.accentOf(context)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(AppRadius.md)),
                           ),
                         ),
                       ),
@@ -775,13 +943,15 @@ class _TripsScreenState extends State<TripsScreen> {
       tripId: trip.id,
       driverName: trip.driverName,
       onSubmitRating: (tripId, stars, comment) async {
-        final response = await ApiService()
-            .rateTrip(tripId: tripId, stars: stars, comment: comment);
-        if (response.isSuccess && sheetContext.mounted) {
-          await sheetContext.read<AppProvider>().refreshTrips();
+        final success = await sheetContext.read<AppProvider>().rateTrip(
+          tripId,
+          stars,
+          comment: comment,
+        );
+        if (success && sheetContext.mounted) {
           if (sheetContext.mounted) Navigator.of(sheetContext).pop();
         }
-        return response.isSuccess;
+        return success;
       },
     );
   }

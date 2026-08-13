@@ -99,7 +99,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   decoration: BoxDecoration(
                     color:
                         Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
@@ -159,7 +159,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                               EdgeInsets.all(responsive.responsiveSpacing()),
                           decoration: BoxDecoration(
                             color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: Text(
                             error!,
@@ -292,7 +292,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                 color: AppColors.accent,
                 width: 3,
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -310,7 +310,7 @@ class _QRScannerModalState extends State<QRScannerModal> {
                   ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     'Alinhe o QR do passageiro aqui',

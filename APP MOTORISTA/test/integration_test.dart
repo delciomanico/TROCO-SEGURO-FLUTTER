@@ -36,7 +36,7 @@ Future<({int status, dynamic body})> req(
 }) async {
   var uriStr = '$_base$path';
   if (query != null && query.isNotEmpty) {
-    uriStr += '?' + query.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    uriStr += '?${query.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
   }
   final uri = Uri.parse(uriStr);
   final rq = await _http.openUrl(method, uri);
@@ -93,7 +93,7 @@ void shape(String endpoint, dynamic data, List<String> fields) {
   if (missing.isNotEmpty) {
     _shapeErrors.add('$endpoint: campos em falta: $missing');
     print('  ⚠️   Shape: $endpoint — em falta: $missing');
-    print('       Chaves recebidas: ${(data as Map).keys.toList()}');
+    print('       Chaves recebidas: ${(data).keys.toList()}');
   }
 }
 
@@ -933,7 +933,7 @@ Future<void> main(List<String> args) async {
 
   print('\n╔══════════════════════════════════════════════════╗');
   print('║  APP MOTORISTA — Integração API completa         ║');
-  print('║  ${'$_base'.padRight(48)} ║');
+  print('║  ${_base.padRight(48)} ║');
   print('╚══════════════════════════════════════════════════╝');
 
   await testAuth(phone, pin);
@@ -961,9 +961,9 @@ Future<void> main(List<String> args) async {
   // ── Resultado final ───────────────────────────────────────────────────────
   final total = _pass + _fail;
   print('\n╔══════════════════════════════════════════════════╗');
-  print('║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos'.padRight(51) + '║');
+  print('${'║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos'.padRight(51)}║');
   if (_shapeErrors.isNotEmpty) {
-    print('║  ${_shapeErrors.length} problema(s) de shape detectado(s)'.padRight(51) + '║');
+    print('${'║  ${_shapeErrors.length} problema(s) de shape detectado(s)'.padRight(51)}║');
   }
   print('╚══════════════════════════════════════════════════╝\n');
 

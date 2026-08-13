@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
@@ -83,6 +83,50 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
     }
   }
 
+  /// Compõe o QR do assento com o número do assento desenhado na própria
+  /// imagem — sem isto, o ficheiro partilhado/impresso é só o QR em bruto
+  /// e o número só existe na legenda de texto do share, que muitos fluxos
+  /// de impressão/gravação descartam (ver relato do cliente: folha
+  /// impressa com QRs sem nenhum número visível).
+  Future<Uint8List> _composeSeatQrImage(Uint8List qrBytes, String label) async {
+    try {
+      final controller = ScreenshotController();
+      final composed = await controller.captureFromWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Container(
+            width: 640,
+            height: 760,
+            color: Colors.white,
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.memory(qrBytes, width: 560, height: 560, fit: BoxFit.contain),
+                const SizedBox(height: 24),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        pixelRatio: 2.0,
+        targetSize: const Size(640, 760),
+      );
+      return composed;
+    } catch (_) {
+      return qrBytes;
+    }
+  }
+
   Future<void> _shareOne(int index) async {
     setState(() => _savingIndex[index] = true);
     try {
@@ -93,8 +137,9 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
         return;
       }
       final label = _seatLabel(seat, index);
+      final composed = await _composeSeatQrImage(bytes, label);
       final safeName = label.toLowerCase().replaceAll(' ', '_');
-      final file = await _writeTempFile(bytes, 'qr_${safeName}_troco_seguro.png');
+      final file = await _writeTempFile(composed, 'qr_${safeName}_troco_seguro.png');
       if (file == null) {
         _showError('Não foi possível preparar o ficheiro.');
         return;
@@ -120,8 +165,9 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
         final bytes = _decodeImage(seat['image']?.toString());
         if (bytes == null) continue;
         final label = _seatLabel(seat, i);
+        final composed = await _composeSeatQrImage(bytes, label);
         final safeName = label.toLowerCase().replaceAll(' ', '_');
-        final file = await _writeTempFile(bytes, 'qr_${safeName}_troco_seguro.png');
+        final file = await _writeTempFile(composed, 'qr_${safeName}_troco_seguro.png');
         if (file != null) files.add(XFile(file.path));
       }
       if (files.isEmpty) {
@@ -162,7 +208,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
       height: MediaQuery.of(context).size.height * 0.92,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Column(
         children: [
@@ -175,7 +221,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.15)
                   : Colors.black.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
 
@@ -193,7 +239,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                   padding: EdgeInsets.all(responsive.scaledWidth(10)),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Icon(
                     Icons.event_seat_rounded,
@@ -241,7 +287,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
               padding: EdgeInsets.all(responsive.responsivePadding()),
               decoration: BoxDecoration(
                 color: AppColors.darkBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(
                   color: AppColors.darkBlue.withValues(alpha: 0.2),
                 ),
@@ -317,7 +363,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                     padding: EdgeInsets.symmetric(
                         vertical: responsive.scaledHeight(16)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     elevation: 0,
                   ),
@@ -368,7 +414,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.07)
@@ -401,7 +447,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -445,7 +491,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
             padding: EdgeInsets.all(responsive.scaledWidth(16)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: AppColors.accent.withValues(alpha: 0.2),
                 width: 2,
@@ -546,41 +592,37 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
     required int index,
     required Color subtleColor,
   }) {
-    final screenshotCtrl = ScreenshotController();
-    return Screenshot(
-      controller: screenshotCtrl,
-      child: _buildActionButton(
-        responsive: responsive,
-        isDark: isDark,
-        icon: Icons.download_rounded,
-        label: 'Guardar',
-        isLoading: false,
-        onTap: imageBytes == null
-            ? null
-            : () async {
-                setState(() => _savingIndex[index] = true);
-                try {
-                  final safeName =
-                      label.toLowerCase().replaceAll(' ', '_');
-                  final file = await _writeTempFile(
-                    imageBytes,
-                    'qr_${safeName}_troco_seguro.png',
-                  );
-                  if (file == null) {
-                    _showError('Não foi possível guardar o ficheiro.');
-                    return;
-                  }
-                  await Share.shareXFiles(
-                    [XFile(file.path)],
-                    text: '$label · ${widget.driverName} · Troco Seguro',
-                    subject: 'QR Code $label',
-                  );
-                } finally {
-                  if (mounted) setState(() => _savingIndex.remove(index));
+    return _buildActionButton(
+      responsive: responsive,
+      isDark: isDark,
+      icon: Icons.download_rounded,
+      label: 'Guardar',
+      isLoading: false,
+      onTap: imageBytes == null
+          ? null
+          : () async {
+              setState(() => _savingIndex[index] = true);
+              try {
+                final composed = await _composeSeatQrImage(imageBytes, label);
+                final safeName = label.toLowerCase().replaceAll(' ', '_');
+                final file = await _writeTempFile(
+                  composed,
+                  'qr_${safeName}_troco_seguro.png',
+                );
+                if (file == null) {
+                  _showError('Não foi possível guardar o ficheiro.');
+                  return;
                 }
-              },
-        isPrimary: false,
-      ),
+                await Share.shareXFiles(
+                  [XFile(file.path)],
+                  text: '$label · ${widget.driverName} · Troco Seguro',
+                  subject: 'QR Code $label',
+                );
+              } finally {
+                if (mounted) setState(() => _savingIndex.remove(index));
+              }
+            },
+      isPrimary: false,
     );
   }
 
@@ -613,7 +655,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
           ),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: isLoading
               ? Center(

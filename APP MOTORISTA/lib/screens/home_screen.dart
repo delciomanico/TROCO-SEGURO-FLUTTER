@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
             activeVehicleId: widget.activeVehicleId,
           );
           if (!setupResult.isSuccess || setupResult.data == null) {
-            if (mounted) {
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: Text(setupResult.error ?? 'Erro ao actualizar valor'),
                 backgroundColor: Colors.red,
@@ -510,7 +510,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.08)
                     : Colors.black.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -588,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -1012,7 +1012,7 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: AppColors.adaptiveAccent(context),
             behavior: SnackBarBehavior.floating,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           ),
         );
 
@@ -1091,7 +1091,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.green.shade600,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
                     child: Text(
@@ -1147,7 +1147,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: accent.withValues(alpha: 0.35),
           ),
@@ -1175,15 +1175,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Lotação — sessão activa',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(11),
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.5)
-                              : Colors.black.withValues(alpha: 0.45),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Lotação — sessão activa',
+                            style: TextStyle(
+                              fontSize: responsive.responsiveFontSize(11),
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.5)
+                                  : Colors.black.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          SizedBox(width: responsive.scaledWidth(4)),
+                          Icon(
+                            Icons.unfold_more_rounded,
+                            size: responsive.responsiveFontSize(13),
+                            color: accent,
+                          ),
+                        ],
                       ),
                       SizedBox(height: responsive.scaledHeight(3)),
                       Text(
@@ -1207,7 +1217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Text(
                       'Encerrar',
@@ -1223,7 +1233,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: responsive.scaledHeight(10)),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               child: LinearProgressIndicator(
                 value: filled.clamp(0.0, 1.0),
                 minHeight: responsive.scaledHeight(5),
@@ -1279,7 +1289,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : (isDark
                                     ? Colors.white.withValues(alpha: 0.06)
                                     : Colors.black.withValues(alpha: 0.05)),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                             border: Border.all(
                               color: seat.paid
                                   ? accent
@@ -1302,6 +1312,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     .toList(),
               ),
             ],
+            SizedBox(height: responsive.scaledHeight(10)),
+            Center(
+              child: Text(
+                'Toque para expandir',
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(10),
+                  fontWeight: FontWeight.w600,
+                  color: accent.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1354,6 +1375,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await cleared.save();
         setState(() => _qrConfig = cleared);
       }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sessão encerrada com sucesso.'),
@@ -1442,7 +1464,7 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: EdgeInsets.symmetric(horizontal: responsive.scaledWidth(20)),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.06)
@@ -1761,7 +1783,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1776,7 +1798,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             SizedBox(height: r.scaledHeight(24)),
@@ -1832,13 +1854,13 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
           hintText: 'Ex: Roque Santeiro',
           labelStyle: TextStyle(color: subtleText),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(color: borderColor)),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(color: borderColor)),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: const BorderSide(color: AppColors.primaryGold, width: 2)),
           prefixIcon: Icon(Icons.location_on_outlined, color: subtleText),
         ),
@@ -1852,13 +1874,13 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
           hintText: 'Ex: Talatona',
           labelStyle: TextStyle(color: subtleText),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(color: borderColor)),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(color: borderColor)),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: const BorderSide(color: AppColors.primaryGold, width: 2)),
           prefixIcon:
               Icon(Icons.flag_outlined, color: subtleText),
@@ -1875,7 +1897,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
           color: isDark
               ? Colors.white.withValues(alpha: 0.05)
               : Colors.black.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.10),
           ),
@@ -1970,7 +1992,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
               decoration: BoxDecoration(
                   border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: Text('CANCELAR',
                       style: TextStyle(
@@ -1988,7 +2010,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
             child: Container(
               padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
               decoration: BoxDecoration(
-                  color: accent, borderRadius: BorderRadius.circular(12)),
+                  color: accent, borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: _checkingCard
                       ? SizedBox(
@@ -2032,7 +2054,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: accent.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: accent.withValues(alpha: 0.3)),
         ),
         child: Text(
@@ -2065,7 +2087,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
                             : (isDark ? Colors.white30 : Colors.black26),
                         width: _enteredPin.length > i ? 2 : 1.5,
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     alignment: Alignment.center,
                     child: _enteredPin.length > i
@@ -2108,7 +2130,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
               decoration: BoxDecoration(
                   border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: Text('VOLTAR',
                       style: TextStyle(
@@ -2129,7 +2151,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
                   color: _enteredPin.length == _pinLength
                       ? accent
                       : accent.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: Text('CONFIRMAR',
                       style: TextStyle(
@@ -2201,7 +2223,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               horizontal: r.scaledWidth(16), vertical: r.scaledHeight(10)),
           decoration: BoxDecoration(
             color: accent.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -2226,7 +2248,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
             padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
             decoration: BoxDecoration(
                 color: AppColors.primaryGold,
-                borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(AppRadius.md)),
             child: Center(
                 child: Text('CONTINUAR',
                     style: TextStyle(
@@ -2269,7 +2291,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
               decoration: BoxDecoration(
                   border: Border.all(color: Colors.black12),
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: Text('FECHAR',
                       style: TextStyle(
@@ -2288,7 +2310,7 @@ class _PassengerQRPaymentModalState extends State<_PassengerQRPaymentModal> {
               padding: EdgeInsets.symmetric(vertical: r.scaledHeight(16)),
               decoration: BoxDecoration(
                   color: AppColors.primaryGold,
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Center(
                   child: Text('TENTAR NOVAMENTE',
                       style: TextStyle(

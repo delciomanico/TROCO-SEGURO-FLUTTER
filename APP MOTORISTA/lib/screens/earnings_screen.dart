@@ -347,7 +347,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
       ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.06)
@@ -394,7 +394,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             ),
             decoration: BoxDecoration(
               color: AppColors.primaryGold.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -433,7 +433,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         padding: EdgeInsets.all(responsive.scaledWidth(4)),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -456,7 +456,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   decoration: BoxDecoration(
                     color:
                         isSelected ? AppColors.primaryGold : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     period['label']!,
@@ -531,7 +531,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
       padding: EdgeInsets.all(responsive.responsivePadding()),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -546,7 +546,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             padding: EdgeInsets.all(responsive.scaledWidth(8)),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
@@ -589,7 +589,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -643,7 +643,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                           ),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                         ),
                       ),
                       SizedBox(height: responsive.scaledHeight(8)),
@@ -674,7 +674,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         padding: EdgeInsets.all(responsive.responsivePadding()),
         decoration: BoxDecoration(
           color: AppColors.primaryGold.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.3)),
         ),
         child: Column(

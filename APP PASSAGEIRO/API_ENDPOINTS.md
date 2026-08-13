@@ -201,7 +201,9 @@ Detalhes do motorista.
 
 ## Transações Financeiras
 
-### POST /transactions/deposit
+### POST /transactions/deposit (legado — removido)
+
+> Não utilizar. O endpoint já não existe no backend (`404`). Para depósitos, usar `POST /payments/deposit/initiate`.
 Carregar carteira (simulação).
 
 **Request:**
@@ -301,11 +303,20 @@ Gerar QR Code de cobrança (taxista).
 ## Pagamentos
 
 ### POST /payments/deposit/initiate
+
+Cria uma transação `PENDING` e devolve uma referência Multicaixa. Envie
+`Idempotency-Key` em cada tentativa lógica do pedido; o saldo só é creditado
+após a confirmação do gateway.
 Iniciar depósito.
 
 ---
 
-### POST /payments/webhook/simulate
+### POST /payments/webhook (interno, gateway)
+
+Protegido por HMAC-SHA256 e chamado exclusivamente pelo gateway de pagamento.
+Não é um endpoint para a app mobile.
+
+### POST /payments/webhook/simulate (apenas testes/admin)
 Simular webhook de pagamento.
 
 ---

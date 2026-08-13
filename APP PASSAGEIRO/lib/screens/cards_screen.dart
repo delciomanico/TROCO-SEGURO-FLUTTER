@@ -15,6 +15,7 @@ import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
+import 'package:troco_seguro/services/virtual_card_export_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/widgets/card_transfer_modal.dart';
@@ -73,7 +74,7 @@ class _CardsScreenState extends State<CardsScreen> {
             decoration: BoxDecoration(
               color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
             child: Column(
@@ -89,7 +90,7 @@ class _CardsScreenState extends State<CardsScreen> {
                           .colorScheme
                           .onSurface
                           .withAlpha((0.25 * 255).round()),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -122,9 +123,9 @@ class _CardsScreenState extends State<CardsScreen> {
                     suffixText: 'Kz',
                     prefixIcon: const Icon(Icons.add_card_outlined),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx)
                             .colorScheme
@@ -133,7 +134,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx).colorScheme.primary,
                         width: 2,
@@ -172,10 +173,10 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (err != null) {
-                              FeedbackService.showError(context,
+                              FeedbackService.showError(ctx,
                                   message: err);
                             } else {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message:
                                       '${_fmt(amount)} Kz adicionados ao cartão');
                             }
@@ -185,7 +186,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       foregroundColor: Theme.of(ctx).colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       elevation: 0,
                     ),
@@ -229,7 +230,7 @@ class _CardsScreenState extends State<CardsScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
             child: Column(
@@ -245,7 +246,7 @@ class _CardsScreenState extends State<CardsScreen> {
                           .colorScheme
                           .onSurface
                           .withAlpha((0.25 * 255).round()),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -277,15 +278,15 @@ class _CardsScreenState extends State<CardsScreen> {
                     labelText: 'Valor a levantar',
                     suffixText: 'Kz',
                     prefixIcon: const Icon(Icons.arrow_upward_rounded),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.2 * 255).round()),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
                     ),
                     filled: true,
@@ -302,15 +303,15 @@ class _CardsScreenState extends State<CardsScreen> {
                     labelText: 'PIN do cartão (4 dígitos)',
                     counterText: '',
                     prefixIcon: const Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx).colorScheme.onSurface.withAlpha((0.2 * 255).round()),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: Theme.of(ctx).colorScheme.primary, width: 2),
                     ),
                     filled: true,
@@ -347,17 +348,17 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (ok) {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message: '${_fmt(amount)} Kz devolvidos à carteira');
                             } else {
-                              FeedbackService.showError(context, message: 'Erro ao levantar do cartão');
+                              FeedbackService.showError(ctx, message: 'Erro ao levantar do cartão');
                             }
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                       elevation: 0,
                     ),
                     child: isLoading
@@ -416,7 +417,7 @@ class _CardsScreenState extends State<CardsScreen> {
             decoration: BoxDecoration(
               color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
             child: Column(
@@ -432,7 +433,7 @@ class _CardsScreenState extends State<CardsScreen> {
                           .colorScheme
                           .onSurface
                           .withAlpha((0.25 * 255).round()),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   ),
                 ),
@@ -466,9 +467,9 @@ class _CardsScreenState extends State<CardsScreen> {
                     suffixText: 'Kz',
                     prefixIcon: const Icon(Icons.speed_outlined),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx)
                             .colorScheme
@@ -477,7 +478,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(
                         color: Theme.of(ctx).colorScheme.primary,
                         width: 2,
@@ -511,9 +512,9 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (err != null) {
-                              FeedbackService.showError(context, message: err);
+                              FeedbackService.showError(ctx, message: err);
                             } else {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message: limit == 0
                                       ? 'Limite removido'
                                       : 'Limite definido: ${_fmt(limit)} Kz/dia');
@@ -524,7 +525,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       foregroundColor: Theme.of(ctx).colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       elevation: 0,
                     ),
@@ -555,7 +556,7 @@ class _CardsScreenState extends State<CardsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: const Text('Apagar cartão',
             style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
@@ -574,6 +575,7 @@ class _CardsScreenState extends State<CardsScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
     final provider = context.read<AppProvider>();
     final ok = await provider.deleteVirtualCard(card.id);
@@ -781,7 +783,7 @@ class _CardsScreenState extends State<CardsScreen> {
               decoration: BoxDecoration(
                 color: isDark ? Theme.of(ctx).cardColor : AppColors.lightCard,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                    const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -797,7 +799,7 @@ class _CardsScreenState extends State<CardsScreen> {
                           height: 5,
                           decoration: BoxDecoration(
                             color: onSurface.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(AppRadius.xs),
                           ),
                         ),
                       ),
@@ -815,7 +817,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       Container(
                         decoration: BoxDecoration(
                           color: groupColor,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: Column(
                           children: [
@@ -881,7 +883,7 @@ class _CardsScreenState extends State<CardsScreen> {
                               .colorScheme
                               .primary
                               .withAlpha((0.08 * 255).round()),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: Text(
                           'Precisas de dois PINs: o PIN da tua conta (6 dígitos) para confirmar identidade, e um PIN do cartão (4 dígitos) para pagamentos.',
@@ -896,7 +898,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       Container(
                         decoration: BoxDecoration(
                           color: groupColor,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: Column(
                           children: [
@@ -968,7 +970,7 @@ class _CardsScreenState extends State<CardsScreen> {
                       Container(
                         decoration: BoxDecoration(
                           color: groupColor,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: SwitchListTile(
                           value: pinRequired,
@@ -1018,12 +1020,12 @@ class _CardsScreenState extends State<CardsScreen> {
                                     );
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
-                                    FeedbackService.showSuccess(context,
+                                    FeedbackService.showSuccess(ctx,
                                         message: 'Cartão criado com sucesso!');
                                   } catch (e) {
                                     if (!ctx.mounted) return;
                                     setSheet(() => isCreating = false);
-                                    FeedbackService.showError(context,
+                                    FeedbackService.showError(ctx,
                                         message: e.toString());
                                   }
                                 },
@@ -1047,7 +1049,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                 Theme.of(ctx).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             elevation: 0,
                           ),
@@ -1314,7 +1316,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                   color: isDark
                                       ? Colors.white.withValues(alpha: 0.07)
                                       : Colors.black.withValues(alpha: 0.04),
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(AppRadius.md),
                                   border: Border.all(
                                     color: AppColors.accentOf(context)
                                         .withValues(alpha: 0.6),
@@ -1408,7 +1410,7 @@ class _CardsScreenState extends State<CardsScreen> {
                                   ? AppColors.accentOf(context)
                                   : AppColors.accentOf(context)
                                       .withAlpha((0.25 * 255).round()),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
                             ),
                           );
                         }),
@@ -1507,7 +1509,7 @@ class _CardsScreenState extends State<CardsScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: isDark ? AppColors.darkCard : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             border: Border.all(
                               color: isDark
                                   ? Colors.white.withValues(alpha: 0.08)
@@ -1625,7 +1627,7 @@ class _CardCarouselItem extends StatelessWidget {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: AppColors.accentOf(context).withAlpha((0.9 * 255).round()),
             width: 1.2,
@@ -1640,7 +1642,7 @@ class _CardCarouselItem extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1672,9 +1674,9 @@ class _CardCarouselItem extends StatelessWidget {
                     ),
                   ),
                   if (card.isBlocked)
-                    _StatusBadge('BLOQUEADO', Colors.red)
+                    const _StatusBadge('BLOQUEADO', Colors.red)
                   else if (card.isFrozen)
-                    _StatusBadge('CONGELADO', Colors.orange)
+                    const _StatusBadge('CONGELADO', Colors.orange)
                   else
                     const Icon(Icons.wifi_rounded,
                         color: Colors.white70, size: 18),
@@ -1687,7 +1689,7 @@ class _CardCarouselItem extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                       colors: [Color(0xFFE7C97A), Color(0xFFC39A45)]),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
               ),
               const Spacer(),
@@ -1778,7 +1780,7 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withAlpha((0.85 * 255).round()),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(label,
           style: const TextStyle(
@@ -1885,16 +1887,33 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
   Future<void> _save(VirtualCard card, GlobalKey key) async {
     setState(() => _isSaving = true);
     final bytes = await _captureImage(key);
-    if (bytes != null) {
-      final dir = await getApplicationDocumentsDirectory();
-      final cardsDir = Directory('${dir.path}/virtual_cards');
-      if (!await cardsDir.exists()) await cardsDir.create(recursive: true);
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${cardsDir.path}/card_qr_${card.id}_$ts.png');
-      await file.writeAsBytes(bytes);
+    if (bytes == null) {
       if (mounted) {
-        FeedbackService.showSuccess(context,
-            message: 'QR guardado em: ${file.path}');
+        FeedbackService.showError(
+          context,
+          message: 'Não foi possível gerar a imagem do cartão.',
+        );
+      }
+    } else {
+      final result = await VirtualCardExportService().saveImageBytes(
+        bytes,
+        suggestedName: 'cartao_virtual_${card.id}.png',
+      );
+      if (!mounted) return;
+      if (result.cancelled) {
+        setState(() => _isSaving = false);
+        return;
+      }
+      if (result.path != null) {
+        FeedbackService.showSuccess(
+          context,
+          message: 'Cartão guardado em: ${result.path}',
+        );
+      } else {
+        FeedbackService.showError(
+          context,
+          message: result.error ?? 'Não foi possível guardar o cartão.',
+        );
       }
     }
     if (!mounted) return;
@@ -1906,7 +1925,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -1947,7 +1966,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
             image: AssetImage('assets/images/card_fundo.jpg'),
             fit: BoxFit.cover,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: AppColors.accentOf(context).withAlpha((0.9 * 255).round()),
             width: 1.2,
@@ -1962,7 +1981,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -2007,7 +2026,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
                     width: 40 * scale,
                     height: 28 * scale,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6 * scale),
+                      borderRadius: BorderRadius.circular(AppRadius.sm * scale),
                       gradient: const LinearGradient(
                           colors: [Color(0xFFE7C97A), Color(0xFFC39A45)]),
                     ),
@@ -2061,7 +2080,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
                         padding: EdgeInsets.all(4 * scale),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(8 * scale),
+                          borderRadius: BorderRadius.circular(AppRadius.sm * scale),
                         ),
                         child: qrData == null
                             ? SizedBox(
@@ -2275,7 +2294,7 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
                           left: startsNewGroup ? 10 : 3, right: 3),
                       decoration: BoxDecoration(
                         color: active ? accent : accent.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                     );
                   }),

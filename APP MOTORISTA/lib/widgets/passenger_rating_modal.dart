@@ -99,7 +99,7 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: SingleChildScrollView(
         child: Padding(
@@ -119,7 +119,7 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.15)
                       : Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
               SizedBox(height: responsive.scaledHeight(24)),
@@ -190,7 +190,7 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
                       ? Colors.white.withValues(alpha: 0.06)
                       : Colors.black.withValues(alpha: 0.03),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide.none),
                 ),
               ),

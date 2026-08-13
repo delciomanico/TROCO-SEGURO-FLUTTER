@@ -38,7 +38,7 @@ Future<({int status, dynamic body})> req(
 }) async {
   var uriStr = '$_base$path';
   if (query != null && query.isNotEmpty) {
-    uriStr += '?' + query.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    uriStr += '?${query.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
   }
   final uri = Uri.parse(uriStr);
   final rq = await _http.openUrl(method, uri);
@@ -91,7 +91,7 @@ void shape(String endpoint, dynamic data, List<String> fields) {
   if (missing.isNotEmpty) {
     _shapeErrors.add('$endpoint: campos em falta: $missing');
     print('  ⚠️   Shape: $endpoint — em falta: $missing');
-    print('       Chaves recebidas: ${(data as Map).keys.toList()}');
+    print('       Chaves recebidas: ${(data).keys.toList()}');
   }
 }
 
@@ -623,14 +623,20 @@ Future<void> testNotifications() async {
 
   if (_notifId.isNotEmpty) {
     final r = await req('PUT', '/notifications/$_notifId/read');
-    if (r.status == 200 || r.status == 204) ok('PUT /notifications/:id/read');
-    else fail('PUT /notifications/:id/read', r.body);
+    if (r.status == 200 || r.status == 204) {
+      ok('PUT /notifications/:id/read');
+    } else {
+      fail('PUT /notifications/:id/read', r.body);
+    }
   }
 
   {
     final r = await req('PUT', '/notifications/read-all');
-    if (r.status == 200 || r.status == 204) ok('PUT /notifications/read-all');
-    else fail('PUT /notifications/read-all', r.body);
+    if (r.status == 200 || r.status == 204) {
+      ok('PUT /notifications/read-all');
+    } else {
+      fail('PUT /notifications/read-all', r.body);
+    }
   }
 }
 
@@ -667,8 +673,11 @@ Future<void> testSafety() async {
   }
   if (testContactId.isNotEmpty) {
     final r = await req('DELETE', '/safety/emergency-contacts/$testContactId');
-    if (r.status == 200 || r.status == 204) ok('DELETE /safety/emergency-contacts/:id');
-    else warn('DELETE contacto (${r.status}) — limpar manualmente: $testContactId');
+    if (r.status == 200 || r.status == 204) {
+      ok('DELETE /safety/emergency-contacts/:id');
+    } else {
+      warn('DELETE contacto (${r.status}) — limpar manualmente: $testContactId');
+    }
   }
 
   // POST /safety/panic
@@ -900,7 +909,7 @@ Future<void> main(List<String> args) async {
 
   print('\n╔══════════════════════════════════════════════════╗');
   print('║  APP PASSAGEIRO — Integração API completa        ║');
-  print('║  ${'$_base'.padRight(48)} ║');
+  print('║  ${_base.padRight(48)} ║');
   print('╚══════════════════════════════════════════════════╝');
 
   await testAuth(phone, pin);
@@ -930,9 +939,9 @@ Future<void> main(List<String> args) async {
   // ── Resultado ─────────────────────────────────────────────────────────────
   final total = _pass + _fail;
   print('\n╔══════════════════════════════════════════════════╗');
-  print('║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos'.padRight(51) + '║');
+  print('${'║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos'.padRight(51)}║');
   if (_shapeErrors.isNotEmpty) {
-    print('║  ${_shapeErrors.length} problema(s) de shape detectado(s)'.padRight(51) + '║');
+    print('${'║  ${_shapeErrors.length} problema(s) de shape detectado(s)'.padRight(51)}║');
   }
   print('╚══════════════════════════════════════════════════╝\n');
 

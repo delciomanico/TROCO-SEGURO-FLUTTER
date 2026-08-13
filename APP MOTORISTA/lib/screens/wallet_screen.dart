@@ -297,7 +297,7 @@ class _WalletScreenState extends State<WalletScreen> {
           image: AssetImage('assets/images/card_fundo.jpg'),
           fit: BoxFit.cover,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.primaryGold, width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -541,7 +541,7 @@ class _WalletScreenState extends State<WalletScreen> {
               : (isDark
                   ? Colors.white.withValues(alpha: 0.07)
                   : Colors.black.withValues(alpha: 0.04)),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: isSelected
               ? null
               : Border.all(
@@ -602,7 +602,7 @@ class _WalletScreenState extends State<WalletScreen> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.06)

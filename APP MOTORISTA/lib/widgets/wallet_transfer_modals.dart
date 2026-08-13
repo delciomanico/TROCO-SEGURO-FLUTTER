@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
@@ -9,7 +10,7 @@ import 'package:troco_seguro_pro/widgets/otp_box_input.dart';
 import 'package:troco_seguro_pro/widgets/success_modal.dart';
 
 /// Cabeçalho + moldura partilhados pelos modais de carteira desta ficha,
-/// no mesmo estilo do WithdrawalModal (fundo branco, ícone com gradiente
+/// no mesmo estilo do WithdrawalModal (fundo escuro, ícone com gradiente
 /// dourado, botão de fechar circular).
 class _WalletModalShell extends StatelessWidget {
   final String title;
@@ -31,10 +32,10 @@ class _WalletModalShell extends StatelessWidget {
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.darkCard,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
+            topLeft: Radius.circular(AppRadius.lg),
+            topRight: Radius.circular(AppRadius.lg),
           ),
         ),
         child: SingleChildScrollView(
@@ -48,8 +49,8 @@ class _WalletModalShell extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
@@ -68,7 +69,7 @@ class _WalletModalShell extends StatelessWidget {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primaryGold.withValues(alpha: 0.3),
@@ -88,14 +89,14 @@ class _WalletModalShell extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: responsive.responsiveFontSize(18),
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
+                                color: AppColors.textLight,
                               ),
                             ),
                             Text(
                               subtitle,
                               style: TextStyle(
                                 fontSize: responsive.responsiveFontSize(12),
-                                color: Colors.grey.shade600,
+                                color: Colors.white.withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -107,10 +108,10 @@ class _WalletModalShell extends StatelessWidget {
                       icon: Container(
                         padding: EdgeInsets.all(responsive.scaledWidth(6)),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: Colors.white.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.close, color: Colors.grey.shade600, size: 18),
+                        child: const Icon(Icons.close, color: Colors.white70, size: 18),
                       ),
                     ),
                   ],
@@ -144,7 +145,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -163,20 +164,24 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-InputDecoration _fieldDecoration(String label, {String? hint, Widget? prefixIcon, Widget? suffixIcon}) {
+InputDecoration _fieldDecoration(String label,
+    {String? hint, Widget? prefixIcon, Widget? suffixIcon, String? prefixText}) {
   return InputDecoration(
     labelText: label,
     hintText: hint,
+    prefixText: prefixText,
+    prefixStyle: const TextStyle(
+        color: AppColors.textLight, fontWeight: FontWeight.w600),
     prefixIcon: prefixIcon,
     suffixIcon: suffixIcon,
     filled: true,
-    fillColor: const Color(0xFFF5F7FA),
+    fillColor: Colors.white.withValues(alpha: 0.06),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       borderSide: BorderSide.none,
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
     ),
   );
@@ -309,7 +314,7 @@ class _PayLoaderModalState extends State<PayLoaderModal> {
           TextField(
             controller: _cardCtrl,
             keyboardType: TextInputType.number,
-            style: const TextStyle(color: AppColors.textDark),
+            style: const TextStyle(color: AppColors.textLight),
             decoration: _fieldDecoration(
               'Número do cartão',
               suffixIcon: IconButton(
@@ -323,7 +328,7 @@ class _PayLoaderModalState extends State<PayLoaderModal> {
           TextField(
             controller: _amountCtrl,
             keyboardType: TextInputType.number,
-            style: const TextStyle(color: AppColors.textDark),
+            style: const TextStyle(color: AppColors.textLight),
             decoration: _fieldDecoration('Valor (Kz)'),
           ),
           SizedBox(height: responsive.scaledHeight(20)),
@@ -332,11 +337,11 @@ class _PayLoaderModalState extends State<PayLoaderModal> {
             style: TextStyle(
               fontSize: responsive.responsiveFontSize(14),
               fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
+              color: AppColors.textLight,
             ),
           ),
           SizedBox(height: responsive.scaledHeight(10)),
-          OtpBoxInput(controller: _pinCtrl, accentColor: AppColors.primaryGold, isDark: false),
+          OtpBoxInput(controller: _pinCtrl, accentColor: AppColors.primaryGold, isDark: true),
           SizedBox(height: responsive.scaledHeight(24)),
           SizedBox(
             width: double.infinity,
@@ -345,7 +350,7 @@ class _PayLoaderModalState extends State<PayLoaderModal> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(16)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
                 elevation: 0,
               ),
               child: _loading
@@ -400,6 +405,15 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
     super.dispose();
   }
 
+  /// O QR devolve o número completo (`+244XXXXXXXXX`), mas o campo só
+  /// guarda os 9 dígitos locais — o indicativo é fixo e mostrado à parte.
+  String _stripCountryCode(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.startsWith('244') && digits.length > 9
+        ? digits.substring(digits.length - 9)
+        : digits;
+  }
+
   Future<void> _scanRecipient() async {
     final qrData = await _scanQr(context);
     if (qrData == null || !mounted) return;
@@ -408,7 +422,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       final phone = decoded['phoneNumber'] ?? decoded['phone'] ?? decoded['receiverPhone'];
       if (phone != null) {
         setState(() {
-          _phoneCtrl.text = phone.toString();
+          _phoneCtrl.text = _stripCountryCode(phone.toString());
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -422,11 +436,12 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
   }
 
   Future<void> _verify() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Informe o número de telefone.');
+    final digits = _phoneCtrl.text.trim();
+    if (digits.length != 9) {
+      setState(() => _error = 'Informe os 9 dígitos do número.');
       return;
     }
+    final phone = '+244$digits';
     setState(() {
       _error = null;
       _loading = true;
@@ -460,7 +475,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
     });
     final result = await ApiService().transfer(
       amount: amount,
-      receiverPhone: _phoneCtrl.text.trim(),
+      receiverPhone: '+244${_phoneCtrl.text.trim()}',
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
     );
     if (!mounted) return;
@@ -495,8 +510,13 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   enabled: !_verified,
-                  style: const TextStyle(color: AppColors.textDark),
-                  decoration: _fieldDecoration('Nº de telefone', hint: '+244 9XX XXX XXX'),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
+                  style: const TextStyle(color: AppColors.textLight),
+                  decoration: _fieldDecoration('Nº de telefone',
+                      hint: '9XX XXX XXX', prefixText: '+244 '),
                 ),
               ),
               SizedBox(width: responsive.scaledWidth(8)),
@@ -524,7 +544,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
                         onPressed: _loading ? null : _verify,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryGold,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
                         ),
                         child: _loading
                             ? const SizedBox(
@@ -543,7 +563,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 children: [
@@ -560,13 +580,13 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
           TextField(
             controller: _amountCtrl,
             keyboardType: TextInputType.number,
-            style: const TextStyle(color: AppColors.textDark),
+            style: const TextStyle(color: AppColors.textLight),
             decoration: _fieldDecoration('Valor (Kz)'),
           ),
           SizedBox(height: responsive.scaledHeight(16)),
           TextField(
             controller: _descCtrl,
-            style: const TextStyle(color: AppColors.textDark),
+            style: const TextStyle(color: AppColors.textLight),
             decoration: _fieldDecoration('Descrição (opcional)', hint: 'Ex.: devolução de viagem'),
           ),
           SizedBox(height: responsive.scaledHeight(24)),
@@ -577,7 +597,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(16)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
                 elevation: 0,
               ),
               child: _loading
@@ -633,7 +653,13 @@ class _CardBalanceModalState extends State<CardBalanceModal> {
     String qrId = widget.qrData;
     try {
       final decoded = jsonDecode(widget.qrData);
-      qrId = decoded['qrId'] ?? decoded['id'] ?? decoded['cardId'] ?? widget.qrData;
+      // O QR real de um cartão virtual (`VIRTUAL_CARD_TRANSFER`) só traz
+      // `cardNumber` — não `qrId`/`id`/`cardId`, apesar do nome do campo.
+      qrId = decoded['cardNumber'] ??
+          decoded['qrId'] ??
+          decoded['id'] ??
+          decoded['cardId'] ??
+          widget.qrData;
     } catch (_) {}
 
     final result = await ApiService().getWalletBalanceByQr(qrId);
@@ -667,12 +693,13 @@ class _CardBalanceModalState extends State<CardBalanceModal> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_result!.ownerName != null)
-                      Text(_result!.ownerName!, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                      Text(_result!.ownerName!,
+                          style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.6))),
                     if (_result!.cardName != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         _result!.cardName!,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textLight),
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -681,7 +708,8 @@ class _CardBalanceModalState extends State<CardBalanceModal> {
                       style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.primaryGold),
                     ),
                     const SizedBox(height: 8),
-                    Text('Saldo disponível', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                    Text('Saldo disponível',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5))),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,

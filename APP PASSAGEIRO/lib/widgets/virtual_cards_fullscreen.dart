@@ -5,12 +5,14 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:troco_seguro/utils/constants.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/services/virtual_card_export_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 
 class VirtualCardsFullscreen extends StatefulWidget {
@@ -224,22 +226,25 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
       return;
     }
 
-    final docsDir = await getApplicationDocumentsDirectory();
-    final cardsDir = Directory('${docsDir.path}/virtual_cards');
-    if (!await cardsDir.exists()) {
-      await cardsDir.create(recursive: true);
-    }
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final filePath =
-        '${cardsDir.path}/cartao_virtual_${card.id}_$timestamp.png';
-    final file = File(filePath);
-    await file.writeAsBytes(bytes, flush: true);
+    final result = await VirtualCardExportService().saveImageBytes(
+      bytes,
+      suggestedName: 'cartao_virtual_${card.id}.png',
+    );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cartão guardado em: $filePath')),
-    );
+    if (result.cancelled) return;
+
+    if (result.path != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cartão guardado em: ${result.path}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Não foi possível guardar o cartão.'),
+        ),
+      );
+    }
   }
 
   String _virtualCardNumber(String source) {
@@ -322,7 +327,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                               image: AssetImage('assets/images/card_fundo.jpg'),
                               fit: BoxFit.cover,
                             ),
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             border: Border.all(
                               color: theme.colorScheme.primary
                                   .withAlpha((0.9 * 255).round()),
@@ -353,7 +358,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
 
                               return Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(AppRadius.lg),
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -404,7 +409,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                       height: 32 * scale,
                                       decoration: BoxDecoration(
                                         borderRadius:
-                                            BorderRadius.circular(8 * scale),
+                                            BorderRadius.circular(AppRadius.sm * scale),
                                         gradient: const LinearGradient(
                                           colors: [
                                             Color(0xFFE7C97A),
@@ -695,13 +700,13 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                 children: [
                   InkWell(
                     onTap: () => _showCardDetails(card),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     child: Container(
                       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                       padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         border: Border.all(
                           color: isBlocked
                               ? Colors.red.withAlpha(120)
@@ -743,7 +748,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                                 color: isBlocked
                                     ? Colors.red.shade700
                                     : Colors.orange.shade700,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppRadius.sm),
                               ),
                               child: Text(
                                 isBlocked ? 'BLOQUEADO' : 'CONGELADO',
@@ -773,7 +778,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
                           margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                           decoration: BoxDecoration(
                             color: Colors.red.withAlpha(isBlocked ? 55 : 30),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                         ),
                       ),
@@ -808,7 +813,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               labelText: 'Nome do cartão',
               hintText: 'Ex: Cartão Netflix',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               prefixIcon: const Icon(Icons.badge_outlined),
             ),
@@ -830,7 +835,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               labelText: 'Saldo inicial',
               hintText: 'Valor em AOA',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
               suffixText: 'Kz',
@@ -854,7 +859,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               labelText: 'Limite diário (opcional)',
               hintText: '0 = sem limite',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               prefixIcon: const Icon(Icons.speed_outlined),
               suffixText: 'Kz',
@@ -880,7 +885,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               labelText: 'PIN da conta (6 dígitos)',
               hintText: '●●●●●●',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               prefixIcon: const Icon(Icons.lock_person_outlined),
               counterText: '',
@@ -911,7 +916,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               labelText: 'PIN do cartão (4 dígitos)',
               hintText: '●●●●',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               prefixIcon: const Icon(Icons.credit_card_outlined),
               counterText: '',
@@ -934,7 +939,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.blue.withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -964,7 +969,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.red.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1017,7 +1022,7 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withAlpha((0.06 * 255).round()),
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: RichText(
         text: TextSpan(
@@ -1092,7 +1097,7 @@ class _VirtualCardDisplayState extends State<_VirtualCardDisplay> {
                   Color(0xFF1565C0)
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF1A237E).withAlpha(100),
@@ -1140,7 +1145,7 @@ class _VirtualCardDisplayState extends State<_VirtualCardDisplay> {
                     gradient: const LinearGradient(
                       colors: [Color(0xFFE7C97A), Color(0xFFC39A45)],
                     ),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                 ),
                 const Spacer(),
@@ -1225,7 +1230,7 @@ class _VirtualCardDisplayState extends State<_VirtualCardDisplay> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.red.withAlpha(20),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: Colors.red.withAlpha(80)),
           ),
           child: const Row(

@@ -8,6 +8,11 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
 
+/// Valores monetários vêm da API como string decimal (ex. "0.00") — ver
+/// BACKEND_PENDING_CHANGES.md, item "valores monetários como string".
+int _statInt(dynamic value) =>
+    value == null ? 0 : (num.tryParse(value.toString())?.toInt() ?? 0);
+
 class TripsScreen extends StatefulWidget {
   final bool showBottomDock;
 
@@ -332,8 +337,14 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Widget _buildStatsRow(ResponsiveHelper responsive, bool isDark) {
-    final total = _stats?['total'] ?? _stats?['totalTrips'] ?? 0;
-    final earned = _stats?['totalEarned'] ?? _stats?['earned'] ?? _stats?['revenue'] ?? 0;
+    final total = _statInt(_stats?['total'] ?? _stats?['totalTrips']);
+    // Campo real confirmado ao vivo em GET trips/stats: `monthSpent`
+    // (string decimal) — os nomes antigos nunca bateram certo com a
+    // resposta real, por isso "recebido" ficava sempre em 0 Kz.
+    final earned = _statInt(_stats?['monthSpent'] ??
+        _stats?['totalEarned'] ??
+        _stats?['earned'] ??
+        _stats?['revenue']);
     final fmt = NumberFormat('#,##0', 'pt_AO');
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -376,7 +387,7 @@ class _TripsScreenState extends State<TripsScreen> {
           color: isDark
               ? Colors.white.withValues(alpha: 0.04)
               : Colors.black.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.07)
@@ -472,7 +483,7 @@ class _TripsScreenState extends State<TripsScreen> {
               decoration: BoxDecoration(
                 color: AppColors.primaryGold
                     .withValues(alpha: isDark ? 0.2 : 0.3),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Text(
                 '${trips.length} viagens',
@@ -505,7 +516,7 @@ class _TripsScreenState extends State<TripsScreen> {
             ),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -604,7 +615,7 @@ class _TripsScreenState extends State<TripsScreen> {
             BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -617,7 +628,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
             Padding(
@@ -640,7 +651,7 @@ class _TripsScreenState extends State<TripsScreen> {
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Text(
                       statusLabel,
@@ -764,7 +775,7 @@ class _TripsScreenState extends State<TripsScreen> {
       padding: EdgeInsets.all(responsive.scaledWidth(16)),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.06)
@@ -782,7 +793,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 height: responsive.scaledWidth(44),
                 decoration: BoxDecoration(
                   color: AppColors.primaryGold.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Icon(
                   Icons.person,
@@ -821,7 +832,7 @@ class _TripsScreenState extends State<TripsScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Text(
                   statusLabel,

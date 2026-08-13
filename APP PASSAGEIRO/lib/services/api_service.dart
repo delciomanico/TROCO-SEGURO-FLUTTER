@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/models/transaction.dart';
@@ -34,6 +35,11 @@ class ApiService {
   String? _accessToken;
   String? _refreshToken;
 
+  static const _idempotentPaymentPaths = <String>{
+    'payments/process',
+    'payments/deposit/initiate',
+  };
+
   static final ValueNotifier<int> _sessionExpired = ValueNotifier<int>(0);
 
   /// Notificado sempre que o token expira e a renovação falha — a UI deve
@@ -56,6 +62,11 @@ class ApiService {
           options.headers['Authorization'] = 'Bearer $_accessToken';
         }
         options.headers['user-agent'] = 'TrocoSeguroApp/1.0';
+        if (options.method.toUpperCase() == 'POST' &&
+            _idempotentPaymentPaths.contains(options.path) &&
+            !options.headers.containsKey('Idempotency-Key')) {
+          options.headers['Idempotency-Key'] = const Uuid().v4();
+        }
         return handler.next(options);
       },
       onResponse: (response, handler) {
@@ -400,6 +411,9 @@ class ApiService {
 
   // ============ TRANSAÇÕES ============
 
+  /// Endpoint legado removido do contrato da API.
+  /// Use [initiateDeposit], que cria uma referência Multicaixa PENDING.
+  @Deprecated('Use initiateDeposit; transactions/deposit foi removido da API.')
   /// Depositar (carregar carteira)
   Future<ApiResponse<TransactionResult>> deposit({
     required int amount,
@@ -1534,9 +1548,14 @@ class TripStats {
   TripStats({required this.totalTrips, required this.totalSpentMonth});
 
   factory TripStats.fromJson(Map<String, dynamic> json) => TripStats(
-        totalTrips: json['totalTrips'] ?? json['total'] ?? 0,
-        totalSpentMonth:
-            json['totalSpentMonth'] ?? json['totalSpent'] ?? json['monthlySpent'] ?? 0,
+        totalTrips: _toInt(json['totalTrips'] ?? json['total']),
+        // Campo real confirmado ao vivo: `monthSpent` (string decimal, ex.
+        // "0.00") — os nomes antigos nunca bateram certo com a resposta
+        // real, por isso o valor ficava sempre em 0.
+        totalSpentMonth: _toInt(json['monthSpent'] ??
+            json['totalSpentMonth'] ??
+            json['totalSpent'] ??
+            json['monthlySpent']),
       );
 }
 

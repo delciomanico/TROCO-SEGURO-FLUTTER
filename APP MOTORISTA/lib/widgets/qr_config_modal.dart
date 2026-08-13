@@ -107,7 +107,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
       ),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -119,7 +119,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
             height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
 
@@ -137,7 +137,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                         AppColors.accent.withValues(alpha: 0.7)
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Icon(
                     Icons.settings_rounded,
@@ -217,11 +217,11 @@ class _QrConfigModalState extends State<QrConfigModal> {
                         color: AppColors.accentOf(context),
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         borderSide:
                             BorderSide(color: AppColors.accent, width: 2),
                       ),
@@ -278,7 +278,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
                           vertical: responsive.scaledHeight(16),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -338,7 +338,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
         ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: isSelected ? AppColors.accent : borderColor,
           ),

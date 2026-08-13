@@ -92,7 +92,7 @@ class _BiScannerModalState extends State<BiScannerModal> {
                         .colorScheme
                         .outline
                         .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
                 SizedBox(height: responsive.scaledHeight(16)),
@@ -148,7 +148,7 @@ class _BiScannerModalState extends State<BiScannerModal> {
                         padding: EdgeInsets.all(responsive.responsiveSpacing()),
                         decoration: BoxDecoration(
                           color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: Text(
                           error!,
@@ -230,7 +230,7 @@ class _BiScannerModalState extends State<BiScannerModal> {
             height: responsive.scaledHeight(180),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.accent, width: 3),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
           ),
         ),

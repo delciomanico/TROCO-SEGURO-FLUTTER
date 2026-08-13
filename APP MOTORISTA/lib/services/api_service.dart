@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:troco_seguro_pro/services/secure_storage_service.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
 import 'package:troco_seguro_pro/models/transaction.dart';
@@ -17,7 +18,8 @@ import 'package:troco_seguro_pro/models/notification.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
-  static final  String baseUrl = dotenv.get('BASE_URL') ?? 'http://localhost:3000';
+  static final String baseUrl =
+      dotenv.get('BASE_URL', fallback: 'http://localhost:3000');
   static final ApiService _instance = ApiService._internal();
   static final ValueNotifier<int> _activeRequests = ValueNotifier<int>(0);
   static final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
@@ -27,6 +29,12 @@ class ApiService {
 
   String? _accessToken;
   String? _refreshToken;
+
+  static const _idempotentPaymentPaths = <String>{
+    'payments/process',
+    'payments/authorize-passenger-qr',
+    'payments/deposit/initiate',
+  };
 
   ValueListenable<bool> get loadingListenable => _isLoading;
 
@@ -60,6 +68,11 @@ class ApiService {
           options.headers['Authorization'] = 'Bearer $_accessToken';
         }
         options.headers['user-agent'] = 'TrocoSeguroMotorista/1.0';
+        if (options.method.toUpperCase() == 'POST' &&
+            _idempotentPaymentPaths.contains(options.path) &&
+            !options.headers.containsKey('Idempotency-Key')) {
+          options.headers['Idempotency-Key'] = const Uuid().v4();
+        }
         return handler.next(options);
       },
       onResponse: (response, handler) {
@@ -1186,6 +1199,7 @@ class ApiService {
   }
 
   /// Simular webhook de confirmação de pagamento (ambiente de testes)
+  @Deprecated('Não use na app; o webhook real é server-to-server.')
   Future<ApiResponse<void>> simulateDepositWebhook({
     required String reference,
   }) async {

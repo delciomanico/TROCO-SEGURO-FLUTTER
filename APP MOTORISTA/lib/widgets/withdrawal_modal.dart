@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
-import 'package:intl/intl.dart';
 
+/// Modal de solicitação de saque — visual e estrutura alinhados com o
+/// _WithdrawalSheet do APP PASSAGEIRO, mantendo o passo de cotação
+/// (Valor/Tarifa/Total) já confirmado a funcionar com o backend.
 class WithdrawalModal extends StatefulWidget {
   final int availableBalance;
-  final String? bankAccount;
-  final String? bankName;
   final VoidCallback? onSuccess;
   final Function(String)? onError;
 
   const WithdrawalModal({
     super.key,
     required this.availableBalance,
-    this.bankAccount,
-    this.bankName,
     this.onSuccess,
     this.onError,
   });
@@ -23,8 +21,6 @@ class WithdrawalModal extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required int availableBalance,
-    String? bankAccount,
-    String? bankName,
     VoidCallback? onSuccess,
     Function(String)? onError,
   }) {
@@ -34,8 +30,6 @@ class WithdrawalModal extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => WithdrawalModal(
         availableBalance: availableBalance,
-        bankAccount: bankAccount,
-        bankName: bankName,
         onSuccess: onSuccess,
         onError: onError,
       ),
@@ -47,78 +41,64 @@ class WithdrawalModal extends StatefulWidget {
 }
 
 class _WithdrawalModalState extends State<WithdrawalModal> {
-  final _amountController = TextEditingController();
-  final _accountController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _amountCtrl = TextEditingController();
+  final _ibanCtrl = TextEditingController();
   final ApiService _api = ApiService();
 
-  String _withdrawalMethod = 'bank';
-  bool _isLoading = false;
+  String _method = 'bank';
+  bool _busy = false;
   bool _loadingQuote = false;
   String? _errorMessage;
   QuoteResult? _quote;
 
-  final List<int> _quickAmounts = [5000, 10000, 25000, 50000];
-
   @override
   void initState() {
     super.initState();
-    _accountController.text = widget.bankAccount ?? '';
     _api.loadTokens();
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
-    _accountController.dispose();
+    _amountCtrl.dispose();
+    _ibanCtrl.dispose();
     super.dispose();
   }
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat('#,##0', 'pt_AO');
-    return '${format.format(amount)} Kz';
+  bool _validIban(String v) => v.isNotEmpty && v.toUpperCase().startsWith('AO06');
+
+  void _resetQuote() {
+    if (_errorMessage != null || _quote != null) {
+      setState(() {
+        _errorMessage = null;
+        _quote = null;
+      });
+    }
   }
 
-  int? _parseAmount(String value) {
-    final cleaned = value.replaceAll(RegExp(r'[^\d]'), '');
-    return int.tryParse(cleaned);
-  }
+  /// Primeiro toque: valida e mostra a cotação (Valor/Tarifa/Total). Segundo
+  /// toque (com `_quote` já carregado): submete o pedido de saque.
+  Future<void> _submit() async {
+    final amount = int.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final account = _ibanCtrl.text.trim();
 
-  void _setQuickAmount(int amount) {
-    _amountController.text = _formatCurrency(amount);
-    setState(() {
-      _errorMessage = null;
-      _quote = null;
-    });
-  }
-
-  void _withdrawAll() {
-    _amountController.text = _formatCurrency(widget.availableBalance);
-    setState(() {
-      _errorMessage = null;
-      _quote = null;
-    });
-  }
-
-  /// Primeiro toque: valida e mostra a cotação (Valor/Tarifa/Total) antes
-  /// de confirmar. Segundo toque (com `_quote` já carregado): submete o
-  /// pedido de saque.
-  Future<void> _submitWithdrawal() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final amount = _parseAmount(_amountController.text);
-    if (amount == null || amount <= 0) {
-      setState(() => _errorMessage = 'Valor inválido');
+    if (amount <= 0) {
+      setState(() => _errorMessage = 'Valor deve ser maior que 0');
       return;
     }
-
     if (amount > widget.availableBalance) {
       setState(() => _errorMessage = 'Saldo insuficiente');
       return;
     }
-
     if (amount < 1000) {
       setState(() => _errorMessage = 'Valor mínimo: 1.000 Kz');
+      return;
+    }
+    if (_method == 'bank' && !_validIban(account)) {
+      setState(() => _errorMessage = 'IBAN inválido (deve começar por AO06)');
+      return;
+    }
+    if (_method == 'mcx_express' && account.length != 9) {
+      setState(() => _errorMessage = 'Informe os 9 dígitos do número');
       return;
     }
 
@@ -147,17 +127,16 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
     }
 
     setState(() {
-      _isLoading = true;
+      _busy = true;
       _errorMessage = null;
     });
 
     final result = await _api.requestWithdrawal(
       amount: amount,
-      iban: _accountController.text,
+      iban: _method == 'mcx_express' ? '+244$account' : account,
     );
-
     if (!mounted) return;
-    setState(() => _isLoading = false);
+    setState(() => _busy = false);
 
     if (result.isSuccess) {
       Navigator.pop(context);
@@ -168,24 +147,23 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
     }
   }
 
-  Widget _quoteLine(String label, String value, ResponsiveHelper responsive,
-      {bool bold = false}) {
+  Widget _quoteLine(String label, String value, {bool bold = false}) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: responsive.scaledHeight(2)),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
               style: TextStyle(
-                fontSize: responsive.responsiveFontSize(12),
+                fontSize: 12,
                 fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-                color: AppColors.textDark,
+                color: AppColors.textLight,
               )),
           Text(value,
               style: TextStyle(
-                fontSize: responsive.responsiveFontSize(12),
+                fontSize: 12,
                 fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                color: AppColors.textDark,
+                color: AppColors.textLight,
               )),
         ],
       ),
@@ -194,492 +172,226 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = ResponsiveHelper(context);
+    const borderColor = Color(0x1FFFFFFF);
+    const fillColor = Color(0x0FFFFFFF);
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
-          ),
+          color: AppColors.darkCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
-                  margin: EdgeInsets.only(top: responsive.scaledHeight(12)),
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                 ),
               ),
-
-              // Header
-              Padding(
-                padding: EdgeInsets.all(responsive.responsivePadding()),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(responsive.scaledWidth(12)),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.primaryGold,
-                                AppColors.secondaryGold
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryGold.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.arrow_upward_rounded,
-                            color: Colors.white,
-                            size: responsive.scaledWidth(20),
-                          ),
-                        ),
-                        SizedBox(width: responsive.scaledWidth(12)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Solicitar Saque',
-                              style: TextStyle(
-                                fontSize: responsive.responsiveFontSize(18),
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textDark,
-                              ),
-                            ),
-                            Text(
-                              'Transferir para sua conta',
-                              style: TextStyle(
-                                fontSize: responsive.responsiveFontSize(12),
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+              const SizedBox(height: 20),
+              const Text('Solicitar Saque',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textLight)),
+              const SizedBox(height: 4),
+              Text('Escolha o método de saque',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5))),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MethodOption(
+                      label: 'Banco',
+                      sublabel: 'Transferência bancária',
+                      icon: Icons.account_balance_rounded,
+                      isSelected: _method == 'bank',
+                      onTap: () {
+                        setState(() {
+                          _method = 'bank';
+                          _ibanCtrl.clear();
+                        });
+                        _resetQuote();
+                      },
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: Container(
-                        padding: EdgeInsets.all(responsive.scaledWidth(6)),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: Colors.grey.shade600,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Balance display
-              Container(
-                margin: EdgeInsets.symmetric(
-                  horizontal: responsive.responsivePadding(),
-                ),
-                padding: EdgeInsets.all(responsive.responsivePadding()),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.darkBackground, AppColors.darkSurface],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.darkBackground.withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _MethodOption(
+                      label: 'MCX Express',
+                      sublabel: 'Receba em minutos',
+                      icon: Icons.flash_on_rounded,
+                      isSelected: _method == 'mcx_express',
+                      onTap: () {
+                        setState(() {
+                          _method = 'mcx_express';
+                          _ibanCtrl.clear();
+                        });
+                        _resetQuote();
+                      },
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Valor a levantar',
+                  suffixText: 'Kz',
+                  prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.primaryGold),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: fillColor,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Saldo disponível',
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(12),
-                            color: Colors.white70,
-                          ),
-                        ),
-                        SizedBox(height: responsive.scaledHeight(4)),
-                        Text(
-                          _formatCurrency(widget.availableBalance),
-                          style: TextStyle(
-                            fontSize: responsive.responsiveFontSize(24),
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
+                onChanged: (_) => _resetQuote(),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ibanCtrl,
+                keyboardType:
+                    _method == 'bank' ? TextInputType.text : TextInputType.phone,
+                inputFormatters: _method == 'bank'
+                    ? null
+                    : [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(9),
                       ],
-                    ),
-                  ],
+                decoration: InputDecoration(
+                  labelText: _method == 'bank' ? 'IBAN (AO06...)' : 'Número de telefone',
+                  hintText: _method == 'bank' ? null : '9XX XXX XXX',
+                  prefixText: _method == 'bank' ? null : '+244 ',
+                  prefixIcon: _method == 'bank'
+                      ? Icon(Icons.credit_score_rounded,
+                          color: Colors.white.withValues(alpha: 0.4))
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: fillColor,
                 ),
+                onChanged: (_) => _resetQuote(),
               ),
 
-              SizedBox(height: responsive.scaledHeight(24)),
-
-              // Form
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: responsive.responsivePadding(),
-                ),
-                child: Form(
-                  key: _formKey,
+              // Cotação (Valor / Tarifa / Total)
+              if (_quote != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.25)),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Withdrawal method
-                      Text(
-                        'Método de saque',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      SizedBox(height: responsive.scaledHeight(12)),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MethodOption(
-                              label: 'Banco',
-                              sublabel: 'Transferência bancária',
-                              icon: Icons.account_balance_rounded,
-                              isSelected: _withdrawalMethod == 'bank',
-                              onTap: () =>
-                                  setState(() => _withdrawalMethod = 'bank'),
-                            ),
-                          ),
-                          SizedBox(width: responsive.scaledWidth(12)),
-                          Expanded(
-                            child: _MethodOption(
-                              label: 'MCX Express',
-                              sublabel: 'Receba em minutos',
-                              icon: Icons.flash_on_rounded,
-                              isSelected: _withdrawalMethod == 'mcx_express',
-                              onTap: () => setState(
-                                  () => _withdrawalMethod = 'mcx_express'),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: responsive.scaledHeight(20)),
-
-                      // Amount field
-                      Text(
-                        'Valor do saque',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      SizedBox(height: responsive.scaledHeight(10)),
-                      TextFormField(
-                        controller: _amountController,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(22),
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '0 Kz',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          prefixIcon: Container(
-                            padding: EdgeInsets.all(responsive.scaledWidth(12)),
-                            margin: EdgeInsets.only(
-                                right: responsive.scaledWidth(8)),
-                            child: const Icon(
-                              Icons.payments_outlined,
-                              color: AppColors.primaryGold,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF5F7FA),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                                color: AppColors.primaryGold, width: 2),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Informe o valor';
-                          }
-                          return null;
-                        },
-                        onChanged: (_) {
-                          if (_errorMessage != null || _quote != null) {
-                            setState(() {
-                              _errorMessage = null;
-                              _quote = null;
-                            });
-                          }
-                        },
-                      ),
-
-                      SizedBox(height: responsive.scaledHeight(20)),
-
-                      // Account field
-                      Text(
-                        _withdrawalMethod == 'bank'
-                            ? 'Número da conta (IBAN)'
-                            : 'Número de telefone',
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      SizedBox(height: responsive.scaledHeight(10)),
-                      TextFormField(
-                        controller: _accountController,
-                        keyboardType: _withdrawalMethod == 'bank'
-                            ? TextInputType.text
-                            : TextInputType.phone,
-                        style: TextStyle(
-                          fontSize: responsive.responsiveFontSize(14),
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textDark,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: _withdrawalMethod == 'bank'
-                              ? 'AO06 0000 0000 0000 0000 0000 0'
-                              : '9XX XXX XXX',
-                          hintStyle: TextStyle(color: Colors.grey.shade400),
-                          prefixIcon: Icon(
-                            _withdrawalMethod == 'bank'
-                                ? Icons.account_balance_outlined
-                                : Icons.phone_android_rounded,
-                            color: Colors.grey.shade500,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF5F7FA),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                                color: AppColors.primaryGold, width: 2),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return _withdrawalMethod == 'bank'
-                                ? 'Informe o número da conta'
-                                : 'Informe o número de telefone';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      // Cotação (Valor / Tarifa / Total)
-                      if (_quote != null) ...[
-                        SizedBox(height: responsive.scaledHeight(16)),
-                        Container(
-                          padding: EdgeInsets.all(
-                              responsive.responsivePadding() * 0.8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppColors.primaryGold.withValues(alpha: 0.25)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _quoteLine('Valor', '${_quote!.amount} Kz',
-                                  responsive),
-                              _quoteLine(
-                                  'Tarifa', '${_quote!.feeAmount} Kz', responsive),
-                              _quoteLine('Total a debitar',
-                                  '${_quote!.totalDebited} Kz', responsive,
-                                  bold: true),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // Error message
-                      if (_errorMessage != null) ...[
-                        SizedBox(height: responsive.scaledHeight(16)),
-                        Container(
-                          padding: EdgeInsets.all(
-                              responsive.responsivePadding() * 0.8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border:
-                                Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              SizedBox(width: responsive.scaledWidth(10)),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: TextStyle(
-                                    fontSize: responsive.responsiveFontSize(13),
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      SizedBox(height: responsive.scaledHeight(28)),
-
-                      // Submit button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: (_isLoading || _loadingQuote)
-                              ? null
-                              : _submitWithdrawal,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryGold,
-                            padding: EdgeInsets.symmetric(
-                              vertical: responsive.scaledHeight(16),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: (_isLoading || _loadingQuote)
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.arrow_upward_rounded,
-                                        color: Colors.white),
-                                    SizedBox(width: responsive.scaledWidth(8)),
-                                    Text(
-                                      _quote == null
-                                          ? 'VER TARIFA E CONTINUAR'
-                                          : 'CONFIRMAR SAQUE',
-                                      style: TextStyle(
-                                        fontSize:
-                                            responsive.responsiveFontSize(14),
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-
-                      SizedBox(height: responsive.scaledHeight(16)),
-
-                      // Info
-                      Center(
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: responsive.scaledWidth(16),
-                            vertical: responsive.scaledHeight(8),
-                          ),
-                          decoration: BoxDecoration(
-                            color: _withdrawalMethod == 'mcx_express'
-                                ? Colors.green.withValues(alpha: 0.1)
-                                : Colors.blue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _withdrawalMethod == 'mcx_express'
-                                    ? Icons.flash_on_rounded
-                                    : Icons.schedule_rounded,
-                                size: 16,
-                                color: _withdrawalMethod == 'mcx_express'
-                                    ? Colors.green
-                                    : Colors.blue,
-                              ),
-                              SizedBox(width: responsive.scaledWidth(6)),
-                              Text(
-                                _withdrawalMethod == 'bank'
-                                    ? 'Processamento em até 24h úteis'
-                                    : 'Processamento instantâneo',
-                                style: TextStyle(
-                                  fontSize: responsive.responsiveFontSize(11),
-                                  fontWeight: FontWeight.w600,
-                                  color: _withdrawalMethod == 'mcx_express'
-                                      ? Colors.green
-                                      : Colors.blue,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: responsive.scaledHeight(32)),
+                      _quoteLine('Valor', '${_quote!.amount} Kz'),
+                      _quoteLine('Tarifa', '${_quote!.feeAmount} Kz'),
+                      _quoteLine('Total a debitar', '${_quote!.totalDebited} Kz', bold: true),
                     ],
                   ),
+                ),
+              ],
+
+              // Erro
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                              fontSize: 13, color: Colors.red, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 16, color: Colors.orange.shade300),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _method == 'bank'
+                            ? 'O valor será transferido para a sua conta bancária em 1-3 dias úteis'
+                            : 'O valor será transferido via Multicaixa Express em poucos minutos',
+                        style: TextStyle(fontSize: 11, color: Colors.orange.shade200),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_busy || _loadingQuote) ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
+                    elevation: 0,
+                  ),
+                  child: (_busy || _loadingQuote)
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          _quote == null ? 'VER TARIFA E CONTINUAR' : 'CONFIRMAR SAQUE',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
                 ),
               ),
             ],
@@ -707,56 +419,43 @@ class _MethodOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = ResponsiveHelper(context);
-
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.all(responsive.responsivePadding()),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primaryGold.withValues(alpha: 0.1)
-              : const Color(0xFFF5F7FA),
-          borderRadius: BorderRadius.circular(16),
+              ? AppColors.primaryGold.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isSelected ? AppColors.primaryGold : Colors.grey.shade200,
+            color: isSelected ? AppColors.primaryGold : Colors.white.withValues(alpha: 0.15),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.all(responsive.scaledWidth(10)),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryGold.withValues(alpha: 0.15)
-                    : Colors.grey.shade200,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color:
-                    isSelected ? AppColors.primaryGold : Colors.grey.shade500,
-                size: responsive.scaledWidth(24),
-              ),
+            Icon(
+              icon,
+              color: isSelected
+                  ? AppColors.primaryGold
+                  : AppColors.textLight.withValues(alpha: 0.6),
+              size: 22,
             ),
-            SizedBox(height: responsive.scaledHeight(10)),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: responsive.responsiveFontSize(13),
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.primaryGold : AppColors.textDark,
+                color: isSelected ? AppColors.primaryGold : AppColors.textLight,
               ),
             ),
-            SizedBox(height: responsive.scaledHeight(2)),
+            const SizedBox(height: 2),
             Text(
               sublabel,
-              style: TextStyle(
-                fontSize: responsive.responsiveFontSize(10),
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 10, color: AppColors.textLight.withValues(alpha: 0.5)),
               textAlign: TextAlign.center,
             ),
           ],
