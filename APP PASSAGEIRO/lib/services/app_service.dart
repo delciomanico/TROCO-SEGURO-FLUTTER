@@ -236,21 +236,17 @@ class AppService extends ChangeNotifier {
   // ============ WALLET ============
 
   /// Carregar carteira (depósito)
-  Future<bool> topupWallet(int amount, {String? reference}) async {
+  Future<bool> topupWallet(int amount) async {
     _setLoading(true);
     _setError(null);
 
-    final result = await _api.deposit(amount: amount, reference: reference);
+    final result = await _api.initiateDeposit(amount: amount);
 
     _setLoading(false);
 
     if (result.isSuccess && result.data != null) {
       // Atualizar saldo
-      if (result.data!.newBalance != null) {
-        user = user?.copyWith(balance: result.data!.newBalance);
-      } else {
-        user = user?.copyWith(balance: (user?.balance ?? 0) + amount);
-      }
+      // O depósito fica PENDING; não creditar o saldo localmente.
 
       // Adicionar transação localmente
       _addTransaction('topup', 'Carregamento Multicaixa', amount);
