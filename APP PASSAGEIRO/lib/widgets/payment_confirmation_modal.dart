@@ -84,7 +84,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
     // Card PIN is validated server-side (we never store it locally).
     if (!_isCardPayment) {
       final pinValid = await widget.pinValidator(_enteredPin);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       if (!pinValid) {
         setState(() {
           _isProcessing = false;
@@ -110,7 +110,7 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
       durationMinutes: 0,
     );
 
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     setState(() => _isProcessing = false);
     if (result != null) {
       // Invalidar domínios afetados pelo pagamento antes de fechar o modal
@@ -131,13 +131,11 @@ class _PaymentConfirmationModalState extends State<PaymentConfirmationModal> {
               tripId: result.tripId!,
               driverName: widget.driverInfo.driverName ?? 'Motorista',
               onSubmitRating: (tripId, rating, comment) async {
-                final api = ApiService();
-                final response = await api.rateTrip(
-                  tripId: tripId,
-                  stars: rating,
+                return context.read<AppProvider>().rateTrip(
+                  tripId,
+                  rating,
                   comment: comment,
                 );
-                return response.isSuccess;
               },
             );
           }

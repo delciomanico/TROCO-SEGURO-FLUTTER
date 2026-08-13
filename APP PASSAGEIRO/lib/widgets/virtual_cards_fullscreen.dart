@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:troco_seguro/models/virtual_card.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
+import 'package:troco_seguro/services/virtual_card_export_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
 
 class VirtualCardsFullscreen extends StatefulWidget {
@@ -225,22 +226,25 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
       return;
     }
 
-    final docsDir = await getApplicationDocumentsDirectory();
-    final cardsDir = Directory('${docsDir.path}/virtual_cards');
-    if (!await cardsDir.exists()) {
-      await cardsDir.create(recursive: true);
-    }
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final filePath =
-        '${cardsDir.path}/cartao_virtual_${card.id}_$timestamp.png';
-    final file = File(filePath);
-    await file.writeAsBytes(bytes, flush: true);
+    final result = await VirtualCardExportService().saveImageBytes(
+      bytes,
+      suggestedName: 'cartao_virtual_${card.id}.png',
+    );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cartão guardado em: $filePath')),
-    );
+    if (result.cancelled) return;
+
+    if (result.path != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cartão guardado em: ${result.path}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Não foi possível guardar o cartão.'),
+        ),
+      );
+    }
   }
 
   String _virtualCardNumber(String source) {

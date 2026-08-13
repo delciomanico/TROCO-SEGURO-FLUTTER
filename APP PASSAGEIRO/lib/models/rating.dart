@@ -7,6 +7,7 @@ class Rating {
   final DateTime createdAt;
   final String? raterName;
   final String? ratedName;
+  final String? avatarUrl;
   final String? tripId;
 
   Rating({
@@ -16,8 +17,11 @@ class Rating {
     required this.createdAt,
     this.raterName,
     this.ratedName,
+    this.avatarUrl,
     this.tripId,
   });
+
+  String get displayName => ratedName ?? raterName ?? 'Utilizador';
 
   String get scoreLabel {
     switch (stars) {
@@ -52,8 +56,10 @@ class Rating {
     // Normaliza rater (quem avaliou)
     final raterRaw = json['rater'] ?? json['ratedBy'] ?? json['reviewer'];
     String? raterName;
+    String? raterAvatar;
     if (raterRaw is Map) {
       raterName = raterRaw['fullName'] ?? raterRaw['name'];
+      raterAvatar = raterRaw['photo'] ?? raterRaw['avatar'] ?? raterRaw['avatarUrl'] ?? raterRaw['photoUrl'];
     } else if (raterRaw is String) {
       raterName = raterRaw;
     }
@@ -61,8 +67,10 @@ class Rating {
     // Normaliza rated (quem foi avaliado)
     final ratedRaw = json['rated'] ?? json['targetUser'] ?? json['driver'];
     String? ratedName;
+    String? ratedAvatar;
     if (ratedRaw is Map) {
       ratedName = ratedRaw['fullName'] ?? ratedRaw['name'];
+      ratedAvatar = ratedRaw['photo'] ?? ratedRaw['avatar'] ?? ratedRaw['avatarUrl'] ?? ratedRaw['photoUrl'];
     } else if (ratedRaw is String) {
       ratedName = ratedRaw;
     }
@@ -83,6 +91,7 @@ class Rating {
       createdAt: createdAt,
       raterName: raterName,
       ratedName: ratedName,
+      avatarUrl: ratedAvatar ?? raterAvatar ?? json['photo']?.toString() ?? json['avatar']?.toString(),
       tripId: tripId,
     );
   }

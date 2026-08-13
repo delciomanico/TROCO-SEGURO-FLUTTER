@@ -150,7 +150,7 @@ class _TransferModalState extends State<TransferModal> {
                       readExpectedPin: () => SecureStorageService().readPin(),
                     );
                     if (!isValid) {
-                      if (mounted) {
+                      if (context.mounted) {
                         setState(() => error = 'PIN incorreto');
                         Navigator.pop(context);
                       }

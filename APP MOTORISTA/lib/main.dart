@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:troco_seguro_pro/utils/theme.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
-import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/models/driver_user.dart';
 import 'package:troco_seguro_pro/models/transaction.dart';
 import 'package:troco_seguro_pro/models/vehicle.dart';
@@ -1163,7 +1162,6 @@ class _MainNavigationState extends State<_MainNavigation> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor:
@@ -3435,22 +3433,6 @@ class _SettingsModalState extends State<_SettingsModal> {
   bool _notifications = true;
   final ApiService _api = ApiService();
 
-  void _openFullscreen(Widget page) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (ctx, animation, _) => SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-        child: page,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -3546,6 +3528,8 @@ class _SettingsModalState extends State<_SettingsModal> {
         balance = map['balance'] as int? ?? 0;
       }
     } catch (_) {}
+
+    if (!mounted) return;
 
     final ibanCtrl = TextEditingController();
 

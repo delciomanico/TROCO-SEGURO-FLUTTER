@@ -1412,7 +1412,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: responsive.scaledWidth(58),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [AppColors.primaryGold, AppColors.secondaryGold],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,

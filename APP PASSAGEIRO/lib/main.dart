@@ -1400,7 +1400,7 @@ class _SettingsModalState extends State<_SettingsModal> {
               if (balance > 0) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'Tem ${balance} Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
+                  'Tem $balance Kz na carteira. Indique um IBAN angolano para receber a transferência após os 30 dias.',
                   style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
                 ),
                 const SizedBox(height: 10),
@@ -2302,13 +2302,13 @@ class _ReauthScreenState extends State<ReauthScreen> {
                         color: accent,
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.fingerprint_rounded,
+                          Icon(Icons.fingerprint_rounded,
                               color: Colors.white, size: 22),
-                          const SizedBox(width: 10),
-                          const Text(
+                          SizedBox(width: 10),
+                          Text(
                             'Usar biometria',
                             style: TextStyle(
                               fontSize: 16,

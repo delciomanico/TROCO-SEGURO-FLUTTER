@@ -239,7 +239,7 @@ Future<void> main(List<String> args) async {
 
   final total = _pass + _fail;
   print('\n╔══════════════════════════════════════════════════╗');
-  print(('║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos').padRight(53) + '║');
+  print('${('║  $_pass/$total passou  |  $_fail falharam  |  $_warn avisos').padRight(53)}║');
   print('╚══════════════════════════════════════════════════╝\n');
 
   _http.close();

@@ -552,19 +552,6 @@ class AppService extends ChangeNotifier {
   /// Avaliar viagem
   Future<bool> rateTrip(String tripId, int stars, {String? comment}) async {
     // Buscar o driverId da viagem
-    final trip = trips.firstWhere((t) => t.id == tripId,
-        orElse: () => Trip(
-              id: '',
-              driverName: '',
-              licensePlate: '',
-              origin: '',
-              destination: '',
-              date: '',
-              time: '',
-              amount: 0,
-              status: '',
-            ));
-
     // Por enquanto usar tripId como targetUserId
     final result = await _api.createRating(
       targetUserId: tripId,

@@ -15,6 +15,7 @@ import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/services/feedback_service.dart';
 import 'package:troco_seguro/services/virtual_card_service.dart';
+import 'package:troco_seguro/services/virtual_card_export_service.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/widgets/card_transfer_modal.dart';
@@ -172,10 +173,10 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (err != null) {
-                              FeedbackService.showError(context,
+                              FeedbackService.showError(ctx,
                                   message: err);
                             } else {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message:
                                       '${_fmt(amount)} Kz adicionados ao cartão');
                             }
@@ -347,10 +348,10 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (ok) {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message: '${_fmt(amount)} Kz devolvidos à carteira');
                             } else {
-                              FeedbackService.showError(context, message: 'Erro ao levantar do cartão');
+                              FeedbackService.showError(ctx, message: 'Erro ao levantar do cartão');
                             }
                           },
                     style: ElevatedButton.styleFrom(
@@ -511,9 +512,9 @@ class _CardsScreenState extends State<CardsScreen> {
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                             if (err != null) {
-                              FeedbackService.showError(context, message: err);
+                              FeedbackService.showError(ctx, message: err);
                             } else {
-                              FeedbackService.showSuccess(context,
+                              FeedbackService.showSuccess(ctx,
                                   message: limit == 0
                                       ? 'Limite removido'
                                       : 'Limite definido: ${_fmt(limit)} Kz/dia');
@@ -574,6 +575,7 @@ class _CardsScreenState extends State<CardsScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
     final provider = context.read<AppProvider>();
     final ok = await provider.deleteVirtualCard(card.id);
@@ -1018,12 +1020,12 @@ class _CardsScreenState extends State<CardsScreen> {
                                     );
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
-                                    FeedbackService.showSuccess(context,
+                                    FeedbackService.showSuccess(ctx,
                                         message: 'Cartão criado com sucesso!');
                                   } catch (e) {
                                     if (!ctx.mounted) return;
                                     setSheet(() => isCreating = false);
-                                    FeedbackService.showError(context,
+                                    FeedbackService.showError(ctx,
                                         message: e.toString());
                                   }
                                 },
@@ -1672,9 +1674,9 @@ class _CardCarouselItem extends StatelessWidget {
                     ),
                   ),
                   if (card.isBlocked)
-                    _StatusBadge('BLOQUEADO', Colors.red)
+                    const _StatusBadge('BLOQUEADO', Colors.red)
                   else if (card.isFrozen)
-                    _StatusBadge('CONGELADO', Colors.orange)
+                    const _StatusBadge('CONGELADO', Colors.orange)
                   else
                     const Icon(Icons.wifi_rounded,
                         color: Colors.white70, size: 18),
@@ -1885,16 +1887,33 @@ class _QrCarouselScreenState extends State<_QrCarouselScreen> {
   Future<void> _save(VirtualCard card, GlobalKey key) async {
     setState(() => _isSaving = true);
     final bytes = await _captureImage(key);
-    if (bytes != null) {
-      final dir = await getApplicationDocumentsDirectory();
-      final cardsDir = Directory('${dir.path}/virtual_cards');
-      if (!await cardsDir.exists()) await cardsDir.create(recursive: true);
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${cardsDir.path}/card_qr_${card.id}_$ts.png');
-      await file.writeAsBytes(bytes);
+    if (bytes == null) {
       if (mounted) {
-        FeedbackService.showSuccess(context,
-            message: 'QR guardado em: ${file.path}');
+        FeedbackService.showError(
+          context,
+          message: 'Não foi possível gerar a imagem do cartão.',
+        );
+      }
+    } else {
+      final result = await VirtualCardExportService().saveImageBytes(
+        bytes,
+        suggestedName: 'cartao_virtual_${card.id}.png',
+      );
+      if (!mounted) return;
+      if (result.cancelled) {
+        setState(() => _isSaving = false);
+        return;
+      }
+      if (result.path != null) {
+        FeedbackService.showSuccess(
+          context,
+          message: 'Cartão guardado em: ${result.path}',
+        );
+      } else {
+        FeedbackService.showError(
+          context,
+          message: result.error ?? 'Não foi possível guardar o cartão.',
+        );
       }
     }
     if (!mounted) return;

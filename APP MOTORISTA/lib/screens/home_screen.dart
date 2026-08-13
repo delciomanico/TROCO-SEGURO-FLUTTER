@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
             activeVehicleId: widget.activeVehicleId,
           );
           if (!setupResult.isSuccess || setupResult.data == null) {
-            if (mounted) {
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: Text(setupResult.error ?? 'Erro ao actualizar valor'),
                 backgroundColor: Colors.red,
@@ -1375,6 +1375,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await cleared.save();
         setState(() => _qrConfig = cleared);
       }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sessão encerrada com sucesso.'),

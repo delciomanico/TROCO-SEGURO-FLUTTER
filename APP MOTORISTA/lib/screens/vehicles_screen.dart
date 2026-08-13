@@ -370,7 +370,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _seats,
+              initialValue: _seats,
               decoration: const InputDecoration(
                 labelText: 'Nº de lugares',
                 border: OutlineInputBorder(),
@@ -546,7 +546,7 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _seats,
+              initialValue: _seats,
               decoration: const InputDecoration(
                 labelText: 'Nº de lugares',
                 border: OutlineInputBorder(),

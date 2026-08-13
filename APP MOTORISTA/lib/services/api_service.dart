@@ -18,7 +18,8 @@ import 'package:troco_seguro_pro/models/notification.dart';
 
 /// Serviço para comunicação com a API do Troco Seguro (App Motorista)
 class ApiService {
-  static final  String baseUrl = dotenv.get('BASE_URL') ?? 'http://localhost:3000';
+  static final String baseUrl =
+      dotenv.get('BASE_URL', fallback: 'http://localhost:3000');
   static final ApiService _instance = ApiService._internal();
   static final ValueNotifier<int> _activeRequests = ValueNotifier<int>(0);
   static final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);

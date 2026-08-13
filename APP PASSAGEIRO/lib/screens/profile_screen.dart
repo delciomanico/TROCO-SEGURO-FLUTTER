@@ -1011,7 +1011,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           if (result.isSuccess) {
                             await SecureStorageService().savePin(newPin);
                             await PinGuard.resetFailures('global');
-                            if (mounted) Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnack('PIN alterado com sucesso');
                           } else {
                             _showSnack(
