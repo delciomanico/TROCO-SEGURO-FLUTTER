@@ -472,9 +472,11 @@ class _AppControllerState extends State<AppController>
       builder: (context) => WithdrawalModal(
         availableBalance: driver?.balance ?? 0,
         onSuccess: () async {
-          Navigator.pop(context);
+          // WithdrawalModal já se fecha a si próprio (Navigator.pop) antes
+          // de chamar este callback — popar aqui outra vez fechava a rota
+          // seguinte (o próprio ecrã principal), deixando a tela preta.
           _showSuccessModal(
-              'Saque solicitado!', 'Sua solicitaÃ§Ã£o foi enviada.');
+              'Saque solicitado!', 'Sua solicitação foi enviada.');
           await _refreshFromApi();
         },
       ),

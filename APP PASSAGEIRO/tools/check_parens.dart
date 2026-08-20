@@ -15,17 +15,23 @@ void main(List<String> args) {
     final line = lines[i];
     for (var ch in line.runes) {
       final c = String.fromCharCode(ch);
-      if (c == '(') openParen++;
       if (c == '(') {
-        parenStack.add(i+1);
-      } else if (c == ')') openParen--;
-      else if (c == ')') {
-        if (parenStack.isNotEmpty) parenStack.removeLast();
+        openParen++;
+        parenStack.add(i + 1);
+      } else if (c == ')') {
+        openParen--;
+        if (parenStack.isNotEmpty) {
+          parenStack.removeLast();
+        }
+      } else if (c == '{') {
+        openBrace++;
+      } else if (c == '}') {
+        openBrace--;
+      } else if (c == '[') {
+        openBracket++;
+      } else if (c == ']') {
+        openBracket--;
       }
-      else if (c == '{') openBrace++;
-      else if (c == '}') openBrace--;
-      else if (c == '[') openBracket++;
-      else if (c == ']') openBracket--;
     }
     if (openParen < 0 || openBrace < 0 || openBracket < 0) {
       print('Mismatch at line ${i + 1}: paren=$openParen brace=$openBrace bracket=$openBracket');

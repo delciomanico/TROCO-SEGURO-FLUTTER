@@ -37,6 +37,18 @@ class AppProvider extends ChangeNotifier {
   String? _tripsError;
   int _ratingsRevision = 0;
 
+  // Controle de cache
+  DateTime? _cardsLastFetch;
+  DateTime? _transactionsLastFetch;
+  DateTime? _tripsLastFetch;
+  final Duration _cacheDuration = const Duration(minutes: 5);
+
+  /// Verifica se o cache está válido para um domínio
+  bool _isCacheValid(DateTime? lastFetch) {
+    if (lastFetch == null) return false;
+    return DateTime.now().difference(lastFetch) < _cacheDuration;
+  }
+
   // Duração do cache (5 minutos)
   // Aviso de tentativas de PIN restantes (ex: durante compra com cartão)
   String? _pinAttemptsWarning;
@@ -192,6 +204,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Buscar cartões virtuais da API
   Future<void> _fetchCardsFromApi({bool showLoading = true}) async {
+    if (_isCacheValid(_cardsLastFetch)) return;
+
     if (showLoading) {
       _isLoadingCards = true;
       notifyListeners();
@@ -204,6 +218,7 @@ class AppProvider extends ChangeNotifier {
 
       if (result.isSuccess && result.data != null) {
         _virtualCards = result.data!;
+        _cardsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_cards',
           json.encode(_virtualCards.map((c) => c.toJson()).toList()),
@@ -226,6 +241,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Buscar transações da API
   Future<void> _fetchTransactionsFromApi({bool showLoading = true}) async {
+    if (_isCacheValid(_transactionsLastFetch)) return;
+
     if (showLoading) {
       _isLoadingTransactions = true;
       notifyListeners();
@@ -235,6 +252,7 @@ class AppProvider extends ChangeNotifier {
       final result = await _api.getTransactionHistory();
       if (result.isSuccess && result.data != null) {
         _transactions = result.data!;
+        _transactionsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_transactions',
           json.encode(_transactions.map((t) => t.toJson()).toList()),
@@ -253,6 +271,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Buscar viagens da API
   Future<void> _fetchTripsFromApi({bool showLoading = true}) async {
+    if (_isCacheValid(_tripsLastFetch)) return;
+
     if (showLoading) {
       _isLoadingTrips = true;
       notifyListeners();
@@ -264,6 +284,7 @@ class AppProvider extends ChangeNotifier {
       final result = await _api.getTrips();
       if (result.isSuccess && result.data != null) {
         _trips = result.data!;
+        _tripsLastFetch = DateTime.now();
         await _prefs?.setString(
           'ts_trips',
           json.encode(_trips.map((t) => t.toJson()).toList()),
@@ -291,16 +312,19 @@ class AppProvider extends ChangeNotifier {
 
   /// Refresh manual dos cartões virtuais
   Future<void> refreshVirtualCards() async {
+    _cardsLastFetch = null;
     await _fetchCardsFromApi(showLoading: true);
   }
 
   /// Refresh manual das transações
   Future<void> refreshTransactions() async {
+    _transactionsLastFetch = null;
     await _fetchTransactionsFromApi(showLoading: true);
   }
 
   /// Refresh manual das viagens
   Future<void> refreshTrips() async {
+    _tripsLastFetch = null;
     await _fetchTripsFromApi(showLoading: true);
   }
 

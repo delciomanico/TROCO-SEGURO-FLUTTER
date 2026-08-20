@@ -97,9 +97,7 @@ class AppController extends StatefulWidget {
   State<AppController> createState() => _AppControllerState();
 }
 
-// TODO(remover após testar o redesign): força onboarding+auth a aparecerem
-// sempre no arranque, ignorando os caches 'ts_onboarding'/sessão guardada.
-const bool kForceOnboardingAuthForTesting = true;
+const bool kForceOnboardingAuthForTesting = false;
 
 class _AppControllerState extends State<AppController>
     with WidgetsBindingObserver {

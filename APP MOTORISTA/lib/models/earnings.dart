@@ -83,7 +83,8 @@ class Earnings {
       final status = t['status']?.toString() ?? '';
       if (status != 'completed') continue;
 
-      final rawAmount = t['amount'];
+      final rawAmount =
+          t['amount'] ?? t['totalAmount'] ?? t['fare'] ?? t['price'];
       final amount =
           double.tryParse(rawAmount?.toString() ?? '0')?.toInt() ?? 0;
 

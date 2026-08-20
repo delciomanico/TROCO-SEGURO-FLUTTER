@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:file_selector/file_selector.dart';
+import 'package:file_saver/file_saver.dart';
 
 class VirtualCardExportResult {
   final String? path;
@@ -32,23 +31,24 @@ class VirtualCardExportService {
   Future<VirtualCardExportResult> saveImageBytes(
     Uint8List bytes, {
     required String suggestedName,
-    String? initialDirectory,
   }) async {
+    final dotIndex = suggestedName.lastIndexOf('.');
+    final baseName =
+        dotIndex > 0 ? suggestedName.substring(0, dotIndex) : suggestedName;
+
     try {
-      final location = await getSaveLocation(
-        suggestedName: suggestedName,
-        confirmButtonText: 'Guardar',
-        initialDirectory: initialDirectory,
-        canCreateDirectories: true,
+      final path = await FileSaver.instance.saveAs(
+        name: baseName,
+        bytes: bytes,
+        fileExtension: 'png',
+        mimeType: MimeType.png,
       );
 
-      if (location == null) {
+      if (path == null) {
         return VirtualCardExportResult.cancelled();
       }
 
-      final file = File(location.path);
-      await file.writeAsBytes(bytes, flush: true);
-      return VirtualCardExportResult.saved(file.path);
+      return VirtualCardExportResult.saved(path);
     } catch (_) {
       return VirtualCardExportResult.failure(
         'Não foi possível guardar o cartão.',

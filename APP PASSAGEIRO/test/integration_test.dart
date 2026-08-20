@@ -9,7 +9,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-const String _base = 'https://trocoseguro.wemof.tech/api/v1';
+const String _base = 'https://trocoseguro.ao/api/v1';
 
 final HttpClient _http = HttpClient()
   ..connectionTimeout = const Duration(seconds: 15);

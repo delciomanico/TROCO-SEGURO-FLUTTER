@@ -3,6 +3,14 @@ import 'package:troco_seguro_pro/models/vehicle.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 
+/// Números de lugares seleccionáveis ao registar/editar um veículo — de
+/// carros ligeiros (2 lugares) a autocarros/machimbombos (até 65 lugares).
+final List<int> _kSeatOptions = List.generate(64, (i) => i + 2);
+
+/// Normaliza uma matrícula para comparação (evita duplicados por
+/// diferenças de maiúsculas/minúsculas ou espaços).
+String _normalizePlate(String plate) => plate.trim().toUpperCase();
+
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
 
@@ -87,7 +95,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: _EditVehicleModal(vehicle: v),
+        child: _EditVehicleModal(vehicle: v, existingVehicles: _vehicles),
       ),
     );
     if (result == true) _loadVehicles();
@@ -102,7 +110,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: const _AddVehicleModal(),
+        child: _AddVehicleModal(existingVehicles: _vehicles),
       ),
     ).then((result) {
       if (result == true) {
@@ -251,7 +259,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 }
 
 class _AddVehicleModal extends StatefulWidget {
-  const _AddVehicleModal();
+  final List<Vehicle> existingVehicles;
+
+  const _AddVehicleModal({required this.existingVehicles});
 
   @override
   State<_AddVehicleModal> createState() => _AddVehicleModalState();
@@ -341,8 +351,16 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.pin),
               ),
-              validator: (val) =>
-                  val == null || val.isEmpty ? 'Campo obrigatório' : null,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Campo obrigatório';
+                final normalized = _normalizePlate(val);
+                final isDuplicate = widget.existingVehicles.any(
+                    (v) => _normalizePlate(v.licensePlate) == normalized);
+                if (isDuplicate) {
+                  return 'Já tens um veículo registado com esta matrícula.';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -376,7 +394,7 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.event_seat),
               ),
-              items: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
+              items: _kSeatOptions
                   .map((s) => DropdownMenuItem(
                         value: s,
                         child: Text('$s lugares'),
@@ -420,7 +438,8 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
 
 class _EditVehicleModal extends StatefulWidget {
   final Vehicle vehicle;
-  const _EditVehicleModal({required this.vehicle});
+  final List<Vehicle> existingVehicles;
+  const _EditVehicleModal({required this.vehicle, required this.existingVehicles});
 
   @override
   State<_EditVehicleModal> createState() => _EditVehicleModalState();
@@ -517,8 +536,17 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.pin),
               ),
-              validator: (val) =>
-                  val == null || val.isEmpty ? 'Campo obrigatório' : null,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Campo obrigatório';
+                final normalized = _normalizePlate(val);
+                final isDuplicate = widget.existingVehicles.any((v) =>
+                    v.id != widget.vehicle.id &&
+                    _normalizePlate(v.licensePlate) == normalized);
+                if (isDuplicate) {
+                  return 'Já tens um veículo registado com esta matrícula.';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -552,7 +580,7 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.event_seat),
               ),
-              items: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
+              items: _kSeatOptions
                   .map((s) => DropdownMenuItem(
                         value: s,
                         child: Text('$s lugares'),

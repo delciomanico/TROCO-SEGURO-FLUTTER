@@ -81,8 +81,16 @@ class ApiService {
         // cujo catch já devolve false ao chamador.
         final isRefreshRequest = error.requestOptions.path.contains('auth/refresh');
 
+        // Um pedido já reenviado uma vez após refresh não pode ser reenviado
+        // de novo: se voltar a dar 401 (por um motivo que não é token
+        // expirado — ex. o próprio endpoint rejeita o pedido), reenviá-lo
+        // outra vez passaria por este mesmo interceptor e causaria recursão
+        // sem limite (refresh sempre bem sucedido, pedido original sempre a
+        // falhar). Um único reenvio por pedido original é suficiente.
+        final alreadyRetried = error.requestOptions.extra['retriedAfterRefresh'] == true;
+
         // Tentar renovar token se expirado
-        if (error.response?.statusCode == 401 && !isRefreshRequest) {
+        if (error.response?.statusCode == 401 && !isRefreshRequest && !alreadyRetried) {
           final hadSession = isAuthenticated;
           if (_refreshToken != null) {
             bool refreshed = false;
@@ -96,6 +104,7 @@ class ApiService {
                 // Repetir requisição original
                 final opts = error.requestOptions;
                 opts.headers['Authorization'] = 'Bearer $_accessToken';
+                opts.extra['retriedAfterRefresh'] = true;
                 final response = await _dio.fetch(opts);
                 return handler.resolve(response);
               } catch (e) {

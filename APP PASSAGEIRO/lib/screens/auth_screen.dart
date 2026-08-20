@@ -185,15 +185,6 @@ class _AuthScreenState extends State<AuthScreen> {
     super.initState();
   }
 
-  void _handleBack() {
-    setState(() {
-      errorMessage = null;
-      // simply clear transient inputs when backing
-      pinController.clear();
-      otpController.clear();
-    });
-  }
-
   void _handleRecover() {
     showGeneralDialog(
       context: context,
@@ -283,9 +274,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  SizedBox(height: r.scaledHeight(12)),
-                                  _buildSteps(r),
-                                  SizedBox(height: r.scaledHeight(12)),
+                                  SizedBox(height: r.scaledHeight(16)),
                                   _buildTitle(r),
                                   SizedBox(height: r.scaledHeight(20)),
                                   _buildStep1(r),
@@ -604,90 +593,6 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // animation removed — login/register screens won't show logo or animation
-
-  Widget _buildHeader(ResponsiveHelper r) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: r.scaledWidth(16),
-        vertical: r.scaledHeight(8),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: r.scaledWidth(110),
-              height: r.scaledWidth(110),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(colors: [primaryGold, secondaryGold]),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark
-                        ? Colors.black.withAlpha((0.35 * 255).round())
-                        : Colors.black.withAlpha((0.12 * 255).round()),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  )
-                ],
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(r.scaledWidth(12)),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: r.scaledWidth(86),
-                    height: r.scaledWidth(86),
-                    fit: BoxFit.contain,
-                    semanticLabel: 'Troco Seguro logo',
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: r.scaledHeight(8)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSteps(ResponsiveHelper r) {
-    // single-screen now — no step indicator
-    return const SizedBox.shrink();
-  }
-
-  Widget _stepDot(ResponsiveHelper r, int s) {
-    // simplified dot (no active state in single-screen)
-    return Container(
-      width: r.scaledWidth(24),
-      height: r.scaledWidth(24),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.grey[800],
-      ),
-      child: Center(
-        child: Text(
-          '$s',
-          style: TextStyle(
-            fontSize: r.responsiveFontSize(11),
-            fontWeight: FontWeight.w700,
-            color: Colors.grey[500],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _stepLine(ResponsiveHelper r, bool active) {
-    return Container(
-      height: 2,
-      margin: EdgeInsets.symmetric(horizontal: r.scaledWidth(4)),
-      color:
-          active ? primaryGold : (isDark ? Colors.grey[800] : Colors.grey[300]),
-    );
-  }
-
   Widget _buildTitle(ResponsiveHelper r) {
     String title = isLogin ? 'Bem-vindo de volta' : 'Criar conta';
     String subtitle =
@@ -800,62 +705,6 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStep2(ResponsiveHelper r) {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(
-              horizontal: r.scaledWidth(12), vertical: r.scaledHeight(8)),
-          decoration: BoxDecoration(
-            color: primaryGold.withAlpha((0.10 * 255).round()),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Text(
-            '+244 ${phoneController.text}',
-            style: TextStyle(
-              fontSize: r.responsiveFontSize(13),
-              fontWeight: FontWeight.w600,
-              color: primaryGold,
-            ),
-          ),
-        ),
-        SizedBox(height: r.scaledHeight(20)),
-        _buildField(
-          r,
-          controller: pinController,
-          hint: '••••••',
-          icon: Icons.lock_outline,
-          keyboardType: TextInputType.number,
-          obscure: _obscurePin,
-          maxLength: 6,
-          suffix: IconButton(
-            icon: Icon(
-              _obscurePin
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              color: primaryGold.withValues(alpha: 0.7),
-              size: r.scaledWidth(20),
-            ),
-            onPressed: () => setState(() {
-              _obscurePin = !_obscurePin;
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStep3(ResponsiveHelper r) {
-    return _buildField(
-      r,
-      controller: otpController,
-      hint: 'Código de 6 dígitos',
-      icon: Icons.sms_outlined,
-      keyboardType: TextInputType.number,
-      maxLength: 6,
     );
   }
 

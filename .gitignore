@@ -1,0 +1,3 @@
+# Builds locais dos APKs de distribuição (gerados por scripts/build_and_deploy.ps1)
+# — não versionar binários grandes no histórico do git.
+/releases/

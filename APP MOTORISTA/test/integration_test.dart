@@ -9,7 +9,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-const String _base = 'https://trocoseguro.wemof.tech/api/v1';
+const String _base = 'https://trocoseguro.ao/api/v1';
 
 final HttpClient _http = HttpClient()
   ..connectionTimeout = const Duration(seconds: 15);
@@ -20,7 +20,6 @@ String _userId = '';
 String _vehicleId = '';
 String _sessionParentToken = '';
 String _tripId = '';
-String _contactId = '';
 
 int _pass = 0, _fail = 0, _warn = 0;
 final List<String> _shapeErrors = [];
@@ -710,7 +709,6 @@ Future<void> testSafety() async {
       final list = _asList(b['data'] ?? (r.body is List ? r.body : []));
       info('${list.length} contacto(s)');
       if (list.isNotEmpty) {
-        _contactId = _asMap(list.first)['id']?.toString() ?? '';
         shapeItem('GET /safety/emergency-contacts item', _asMap(list.first),
             ['id', 'name', 'phoneNumber']);
       }
@@ -747,18 +745,9 @@ Future<void> testSafety() async {
     }
   }
 
-  // POST /safety/panic — GPS de Luanda
-  {
-    final r = await req('POST', '/safety/panic', body: {
-      'latitude': -8.839988,
-      'longitude': 13.289437,
-    });
-    if (r.status == 200 || r.status == 201 || r.status == 204) {
-      ok('POST /safety/panic');
-    } else {
-      fail('POST /safety/panic', r.body);
-    }
-  }
+  // POST /safety/panic — SKIP: dispara um alerta de pânico real (efeito
+  // colateral de segurança) — não chamado nesta verificação automática.
+  warn('POST /safety/panic — SKIP (efeito colateral real de segurança)');
 }
 
 Future<void> testRatings() async {

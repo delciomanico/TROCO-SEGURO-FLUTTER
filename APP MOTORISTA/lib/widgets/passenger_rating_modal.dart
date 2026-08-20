@@ -64,24 +64,36 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
 
     setState(() => _isSubmitting = true);
 
-    final success = await widget.onSubmitRating(
-      widget.tripId,
-      _selectedRating,
-      _commentController.text.trim().isNotEmpty
-          ? _commentController.text.trim()
-          : null,
-    );
+    bool success = false;
+    try {
+      success = await widget.onSubmitRating(
+        widget.tripId,
+        _selectedRating,
+        _commentController.text.trim().isNotEmpty
+            ? _commentController.text.trim()
+            : null,
+      );
+    } catch (_) {
+      // Sem isto, uma excepção aqui (ex.: erro de rede inesperado) deixava
+      // o botão preso em "ENVIANDO..." para sempre — o ecrã parecia
+      // travado, sem qualquer feedback ao motorista.
+      success = false;
+    }
 
     if (!mounted) return;
 
+    // Captura o ScaffoldMessenger antes de fechar o modal — chamá-lo depois
+    // do pop arrisca apanhar o contexto já removido da árvore.
+    final messenger = ScaffoldMessenger.of(context);
+
     if (success) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Avaliação enviada com sucesso!')),
       );
     } else {
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
             content: Text('Erro ao enviar avaliação. Tente novamente.')),
       );

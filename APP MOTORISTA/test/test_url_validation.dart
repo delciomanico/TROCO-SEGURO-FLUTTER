@@ -50,13 +50,10 @@ void main() async {
     final expected = endpoint['expected'] as String;
     
     try {
-      RequestOptions? requestOptions;
-      
       // Interceptar a request para pegar a URL final
       dio.interceptors.clear();
       dio.interceptors.add(InterceptorsWrapper(
         onRequest: (options, handler) {
-          requestOptions = options;
           // Não enviar a request, apenas capturar
           handler.reject(DioException(
             requestOptions: options,

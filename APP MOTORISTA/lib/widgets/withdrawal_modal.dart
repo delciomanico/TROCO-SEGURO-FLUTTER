@@ -55,6 +55,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
   void initState() {
     super.initState();
     _api.loadTokens();
+    _ibanCtrl.text = 'AO06';
   }
 
   @override
@@ -174,6 +175,12 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
   Widget build(BuildContext context) {
     const borderColor = Color(0x1FFFFFFF);
     const fillColor = Color(0x0FFFFFFF);
+    // Enquanto há um pedido de rede em curso (cotação ou submissão), trocar
+    // de método/editar os campos deixava a cotação já carregada "presa" a
+    // um método diferente do que acabava por ser confirmado — a app
+    // confundia qual dos dois foi realmente pedido. Bloquear os controlos
+    // durante esse intervalo evita essa inconsistência.
+    final inputsLocked = _busy || _loadingQuote;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -216,13 +223,15 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       sublabel: 'Transferência bancária',
                       icon: Icons.account_balance_rounded,
                       isSelected: _method == 'bank',
-                      onTap: () {
-                        setState(() {
-                          _method = 'bank';
-                          _ibanCtrl.clear();
-                        });
-                        _resetQuote();
-                      },
+                      onTap: inputsLocked
+                          ? null
+                          : () {
+                              setState(() {
+                                _method = 'bank';
+                                _ibanCtrl.text = 'AO06';
+                              });
+                              _resetQuote();
+                            },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -232,13 +241,15 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       sublabel: 'Receba em minutos',
                       icon: Icons.flash_on_rounded,
                       isSelected: _method == 'mcx_express',
-                      onTap: () {
-                        setState(() {
-                          _method = 'mcx_express';
-                          _ibanCtrl.clear();
-                        });
-                        _resetQuote();
-                      },
+                      onTap: inputsLocked
+                          ? null
+                          : () {
+                              setState(() {
+                                _method = 'mcx_express';
+                                _ibanCtrl.clear();
+                              });
+                              _resetQuote();
+                            },
                     ),
                   ),
                 ],
@@ -246,6 +257,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
               const SizedBox(height: 20),
               TextField(
                 controller: _amountCtrl,
+                enabled: !inputsLocked,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: 'Valor a levantar',
@@ -268,6 +280,7 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
               const SizedBox(height: 12),
               TextField(
                 controller: _ibanCtrl,
+                enabled: !inputsLocked,
                 keyboardType:
                     _method == 'bank' ? TextInputType.text : TextInputType.phone,
                 inputFormatters: _method == 'bank'
@@ -407,7 +420,7 @@ class _MethodOption extends StatelessWidget {
   final String sublabel;
   final IconData icon;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _MethodOption({
     required this.label,

@@ -107,7 +107,7 @@ void main() async {
     final devePassar = entry.value;
     
     try {
-      final response = await dio.post('/api/v1/auth/login', data: {
+      await dio.post('/api/v1/auth/login', data: {
         'phoneNumber': fullPhone,
         'password': senha,
       });

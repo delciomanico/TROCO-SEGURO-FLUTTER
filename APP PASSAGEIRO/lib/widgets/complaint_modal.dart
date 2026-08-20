@@ -107,9 +107,24 @@ class _ComplaintModalState extends State<ComplaintModal> {
       return;
     }
 
+    final ref = _refCtrl.text.trim();
+    // O backend exige transactionId/tripId para estas duas categorias
+    // (só "Outro" aceita reclamação sem referência) — validar aqui evita
+    // que o motorista escreva a descrição toda e só depois leve com um
+    // erro 400 genérico do servidor.
+    if (_category == 'TRANSACTION' && ref.isEmpty) {
+      FeedbackService.showError(context,
+          message: 'Indique o ID da transação — obrigatório para esta categoria.');
+      return;
+    }
+    if (_category == 'TRIP' && ref.isEmpty) {
+      FeedbackService.showError(context,
+          message: 'Indique o ID da viagem — obrigatório para esta categoria.');
+      return;
+    }
+
     setState(() => _busy = true);
 
-    final ref = _refCtrl.text.trim();
     final result = await ApiService().createComplaint(
       category: _category,
       reasonCode: _category.toLowerCase(),
@@ -564,8 +579,8 @@ class _ComplaintModalState extends State<ComplaintModal> {
               controller: _refCtrl,
               decoration: InputDecoration(
                 labelText: _category == 'TRANSACTION'
-                    ? 'ID da transação (opcional)'
-                    : 'ID da viagem (opcional)',
+                    ? 'ID da transação'
+                    : 'ID da viagem',
                 prefixIcon: const Icon(Icons.tag_rounded),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadius.md)),

@@ -157,7 +157,9 @@ class _TransferModalState extends State<TransferModal> {
                       return;
                     }
 
-                    Navigator.pop(context);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
                     await _processTransfer();
                   },
                   child: const Text('Confirmar'),

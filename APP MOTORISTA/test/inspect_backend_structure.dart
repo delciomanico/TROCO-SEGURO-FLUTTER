@@ -25,9 +25,6 @@ void main() async {
     final accessToken = loginResponse.data['data']?['accessToken'] ??
         loginResponse.data['accessToken'] ??
         '';
-    final refreshToken = loginResponse.data['data']?['refreshToken'] ??
-        loginResponse.data['refreshToken'] ??
-        '';
 
     print('📋 Login Response Structure:');
     print(jsonEncode(loginResponse.data));

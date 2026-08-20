@@ -26,7 +26,7 @@ void main() {
     HttpOverrides.global = null;
 
     dotenv.loadFromString(
-        envString: 'BASE_URL=https://trocoseguro.wemof.tech/api/v1/');
+        envString: 'BASE_URL=https://trocoseguro.ao/api/v1/');
     SharedPreferences.setMockInitialValues({});
 
     const secureStorageChannel =

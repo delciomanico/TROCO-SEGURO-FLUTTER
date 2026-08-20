@@ -74,27 +74,6 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     super.dispose();
   }
 
-  int get _totalBalance =>
-      widget.cards.fold<int>(0, (sum, card) => sum + card.balance);
-
-  int get _activeCards =>
-      widget.cards.where((card) => !card.isBlocked && !card.isFrozen).length;
-
-  int get _limitedCards =>
-      widget.cards.where((card) => card.dailyLimit > 0).length;
-
-  Color _statusColor(ThemeData theme, VirtualCard card) {
-    if (card.isBlocked) return Colors.red.shade700;
-    if (card.isFrozen) return Colors.orange.shade700;
-    return theme.colorScheme.primary;
-  }
-
-  String _statusLabel(VirtualCard card) {
-    if (card.isBlocked) return 'Bloqueado';
-    if (card.isFrozen) return 'Congelado';
-    return 'Ativo';
-  }
-
   Future<void> _submitCreate() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -1013,31 +992,6 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _statPill(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withAlpha((0.06 * 255).round()),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(color: Colors.black87),
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            TextSpan(
-              text: value,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
       ),
     );
   }

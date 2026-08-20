@@ -69,8 +69,12 @@ class Trip {
         passengerObj?['phoneNumber']?.toString() ??
         passengerObj?['phone']?.toString();
 
-    // amount pode vir como String "400.00" ou int
-    final rawAmount = json['amount'];
+    // amount pode vir como String "400.00" ou int, sob chaves diferentes
+    // consoante o endpoint (mesma variação já tratada no APP PASSAGEIRO).
+    final rawAmount = json['amount'] ??
+        json['totalAmount'] ??
+        json['fare'] ??
+        json['price'];
     final amount =
         double.tryParse(rawAmount?.toString() ?? '0')?.toInt() ?? 0;
 

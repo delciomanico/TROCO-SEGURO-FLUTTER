@@ -5,48 +5,40 @@ ordenada por prioridade (mais urgente primeiro). Itens já corrigidos e
 confirmados a funcionar foram removidos deste documento — consultar
 `git log -- BACKEND_PENDING_CHANGES.md` para o histórico completo.
 
-**Actualizado em 2026-07-25.**
+**Actualizado em 2026-08-20.**
 
 ---
 
-## 1. 🔴 URGENTE — `GET wallet/balance-by-qr/:qrId` devolve 500 para o `cardNumber` do QR real
+## 1. 🔴 `POST fleet/vehicles` devolve 500 (em vez de erro de validação) ao registar uma matrícula já existente
 
-**Reportado pelo utilizador:** "erro interno no servidor" ao testar a
-consulta de saldo de um cartão externo no APP MOTORISTA (ecrã "Saldo do
-Cartão", via QR).
+**Reportado pelo utilizador:** no App Motorista, registar um segundo
+veículo dava erro. Reproduzido diretamente contra a API ao vivo
+(`https://trocoseguro.ao/api/v1`) com a conta de teste do motorista QA:
 
-**Confirmado ao vivo** contra `trocoseguro.wemof.tech`, com um cartão
-virtual criado de propósito para o teste:
-
-- O QR gerado por `GET virtual-cards/{id}/qr` codifica este JSON (decodificado
-  a partir da imagem PNG devolvida):
+- Registar um veículo com uma matrícula nova → `201 Created`, normal.
+- Registar novamente com a **mesma matrícula** de um veículo já existente
+  na frota (comparação exacta, incluindo variações de maiúsculas/espaços
+  passam) → `500 Internal Server Error`:
   ```json
-  {"type":"VIRTUAL_CARD_TRANSFER","cardNumber":"4830124046261068","cardName":"...","userName":"..."}
+  {"statusCode":500,"message":"Erro interno do servidor","error":"Internal Server Error"}
   ```
-  **Não contém `id`/`qrId`/`cardId`** — só `cardNumber`. É a única forma
-  que a app (ou qualquer utilizador) tem de identificar o cartão a partir
-  de uma leitura real de QR.
-- `GET wallet/balance-by-qr/{cardNumber}` (o valor que o QR realmente
-  contém) → `500 {"message":"Erro interno do servidor"}`.
-- `GET wallet/balance-by-qr/{id}` (o UUID interno do cartão, que a app
-  **nunca tem acesso** ao ler o QR de outra pessoa) → `200`, funciona
-  correctamente.
-- Ou seja: o endpoint só resolve pelo UUID interno, mas a única coisa que
-  chega de um QR real é o `cardNumber` — a funcionalidade está inutilizável
-  tal como está hoje, para qualquer cartão que não seja o próprio.
+  em vez de um `400`/`409` de validação (ex. "Matrícula já registada").
 
-**Implementar:** `GET wallet/balance-by-qr/:qrId` deve também resolver por
-`cardNumber` (não só pelo `id` interno), já que é o único valor disponível
-a partir de uma leitura de QR real. Devolver `404` (não `500`) quando o
-identificador realmente não corresponder a nenhum cartão.
+Isto indica uma violação de constraint de unicidade (matrícula) na base
+de dados que não está a ser apanhada/tratada no endpoint
+`POST fleet/vehicles` — o erro passa por sem tratamento e vira 500.
 
-**Estado no app:** corrigido um bug relacionado do lado do Flutter —
-`CardBalanceModal._load()` (`APP MOTORISTA/lib/widgets/wallet_transfer_modals.dart`)
-tentava extrair `qrId`/`id`/`cardId` do QR decodificado, campos que nunca
-existem no QR real; passou a extrair `cardNumber` primeiro. Ainda assim,
-a funcionalidade só voltará a funcionar de ponta a ponta depois da
-correcção acima no backend — confirmado ao testar com o `cardNumber` real:
-continua a dar 500.
+**Implementar:** validar a matrícula antes do insert (ou apanhar o erro
+de constraint única) e devolver um `400`/`409` com mensagem clara
+("Matrícula já registada") em vez do 500 genérico.
+
+**No app:** aplicado um paliativo do lado do Flutter — o formulário de
+adicionar/editar veículo (`vehicles_screen.dart`) já valida localmente
+se a matrícula introduzida coincide com a de outro veículo do próprio
+motorista antes de submeter, evitando bater neste 500 no caso mais comum
+(reintroduzir sem querer a mesma matrícula). Não cobre colisões com
+matrículas de **outros** motoristas, cuja validação só pode acontecer no
+backend.
 
 ---
 
@@ -89,7 +81,26 @@ administrativo web, fora do âmbito dos apps Flutter.
 
 ---
 
-## 4. 💬 Pagamento de viagem via `wallet/transfer-to-user` volta com `type: "transfer"`, não distinguível de uma transferência P2P genérica
+## 4. 🔴 Reclamações criadas pelo utilizador não chegam ao painel administrativo
+
+**Reportado pelo utilizador:** reclamações submetidas no APP PASSAGEIRO
+(`POST complaints`) não aparecem no painel administrativo para a equipa
+de suporte tratar.
+
+**Confirmado que a reclamação É criada com sucesso do lado da API** — testado
+directamente contra `https://trocoseguro.ao/api/v1` com a conta de teste:
+`POST complaints` com categoria `OTHER` devolve `201` com um registo válido
+(`id`, `status: "open"`, `createdAt`, etc.). O registo existe na base de
+dados; o problema é o painel administrativo não os listar/mostrar.
+
+**Nota:** este ecrã não existe neste repositório — é do painel
+administrativo web, mantido pela equipa de backend. Nenhuma acção de
+código possível deste lado além de confirmar (como acima) que a API já
+está a gravar os registos correctamente.
+
+---
+
+## 5. 💬 Pagamento de viagem via `wallet/transfer-to-user` volta com `type: "transfer"`, não distinguível de uma transferência P2P genérica
 
 **Reportado pelo utilizador:** no APP PASSAGEIRO, pagar um motorista
 identificado por QR (fluxo "Identificar Motorista" → "Transferir para
@@ -118,7 +129,7 @@ texto, não substitui a correcção acima.
 
 ---
 
-## 5. 💬 Pedido de negócio — dividir a taxa da plataforma entre passageiro e motorista
+## 6. 💬 Pedido de negócio — dividir a taxa da plataforma entre passageiro e motorista
 
 **Pedido do cliente:** hoje a taxa da plataforma (1%) só é retida do
 lado do motorista — o passageiro paga o preço cheio do lugar (ex.

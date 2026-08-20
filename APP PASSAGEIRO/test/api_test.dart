@@ -4,7 +4,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const baseUrl = 'https://troco-seguro.onrender.com';
+const baseUrl = 'https://trocoseguro.ao/api/v1';
 
 Future<void> main() async {
   print('🧪 Testando API Troco Seguro...\n');
