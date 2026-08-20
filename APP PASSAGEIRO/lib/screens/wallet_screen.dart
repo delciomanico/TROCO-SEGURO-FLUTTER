@@ -13,6 +13,8 @@ import 'package:troco_seguro/utils/formatters.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
+import 'package:troco_seguro/security/pin_guard.dart';
+import 'package:troco_seguro/services/secure_storage_service.dart';
 
 class WalletScreen extends StatefulWidget {
   final VoidCallback? onOpenTopup;
@@ -1155,10 +1157,16 @@ class _TransferSheetState extends State<_TransferSheet> {
   final _phoneCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
   String? _error;
   String? _recipientName;
   bool _loading = false;
   bool _verified = false;
+  // Preenchido quando o QR escaneado é o QR de sessão/viagem do motorista
+  // (mostrado em "Meu QR" no App Motorista), em vez do QR de identidade do
+  // passageiro (que traz o telefone em JSON). Nesse caso a transferência
+  // usa wallet/transfer-to-user (por ID + PIN) em vez do fluxo por telefone.
+  String? _driverId;
 
   Future<void> _scanQr() async {
     final qrData = await showModalBottomSheet<String>(
@@ -1180,6 +1188,7 @@ class _TransferSheetState extends State<_TransferSheet> {
       if (phone != null) {
         setState(() {
           _phoneCtrl.text = _stripCountryCode(phone.toString());
+          _driverId = null;
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -1187,7 +1196,42 @@ class _TransferSheetState extends State<_TransferSheet> {
       } else {
         setState(() => _error = 'QR não contém número de telefone.');
       }
+      return;
     } catch (_) {
+      // Não é o QR de identidade do passageiro — tentar resolver como QR
+      // de sessão/motorista antes de desistir.
+    }
+
+    // Extrair o token do payload do QR (mesma lógica de
+    // PaymentService.validateQrCode: query param "token", substring
+    // "token=..." ou o próprio qrData como fallback).
+    String token = '';
+    try {
+      final parsed = Uri.tryParse(qrData);
+      if (parsed != null && parsed.queryParameters.containsKey('token')) {
+        token = parsed.queryParameters['token'] ?? '';
+      }
+    } catch (_) {}
+    if (token.isEmpty && qrData.contains('token=')) {
+      final parts = qrData.split('token=');
+      if (parts.length > 1) token = parts[1];
+    }
+    final tokenParam = token.isNotEmpty ? token : qrData;
+
+    final resolved = await ApiService().resolveQrToken(tokenParam);
+    if (!mounted) return;
+    if (resolved.isSuccess &&
+        resolved.data != null &&
+        resolved.data!.valid &&
+        resolved.data!.driverId != null) {
+      setState(() {
+        _driverId = resolved.data!.driverId;
+        _phoneCtrl.clear();
+        _recipientName = resolved.data!.driverName ?? 'Motorista';
+        _verified = true;
+        _error = null;
+      });
+    } else {
       setState(() => _error = 'QR inválido.');
     }
   }
@@ -1206,6 +1250,7 @@ class _TransferSheetState extends State<_TransferSheet> {
     _phoneCtrl.dispose();
     _amountCtrl.dispose();
     _descCtrl.dispose();
+    _pinCtrl.dispose();
     super.dispose();
   }
 
@@ -1245,6 +1290,12 @@ class _TransferSheetState extends State<_TransferSheet> {
       setState(() => _error = 'Informe um montante válido.');
       return;
     }
+
+    if (_driverId != null) {
+      await _submitToDriver(amount);
+      return;
+    }
+
     setState(() {
       _error = null;
       _loading = true;
@@ -1276,6 +1327,50 @@ class _TransferSheetState extends State<_TransferSheet> {
     });
   }
 
+  /// Transferência para um motorista identificado pelo QR de sessão/viagem
+  /// — usa `wallet/transfer-to-user`, que exige o PIN de conta como
+  /// confirmação extra (ver `_transferToDriver` em home_screen.dart, o
+  /// fluxo "Identificar QR" que já fazia isto).
+  Future<void> _submitToDriver(int amount) async {
+    final pin = _pinCtrl.text.trim();
+    if (pin.length != 6) {
+      setState(() => _error = 'PIN deve ter 6 dígitos.');
+      return;
+    }
+    final isValid = await PinGuard.validatePin(
+      scope: 'transfer_to_user',
+      enteredPin: pin,
+      readExpectedPin: () => SecureStorageService().readPin(),
+    );
+    if (!mounted) return;
+    if (!isValid) {
+      setState(() => _error = 'PIN incorrecto.');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final provider = context.read<AppProvider>();
+    final result = await provider.transferToUser(
+      targetUserId: _driverId!,
+      amount: amount,
+      pin: pin,
+    );
+    if (!mounted) return;
+    if (result != null) {
+      Navigator.of(context).pop();
+      FeedbackService.showSuccess(context,
+          message: 'Transferência realizada com sucesso!');
+      return;
+    }
+    setState(() {
+      _loading = false;
+      _error = provider.error ?? 'Erro ao realizar transferência.';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return _BottomSheetWrapper(
@@ -1290,21 +1385,30 @@ class _TransferSheetState extends State<_TransferSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  enabled: !_verified,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(9),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Nº de telefone',
-                    hintText: '9XX XXX XXX',
-                    prefixText: '+244 ',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                child: _driverId != null
+                    ? const TextField(
+                        enabled: false,
+                        decoration: InputDecoration(
+                          labelText: 'Destinatário',
+                          hintText: 'Motorista identificado por QR',
+                          border: OutlineInputBorder(),
+                        ),
+                      )
+                    : TextField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        enabled: !_verified,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(9),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Nº de telefone',
+                          hintText: '9XX XXX XXX',
+                          prefixText: '+244 ',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
               ),
               const SizedBox(width: 8),
               if (!_verified) ...[
@@ -1325,6 +1429,8 @@ class _TransferSheetState extends State<_TransferSheet> {
                         onPressed: () => setState(() {
                           _verified = false;
                           _recipientName = null;
+                          _driverId = null;
+                          _pinCtrl.clear();
                         }),
                         icon: const Icon(Icons.edit),
                         tooltip: 'Alterar',
@@ -1381,6 +1487,24 @@ class _TransferSheetState extends State<_TransferSheet> {
                 labelText: 'Descrição (opcional)',
                 border: OutlineInputBorder()),
           ),
+          if (_driverId != null) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _pinCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'PIN de conta',
+                border: OutlineInputBorder(),
+                counterText: '',
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           _ActionRow(
             loading: _loading && _verified,

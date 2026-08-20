@@ -190,7 +190,10 @@ class AppProvider extends ChangeNotifier {
         _user = result.data!;
         _isAuthenticated = true;
         await _prefs?.setString('ts_user', json.encode(_user!.toJson()));
-        if (showLoading) notifyListeners();
+        // Notificar sempre que o saldo mudar, mesmo em refresh silencioso
+        // (showLoading: false) — sem isto o ecrã fica preso ao saldo do
+        // cache até uma acção que force showLoading: true (pull-to-refresh).
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Erro ao buscar perfil: $e');
