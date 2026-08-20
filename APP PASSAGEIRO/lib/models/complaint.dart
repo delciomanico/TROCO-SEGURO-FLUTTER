@@ -7,6 +7,7 @@ class Complaint {
   final String? transactionId;
   final String? tripId;
   final Map<String, dynamic>? metadata;
+  final String status;
   final String createdAt;
   final String updatedAt;
 
@@ -19,6 +20,7 @@ class Complaint {
     this.transactionId,
     this.tripId,
     this.metadata,
+    required this.status,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -35,9 +37,23 @@ class Complaint {
       metadata: json['metadata'] is Map
           ? Map<String, dynamic>.from(json['metadata'] as Map)
           : null,
+      status: json['status']?.toString() ?? 'open',
       createdAt: json['createdAt']?.toString() ?? '',
       updatedAt: json['updatedAt']?.toString() ?? '',
     );
+  }
+
+  String get statusLabel {
+    switch (status.toLowerCase()) {
+      case 'in-progress':
+      case 'in_progress':
+        return 'Em progresso';
+      case 'resolved':
+      case 'closed':
+        return 'Resolvida';
+      default:
+        return 'Aberta';
+    }
   }
 
   String get categoryLabel {

@@ -81,22 +81,47 @@ administrativo web, fora do âmbito dos apps Flutter.
 
 ---
 
-## 4. 🔴 Reclamações criadas pelo utilizador não chegam ao painel administrativo
+## 4. 💬 API de reclamações não expõe o texto da resposta do suporte, nem liga a notificação à reclamação
 
-**Reportado pelo utilizador:** reclamações submetidas no APP PASSAGEIRO
-(`POST complaints`) não aparecem no painel administrativo para a equipa
-de suporte tratar.
+**Contexto:** o utilizador reportou que reclamações submetidas no APP
+PASSAGEIRO não pareciam chegar ao painel administrativo. Ao investigar,
+uma reclamação de teste criada no dia anterior **já tinha sido processada**
+pela equipa de suporte — o que indica que o item original está resolvido
+ou nunca foi um bug real (as reclamações chegam e são processadas):
 
-**Confirmado que a reclamação É criada com sucesso do lado da API** — testado
-directamente contra `https://trocoseguro.ao/api/v1` com a conta de teste:
-`POST complaints` com categoria `OTHER` devolve `201` com um registo válido
-(`id`, `status: "open"`, `createdAt`, etc.). O registo existe na base de
-dados; o problema é o painel administrativo não os listar/mostrar.
+- `GET complaints` mostrou o `status` da reclamação de teste a mudar de
+  `"open"` para `"in-progress"`.
+- `GET notifications` tinha uma notificação nova, com o `createdAt` a
+  bater exactamente com o `updatedAt` da reclamação:
+  ```json
+  {"title":"Resposta à sua reclamação","message":"A equipa de atendimento respondeu à sua reclamação.","type":"support_update"}
+  ```
 
-**Nota:** este ecrã não existe neste repositório — é do painel
-administrativo web, mantido pela equipa de backend. Nenhuma acção de
-código possível deste lado além de confirmar (como acima) que a API já
-está a gravar os registos correctamente.
+**O que falta de facto (novo, confirmado ao vivo):**
+- Não existe nenhum sub-recurso para consultar o texto da resposta —
+  testados `GET complaints/:id/messages`, `/replies` e `/comments`,
+  todos devolvem `404 Cannot GET` (rota inexistente). `GET complaints/:id`
+  só devolve `id, userId, category, reasonCode, description,
+  transactionId, tripId, metadata, status, createdAt, updatedAt` — sem
+  nenhum campo com o conteúdo da resposta do suporte.
+- A notificação `support_update` de resposta **não inclui o ID da
+  reclamação** (ao contrário da notificação de "Reclamação Recebida",
+  que inclui o ID em texto simples na mensagem) — não há como ligar a
+  notificação a uma reclamação específica com fiabilidade.
+- Não existe `GET notifications/:id` para tentar obter mais detalhe
+  (também `404`).
+
+**Implementar:** expor o texto da resposta do suporte (ex.: campo
+`responseText`/`resolutionNote` em `GET complaints/:id`, ou um
+sub-recurso `GET complaints/:id/messages`) e incluir o `complaintId` no
+payload da notificação `support_update`.
+
+**No app:** como paliativo, o ecrã de reclamações do APP PASSAGEIRO já
+mostra o estado (`Aberta`/`Em progresso`/`Resolvida`) devolvido pela API,
+e tocar na notificação "Resposta à sua reclamação" abre directamente a
+lista de reclamações (não dá para abrir a reclamação exacta, por falta
+do ID na notificação). O texto da resposta em si continua por mostrar,
+por não existir na API.
 
 ---
 

@@ -168,6 +168,19 @@ class _ComplaintModalState extends State<ComplaintModal> {
     }
   }
 
+  Color _statusColor(String status, bool isDark) {
+    switch (status.toLowerCase()) {
+      case 'in-progress':
+      case 'in_progress':
+        return isDark ? Colors.orange.shade300 : Colors.orange.shade700;
+      case 'resolved':
+      case 'closed':
+        return isDark ? Colors.green.shade300 : Colors.green.shade700;
+      default:
+        return isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    }
+  }
+
   // ─── build ────────────────────────────────────────────────────────────────
 
   @override
@@ -318,20 +331,33 @@ class _ComplaintModalState extends State<ComplaintModal> {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: catColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-              child: Text(
-                c.categoryLabel,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: catColor),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  child: Text(
+                    c.categoryLabel,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: catColor),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  c.statusLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _statusColor(c.status, isDark)),
+                ),
+              ],
             ),
           ],
         ),
@@ -415,6 +441,61 @@ class _ComplaintModalState extends State<ComplaintModal> {
           _detailRow('Motivo',
               c.reasonCode.replaceAll('_', ' '), isDark),
           _detailRow('Data', c.formattedDate, isDark),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 110,
+                  child: Text('Estado',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : Colors.black.withValues(alpha: 0.45))),
+                ),
+                Expanded(
+                  child: Text(c.statusLabel,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _statusColor(c.status, isDark))),
+                ),
+              ],
+            ),
+          ),
+          if (c.status.toLowerCase() != 'open')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentOf(context).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 16, color: AppColors.accentOf(context)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'A equipa de suporte já viu esta reclamação. A resposta '
+                        'detalhada é enviada por outro canal — esta app ainda '
+                        'não mostra o texto exacto da resposta.',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.6)
+                                : Colors.black.withValues(alpha: 0.55)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (c.transactionId != null && c.transactionId!.isNotEmpty)
             _detailRow('ID Transação', c.transactionId!, isDark),
           if (c.tripId != null && c.tripId!.isNotEmpty)

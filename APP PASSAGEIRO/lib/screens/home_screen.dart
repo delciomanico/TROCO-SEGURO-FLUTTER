@@ -12,6 +12,7 @@ import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/widgets/qr_scanner_modal.dart';
 import 'package:troco_seguro/services/payment_service.dart';
 import 'package:troco_seguro/widgets/payment_confirmation_modal.dart';
+import 'package:troco_seguro/widgets/complaint_modal.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart'
@@ -1590,9 +1591,24 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
       case 'security':
         return Icons.security_outlined;
       case 'alert':
+      case 'panic_alert':
         return Icons.warning_amber_rounded;
+      case 'support_update':
+        return Icons.support_agent_rounded;
       default:
         return Icons.notifications_outlined;
+    }
+  }
+
+  /// Notificações de resposta a reclamações não trazem o texto da resposta
+  /// nem o ID da reclamação — a API só avisa que "alguém respondeu". Como
+  /// não há para onde apontar com precisão, ao tocar abrimos a lista de
+  /// reclamações para o utilizador ver o estado actualizado.
+  void _openNotification(AppNotification n) {
+    if (!n.read) _markRead(n.id);
+    if (n.type.toLowerCase() == 'support_update') {
+      Navigator.pop(context);
+      ComplaintModal.show(context);
     }
   }
 
@@ -1749,7 +1765,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
                                 itemBuilder: (_, i) {
                                   final n = _notifications[i];
                                   return GestureDetector(
-                                    onTap: n.read ? null : () => _markRead(n.id),
+                                    onTap: () => _openNotification(n),
                                     child: Container(
                                       padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(

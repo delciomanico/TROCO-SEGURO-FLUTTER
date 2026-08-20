@@ -943,15 +943,14 @@ class _TripsScreenState extends State<TripsScreen> {
       tripId: trip.id,
       driverName: trip.driverName,
       onSubmitRating: (tripId, stars, comment) async {
-        final success = await sheetContext.read<AppProvider>().rateTrip(
+        // O RatingModal já se fecha a si próprio quando onSubmitRating
+        // devolve true — popar aqui também fechava a rota seguinte (a
+        // folha de detalhes da viagem por baixo), deixando a tela preta.
+        return sheetContext.read<AppProvider>().rateTrip(
           tripId,
           stars,
           comment: comment,
         );
-        if (success && sheetContext.mounted) {
-          if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-        }
-        return success;
       },
     );
   }
