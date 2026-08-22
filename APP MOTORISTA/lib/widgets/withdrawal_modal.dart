@@ -240,16 +240,16 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       label: 'MCX Express',
                       sublabel: 'Receba em minutos',
                       icon: Icons.flash_on_rounded,
-                      isSelected: _method == 'mcx_express',
-                      onTap: inputsLocked
-                          ? null
-                          : () {
-                              setState(() {
-                                _method = 'mcx_express';
-                                _ibanCtrl.clear();
-                              });
-                              _resetQuote();
-                            },
+                      isSelected: false,
+                      disabled: true,
+                      // Backend ainda não suporta saque por MCX Express
+                      // (só aceita IBAN) — ver BACKEND_PENDING_CHANGES.md.
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Saque por Multicaixa Express em desenvolvimento. Por agora, use o saque por IBAN.'),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -421,6 +421,7 @@ class _MethodOption extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback? onTap;
+  final bool disabled;
 
   const _MethodOption({
     required this.label,
@@ -428,50 +429,54 @@ class _MethodOption extends StatelessWidget {
     required this.icon,
     required this.isSelected,
     required this.onTap,
+    this.disabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryGold.withValues(alpha: 0.15)
-              : Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryGold : Colors.white.withValues(alpha: 0.15),
-            width: isSelected ? 2 : 1,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primaryGold.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: isSelected ? AppColors.primaryGold : Colors.white.withValues(alpha: 0.15),
+              width: isSelected ? 2 : 1,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? AppColors.primaryGold
-                  : AppColors.textLight.withValues(alpha: 0.6),
-              size: 22,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.primaryGold : AppColors.textLight,
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? AppColors.primaryGold
+                    : AppColors.textLight.withValues(alpha: 0.6),
+                size: 22,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              sublabel,
-              style: TextStyle(fontSize: 10, color: AppColors.textLight.withValues(alpha: 0.5)),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? AppColors.primaryGold : AppColors.textLight,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                disabled ? 'Em desenvolvimento' : sublabel,
+                style: TextStyle(fontSize: 10, color: AppColors.textLight.withValues(alpha: 0.5)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

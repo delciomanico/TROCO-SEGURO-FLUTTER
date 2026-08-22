@@ -623,6 +623,40 @@ class ApiService {
     }
   }
 
+  /// Resolver um QR de sessão/viagem de outro motorista (ex.: "Meu QR")
+  /// para identificar o utilizador antes de uma transferência directa —
+  /// `GET qrcodes/resolve?token=`, mesmo endpoint usado pelo App
+  /// Passageiro em "Identificar Motorista".
+  Future<ApiResponse<QrResolveResult>> resolveQrToken(String token) async {
+    try {
+      final response = await _dio
+          .get('qrcodes/resolve', queryParameters: {'token': token});
+      return ApiResponse.success(QrResolveResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
+  /// Transferir directamente para um utilizador já identificado por ID
+  /// (ex. outro motorista lido por QR) — `POST wallet/transfer-to-user`,
+  /// que exige o PIN de conta como confirmação extra.
+  Future<ApiResponse<TransactionResult>> transferToUser({
+    required String targetUserId,
+    required int amount,
+    required String pin,
+  }) async {
+    try {
+      final response = await _dio.post('wallet/transfer-to-user', data: {
+        'targetUserId': targetUserId,
+        'amount': amount,
+        'pin': pin,
+      });
+      return ApiResponse.success(TransactionResult.fromJson(response.data));
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
+
   /// Resolver o QR de um cartão virtual (número/dono) a partir do conteúdo lido.
   Future<ApiResponse<VirtualCardQrResult>> resolveVirtualCardQr(
       String qrData) async {
@@ -648,6 +682,19 @@ class ApiService {
   }
 
   // ============ QR CODE ============
+
+  /// Obter o QR Code de identidade do motorista (mesmo endpoint usado pelo
+  /// App Passageiro em "Meu QR") — usado para receber transferências
+  /// directas de outro utilizador, distinto do QR de sessão/viagem.
+  Future<ApiResponse<String>> getMyQrCode() async {
+    try {
+      final response = await _dio.get('qr-code/my-code');
+      return ApiResponse.success(
+          response.data['qrCode'] ?? response.data['image']);
+    } on DioException catch (e) {
+      return ApiResponse.error(_parseError(e));
+    }
+  }
 
   /// Iniciar sessão de viagem e gerar QR Codes (pai + filhos por assento)
   Future<ApiResponse<QrSetupResult>> setupQrSession({
@@ -1477,6 +1524,25 @@ class TransactionResult {
       message: json['message'],
       feeAmount: _toIntOrNull(json['feeAmount']),
       totalDebited: _toIntOrNull(json['totalDebited']),
+    );
+  }
+}
+
+/// Resultado de `GET qrcodes/resolve` — identifica quem gerou o QR
+/// escaneado (ex. outro motorista, via o token do "Meu QR").
+class QrResolveResult {
+  final bool valid;
+  final String? driverId;
+  final String? driverName;
+
+  QrResolveResult({required this.valid, this.driverId, this.driverName});
+
+  factory QrResolveResult.fromJson(Map<String, dynamic> json) {
+    final driver = json['driver'] as Map<String, dynamic>?;
+    return QrResolveResult(
+      valid: json['valid'] ?? false,
+      driverId: driver?['id'] ?? json['driverId'],
+      driverName: driver?['name'] ?? json['driverName'],
     );
   }
 }

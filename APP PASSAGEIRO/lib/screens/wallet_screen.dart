@@ -1897,12 +1897,14 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     label: 'MCX Express',
                     sublabel: 'Receba em minutos',
                     icon: Icons.flash_on_rounded,
-                    isSelected: _method == 'mcx_express',
+                    isSelected: false,
                     isDark: isDark,
-                    onTap: () => setState(() {
-                      _method = 'mcx_express';
-                      _ibanCtrl.clear();
-                    }),
+                    disabled: true,
+                    // Backend ainda não suporta levantamento por MCX
+                    // Express (só aceita IBAN) — ver BACKEND_PENDING_CHANGES.md.
+                    onTap: () => FeedbackService.showInfo(context,
+                        message:
+                            'Levantamento por Multicaixa Express em desenvolvimento. Por agora, use o levantamento por IBAN.'),
                   ),
                 ),
               ],
@@ -2016,6 +2018,7 @@ class _WithdrawalMethodOption extends StatelessWidget {
   final bool isSelected;
   final bool isDark;
   final VoidCallback onTap;
+  final bool disabled;
 
   const _WithdrawalMethodOption({
     required this.label,
@@ -2024,6 +2027,7 @@ class _WithdrawalMethodOption extends StatelessWidget {
     required this.isSelected,
     required this.isDark,
     required this.onTap,
+    this.disabled = false,
   });
 
   @override
@@ -2035,36 +2039,39 @@ class _WithdrawalMethodOption extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected ? accent.withValues(alpha: 0.12) : unselectedBg,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isSelected ? accent : unselectedBorder,
-            width: isSelected ? 2 : 1,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected ? accent.withValues(alpha: 0.12) : unselectedBg,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: isSelected ? accent : unselectedBorder,
+              width: isSelected ? 2 : 1,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? accent : textColor.withValues(alpha: 0.6), size: 22),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? accent : textColor,
+          child: Column(
+            children: [
+              Icon(icon, color: isSelected ? accent : textColor.withValues(alpha: 0.6), size: 22),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? accent : textColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              sublabel,
-              style: TextStyle(fontSize: 10, color: textColor.withValues(alpha: 0.5)),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                disabled ? 'Em desenvolvimento' : sublabel,
+                style: TextStyle(fontSize: 10, color: textColor.withValues(alpha: 0.5)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

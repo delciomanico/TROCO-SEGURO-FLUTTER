@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
@@ -25,6 +27,7 @@ class _BiScannerModalState extends State<BiScannerModal> {
   late MobileScannerController scannerController;
   final TextEditingController manualController = TextEditingController();
   String? error;
+  String? scanHint;
   bool showManualInput = false;
   bool isScanning = true;
 
@@ -61,10 +64,33 @@ class _BiScannerModalState extends State<BiScannerModal> {
   void _handleBarcodeDetect(BarcodeCapture barcodes) {
     if (!isScanning || barcodes.barcodes.isEmpty) return;
 
-    final qrData = barcodes.barcodes.first.rawValue;
+    final barcode = barcodes.barcodes.first;
+    var qrData = barcode.rawValue;
+
+    // O QR no verso de alguns BI codifica dados binários (não texto) — o
+    // MLKit não preenche rawValue nesse caso, e o scanner ficava a "ler"
+    // indefinidamente sem nunca disparar onScanned. Como último recurso,
+    // enviamos os bytes em bruto (base64) e deixamos o backend validar.
+    if (qrData == null || qrData.isEmpty) {
+      final bytes = switch (barcode.rawDecodedBytes) {
+        DecodedBarcodeBytes(:final bytes) => bytes,
+        DecodedVisionBarcodeBytes(:final bytes, :final rawBytes) =>
+          bytes ?? rawBytes,
+        null => null,
+      };
+      if (bytes != null && bytes.isNotEmpty) {
+        qrData = base64Encode(bytes);
+      }
+    }
+
     if (qrData != null && qrData.isNotEmpty) {
       setState(() => isScanning = false);
       widget.onScanned(qrData);
+    } else if (scanHint == null) {
+      // Barcode detectado mas sem qualquer dado extraível — avisar em vez
+      // de deixar o utilizador a apontar a câmera sem nenhum feedback.
+      setState(() => scanHint =
+          'QR detectado mas ilegível. Aproxime mais e mantenha o BI estável e bem iluminado.');
     }
   }
 
@@ -234,6 +260,31 @@ class _BiScannerModalState extends State<BiScannerModal> {
             ),
           ),
         ),
+        if (scanHint != null)
+          Positioned(
+            top: responsive.scaledHeight(16),
+            left: responsive.scaledWidth(16),
+            right: responsive.scaledWidth(16),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.responsiveSpacing(),
+                vertical: responsive.scaledHeight(10),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Text(
+                scanHint!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: responsive.responsiveFontSize(12),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         Positioned(
           bottom: responsive.scaledHeight(16),
           left: responsive.scaledWidth(16),

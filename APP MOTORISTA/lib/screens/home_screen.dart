@@ -208,6 +208,125 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _formatCurrency(int amount) => '${AppFormatters.currency(amount)} Kz';
 
+  Widget _buildIdentityQrPreview(String qrCode) {
+    final normalized = qrCode.trim();
+
+    if (normalized.startsWith('data:image')) {
+      final base64Data = normalized.split(',').last;
+      try {
+        return Image.memory(base64Decode(base64Data), fit: BoxFit.contain);
+      } catch (_) {
+        return const Icon(Icons.qr_code_2_rounded, size: 140);
+      }
+    }
+
+    if (normalized.startsWith('http')) {
+      return Image.network(
+        normalized,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.qr_code_2_rounded, size: 140),
+      );
+    }
+
+    return SelectableText(normalized, textAlign: TextAlign.center);
+  }
+
+  /// Mostra o QR de identidade do motorista (conta, não sessão/viagem) —
+  /// usado por outro utilizador para o identificar e transferir-lhe saldo
+  /// directamente (ex.: outro motorista, via "Transferir" → ler QR).
+  Future<void> _showMyIdentityQr() async {
+    final response = await _api.getMyQrCode();
+    if (!mounted) return;
+
+    if (!response.isSuccess || response.data == null || response.data!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response.error ?? 'Não foi possível carregar o seu QR Code.'),
+        ),
+      );
+      return;
+    }
+
+    final qrCode = response.data!;
+    final responsive = ResponsiveHelper(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.darkCard,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+          ),
+          padding: EdgeInsets.only(
+            left: responsive.scaledWidth(24),
+            right: responsive.scaledWidth(24),
+            top: responsive.scaledHeight(16),
+            bottom: MediaQuery.of(context).viewInsets.bottom + responsive.scaledHeight(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
+                  ),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(20)),
+              const Text(
+                'Meu QR',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textLight,
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(12)),
+              Container(
+                width: responsive.scaledWidth(240),
+                height: responsive.scaledWidth(240),
+                padding: EdgeInsets.all(responsive.scaledWidth(16)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: Center(child: _buildIdentityQrPreview(qrCode)),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(16)),
+              Text(
+                'Mostre este QR code para outro utilizador identificar a sua conta e transferir-lhe saldo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: responsive.responsiveFontSize(12),
+                  color: Colors.white.withValues(alpha: 0.72),
+                ),
+              ),
+              SizedBox(height: responsive.scaledHeight(20)),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Fechar'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showQRCode() async {
     final qrImage = _qrConfig?.parentQrImage;
 
@@ -837,6 +956,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         (
                           icon: Icons.qr_code_2_rounded,
                           label: 'Meu QR',
+                          onTap: _showMyIdentityQr,
+                        ),
+                        (
+                          icon: Icons.groups_2_rounded,
+                          label: 'QR da Sessão',
                           onTap: widget.isOnline
                               ? () {
                                   if (_isLoadingQr) return;

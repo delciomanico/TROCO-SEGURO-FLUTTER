@@ -392,16 +392,23 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
   final _phoneCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
   String? _error;
   String? _recipientName;
   bool _loading = false;
   bool _verified = false;
+  // Preenchido quando o QR escaneado é o QR de sessão/viagem de outro
+  // motorista ("Meu QR"), em vez do QR de identidade do passageiro (que
+  // traz o telefone em JSON). Nesse caso a transferência usa
+  // wallet/transfer-to-user (por ID + PIN) em vez do fluxo por telefone.
+  String? _driverId;
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
     _amountCtrl.dispose();
     _descCtrl.dispose();
+    _pinCtrl.dispose();
     super.dispose();
   }
 
@@ -423,6 +430,7 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       if (phone != null) {
         setState(() {
           _phoneCtrl.text = _stripCountryCode(phone.toString());
+          _driverId = null;
           _verified = false;
           _recipientName = null;
           _error = null;
@@ -430,7 +438,42 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       } else {
         setState(() => _error = 'QR não contém número de telefone.');
       }
+      return;
     } catch (_) {
+      // Não é o QR de identidade do passageiro — tentar resolver como QR
+      // de sessão/motorista (ex.: "Meu QR" de outro motorista) antes de
+      // desistir.
+    }
+
+    // Extrair o token do payload do QR (query param "token", substring
+    // "token=..." ou o próprio qrData como fallback).
+    String token = '';
+    try {
+      final parsed = Uri.tryParse(qrData);
+      if (parsed != null && parsed.queryParameters.containsKey('token')) {
+        token = parsed.queryParameters['token'] ?? '';
+      }
+    } catch (_) {}
+    if (token.isEmpty && qrData.contains('token=')) {
+      final parts = qrData.split('token=');
+      if (parts.length > 1) token = parts[1];
+    }
+    final tokenParam = token.isNotEmpty ? token : qrData;
+
+    final resolved = await ApiService().resolveQrToken(tokenParam);
+    if (!mounted) return;
+    if (resolved.isSuccess &&
+        resolved.data != null &&
+        resolved.data!.valid &&
+        resolved.data!.driverId != null) {
+      setState(() {
+        _driverId = resolved.data!.driverId;
+        _phoneCtrl.clear();
+        _recipientName = resolved.data!.driverName ?? 'Motorista';
+        _verified = true;
+        _error = null;
+      });
+    } else {
       setState(() => _error = 'QR inválido.');
     }
   }
@@ -469,6 +512,12 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       setState(() => _error = 'Informe um montante válido.');
       return;
     }
+
+    if (_driverId != null) {
+      await _submitToDriver(amount);
+      return;
+    }
+
     setState(() {
       _error = null;
       _loading = true;
@@ -477,6 +526,36 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
       amount: amount,
       receiverPhone: '+244${_phoneCtrl.text.trim()}',
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (result.isSuccess) {
+      Navigator.of(context).pop();
+      _showSuccess(context, title: 'Transferência enviada!', subtitle: 'O valor foi transferido com sucesso.');
+      return;
+    }
+    setState(() {
+      _loading = false;
+      _error = result.error ?? 'Erro ao realizar transferência.';
+    });
+  }
+
+  /// Transferência para outro motorista identificado pelo QR de
+  /// sessão/viagem — usa wallet/transfer-to-user, que exige o PIN de
+  /// conta como confirmação extra (mesmo padrão de PayLoaderModal acima).
+  Future<void> _submitToDriver(int amount) async {
+    final pin = _pinCtrl.text.trim();
+    if (pin.length < 6) {
+      setState(() => _error = 'Informe o PIN da sua conta (6 dígitos).');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+    final result = await ApiService().transferToUser(
+      targetUserId: _driverId!,
+      amount: amount,
+      pin: pin,
     );
     if (!mounted) return;
     if (result.isSuccess) {
@@ -506,18 +585,25 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  enabled: !_verified,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(9),
-                  ],
-                  style: const TextStyle(color: AppColors.textLight),
-                  decoration: _fieldDecoration('Nº de telefone',
-                      hint: '9XX XXX XXX', prefixText: '+244 '),
-                ),
+                child: _driverId != null
+                    ? TextField(
+                        enabled: false,
+                        style: const TextStyle(color: AppColors.textLight),
+                        decoration: _fieldDecoration('Destinatário',
+                            hint: 'Motorista identificado por QR'),
+                      )
+                    : TextField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        enabled: !_verified,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(9),
+                        ],
+                        style: const TextStyle(color: AppColors.textLight),
+                        decoration: _fieldDecoration('Nº de telefone',
+                            hint: '9XX XXX XXX', prefixText: '+244 '),
+                      ),
               ),
               SizedBox(width: responsive.scaledWidth(8)),
               if (!_verified)
@@ -536,6 +622,8 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
                         onPressed: () => setState(() {
                           _verified = false;
                           _recipientName = null;
+                          _driverId = null;
+                          _pinCtrl.clear();
                         }),
                         icon: const Icon(Icons.edit, color: AppColors.primaryGold),
                         tooltip: 'Alterar',
@@ -589,6 +677,19 @@ class _WalletTransferModalState extends State<WalletTransferModal> {
             style: const TextStyle(color: AppColors.textLight),
             decoration: _fieldDecoration('Descrição (opcional)', hint: 'Ex.: devolução de viagem'),
           ),
+          if (_driverId != null) ...[
+            SizedBox(height: responsive.scaledHeight(20)),
+            Text(
+              'PIN da sua conta',
+              style: TextStyle(
+                fontSize: responsive.responsiveFontSize(14),
+                fontWeight: FontWeight.w700,
+                color: AppColors.textLight,
+              ),
+            ),
+            SizedBox(height: responsive.scaledHeight(10)),
+            OtpBoxInput(controller: _pinCtrl, accentColor: AppColors.primaryGold, isDark: true),
+          ],
           SizedBox(height: responsive.scaledHeight(24)),
           SizedBox(
             width: double.infinity,

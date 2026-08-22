@@ -5,7 +5,7 @@ ordenada por prioridade (mais urgente primeiro). Itens já corrigidos e
 confirmados a funcionar foram removidos deste documento — consultar
 `git log -- BACKEND_PENDING_CHANGES.md` para o histórico completo.
 
-**Actualizado em 2026-08-20.**
+**Actualizado em 2026-08-22.**
 
 ---
 
@@ -179,3 +179,97 @@ implementação do lado do backend antes de qualquer mudança na app:
 **No app:** sem alterações possíveis até o contrato acima existir — a UI
 de "ver tarifa" em ambos os apps já está pronta para mostrar valores
 adicionais assim que o backend os expuser.
+
+---
+
+## 7. 🔴 [FRONTEND — App Motorista] Envio de documentos (Carta de Condução) nunca funciona — falta metade do payload que a API exige
+
+**Reportado pelo utilizador:** no App Motorista, ecrã Perfil →
+Documentos, enviar a Carta de Condução (para validar a conta e poder
+efectuar transacções) não funciona. Isto **não é um bug do backend** —
+confirmado ao vivo contra a API de produção com a conta de teste do
+motorista QA que `POST users/upload-docs` exige, numa única submissão,
+muito mais do que a app hoje envia:
+
+- Enviando só `license` (1 ficheiro, o que a app faz hoje) →
+  `400 Bad Request`:
+  ```json
+  {"message":"É obrigatório enviar: Carta frente (license), Carta verso (licenseBack), BI frente (bi), BI verso (biBack) e Selfie (selfie)."}
+  ```
+- Enviando os 5 ficheiros mas sem os números → `400 Bad Request`:
+  ```json
+  {"message":"Os campos biNumber e licenseNumber são obrigatórios."}
+  ```
+- Enviando os 5 ficheiros (`license`, `licenseBack`, `bi`, `biBack`,
+  `selfie`) **e** os 2 campos de texto (`biNumber`, `licenseNumber`) na
+  mesma submissão → `200 OK`, "Documentos enviados com sucesso. Aguarde
+  aprovação."
+
+**Contrato real de `POST users/upload-docs` (multipart/form-data):**
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `license` | ficheiro | Carta de Condução — frente |
+| `licenseBack` | ficheiro | Carta de Condução — verso |
+| `bi` | ficheiro | Bilhete de Identidade — frente |
+| `biBack` | ficheiro | Bilhete de Identidade — verso |
+| `selfie` | ficheiro | Selfie do motorista |
+| `licenseNumber` | texto | Número da Carta de Condução |
+| `biNumber` | texto | Número do Bilhete de Identidade |
+
+Todos os 7 campos são obrigatórios na mesma submissão — não há envio
+parcial/incremental.
+
+**Gap na app hoje:** o ecrã "Documentos"
+(`APP MOTORISTA/lib/main.dart`, `_showDocumentsSheet`/`_uploadLicense`)
+só tira 1 foto (a carta, frente) e chama
+`ApiService.uploadDocuments(license: ...)`, que só suporta os
+parâmetros `license` e `bi` — faltam `licenseBack`, `biBack`, `selfie`,
+`licenseNumber` e `biNumber` inteiramente. Por isto o envio falha
+sempre com 400, para qualquer motorista, sem excepção. O caminho de
+verificação automática do BI por QR (`verifyBiQr`, ver item mais
+recente no histórico deste ficheiro) é um atalho separado e continua a
+funcionar — só cobre o BI, não a Carta de Condução.
+
+**Decisão do utilizador (2026-08-21): deixar pendente.** Requer
+reconstruir o ecrã "Documentos" como um assistente de vários passos (5
+fotos + 2 números, submetidos juntos) — âmbito maior do que uma
+correcção pontual. Não implementado nesta ronda.
+
+---
+
+## 8. 🔴 `POST transactions/withdraw` rejeita sempre o levantamento via Multicaixa Express — só aceita IBAN real
+
+**Reportado pelo utilizador:** no APP PASSAGEIRO, o levantamento por
+Multicaixa Express nunca é aceite, só o levantamento por IBAN. Confirmado
+ao vivo contra a API de produção com a conta de teste do passageiro QA
+(o mesmo endpoint e o mesmo payload são usados por ambos os apps, o bug
+não é específico do passageiro):
+
+- Levantamento com um IBAN de exemplo mal formado →
+  `400 Bad Request`: `"IBAN angolano inválido (formato ou dígito de
+  verificação incorrecto). Exemplo electrónico: AO060040000012345678901
+  23"`.
+- Levantamento com o método "MCX Express" seleccionado, enviando o
+  número de telefone (`+244900000011`) no mesmo campo `iban` (é assim
+  que ambos os apps implementam este método — não há campo separado) →
+  **exactamente o mesmo erro** de IBAN inválido.
+
+Ou seja, `transactions/withdraw` valida `iban` estritamente como um
+IBAN angolano real em todos os casos — não existe, hoje, nenhuma forma
+de o cliente accionar um levantamento por Multicaixa Express com
+sucesso.
+
+**Implementar:** ou (a) `transactions/withdraw` aceitar um campo
+`method`/`type` (`bank` vs `mcx_express`) e, quando for `mcx_express`,
+validar `iban` como número de telefone em vez de IBAN; ou (b) expor um
+endpoint/parâmetro dedicado para levantamento por Multicaixa Express.
+
+**No app (2026-08-22):** como o levantamento por MCX Express nunca
+completa com sucesso, a opção passou de seleccionável para desactivada
+e marcada "Em desenvolvimento" em ambos os apps
+(`APP PASSAGEIRO/lib/screens/wallet_screen.dart`, `_WithdrawalMethodOption`
+e `APP MOTORISTA/lib/widgets/withdrawal_modal.dart`, `_MethodOption`) —
+toca-se na opção e aparece um aviso a dizer para usar o levantamento por
+IBAN por agora, em vez de deixar o utilizador tentar e receber o erro
+confuso de "IBAN inválido". A lógica de envio por `+244...` fica no
+código, pronta a reactivar-se assim que o contrato acima existir.
