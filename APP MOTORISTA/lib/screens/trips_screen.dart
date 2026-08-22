@@ -338,13 +338,18 @@ class _TripsScreenState extends State<TripsScreen> {
 
   Widget _buildStatsRow(ResponsiveHelper responsive, bool isDark) {
     final total = _statInt(_stats?['total'] ?? _stats?['totalTrips']);
-    // Campo real confirmado ao vivo em GET trips/stats: `monthSpent`
-    // (string decimal) — os nomes antigos nunca bateram certo com a
-    // resposta real, por isso "recebido" ficava sempre em 0 Kz.
-    final earned = _statInt(_stats?['monthSpent'] ??
-        _stats?['totalEarned'] ??
-        _stats?['earned'] ??
-        _stats?['revenue']);
+    // `monthSpent` em GET trips/stats é, pelo nome, o valor GASTO por um
+    // passageiro — não o valor RECEBIDO por um motorista. Para o motorista
+    // este campo fica sempre a 0/errado, por isso "recebido" nunca
+    // aparecia. Somamos antes o valor das próprias viagens já carregadas
+    // (mesma abordagem já usada em Earnings.fromTrips na tela inicial),
+    // com o campo antigo só como recurso se ainda não houver viagens.
+    final earned = trips.isNotEmpty
+        ? trips.fold<int>(0, (sum, t) => sum + t.amount)
+        : _statInt(_stats?['monthSpent'] ??
+            _stats?['totalEarned'] ??
+            _stats?['earned'] ??
+            _stats?['revenue']);
     final fmt = NumberFormat('#,##0', 'pt_AO');
     return Padding(
       padding: EdgeInsets.fromLTRB(

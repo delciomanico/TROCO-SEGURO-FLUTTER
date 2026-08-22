@@ -1541,7 +1541,14 @@ class _QrBalanceSheetState extends State<_QrBalanceSheet> {
     String qrId = widget.qrData;
     try {
       final decoded = jsonDecode(widget.qrData);
-      qrId = decoded['qrId'] ?? decoded['id'] ?? decoded['cardId'] ?? widget.qrData;
+      // O QR real de um cartão virtual (`VIRTUAL_CARD_TRANSFER`) só traz
+      // `cardNumber` — não `qrId`/`id`/`cardId`, apesar do nome do campo
+      // (ver o mesmo ajuste em CardBalanceModal no App Motorista).
+      qrId = decoded['cardNumber'] ??
+          decoded['qrId'] ??
+          decoded['id'] ??
+          decoded['cardId'] ??
+          widget.qrData;
     } catch (_) {}
 
     final result = await ApiService().getWalletBalanceByQr(qrId);
@@ -1795,6 +1802,12 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
   String _method = 'bank';
 
   @override
+  void initState() {
+    super.initState();
+    _ibanCtrl.text = 'AO06';
+  }
+
+  @override
   void dispose() {
     _amountCtrl.dispose();
     _ibanCtrl.dispose();
@@ -1887,7 +1900,7 @@ class _WithdrawalSheetState extends State<_WithdrawalSheet> {
                     isDark: isDark,
                     onTap: () => setState(() {
                       _method = 'bank';
-                      _ibanCtrl.clear();
+                      _ibanCtrl.text = 'AO06';
                     }),
                   ),
                 ),
