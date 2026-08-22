@@ -145,7 +145,9 @@ class _AppControllerState extends State<AppController>
         final didAuth = await auth.authenticate(
           localizedReason: 'Desbloqueie Troco Seguro',
           options: const AuthenticationOptions(
-            biometricOnly: true,
+            // biometricOnly: false permite fallback para PIN/padrão do
+            // dispositivo, igual ao App Motorista.
+            biometricOnly: false,
             useErrorDialogs: true,
           ),
         );
@@ -1091,6 +1093,29 @@ class _SecurityModalState extends State<_SecurityModal> {
     final prefs = await SharedPreferences.getInstance();
     if (enable) {
       try {
+        final auth = LocalAuthentication();
+        final isSupported = await auth.isDeviceSupported();
+        if (!isSupported) {
+          if (mounted) {
+            FeedbackService.showError(context,
+                message: 'Este dispositivo não suporta autenticação biométrica.');
+          }
+          return;
+        }
+
+        // Verificar se há biometria inscrita — sem isto, o pedido de
+        // autenticação abaixo falhava em silêncio e a biometria nunca
+        // chegava a activar-se (nem o botão de reautenticação aparecia).
+        final available = await auth.getAvailableBiometrics();
+        if (available.isEmpty) {
+          if (mounted) {
+            FeedbackService.showError(context,
+                message:
+                    'Nenhuma biometria registada. Configure a impressão digital ou Face ID nas definições do dispositivo.');
+          }
+          return;
+        }
+
         final ok = await _bio$.authenticate(
           reason: 'Confirme para ativar a biometria',
           useErrorDialogs: true,
@@ -1103,6 +1128,24 @@ class _SecurityModalState extends State<_SecurityModal> {
         await prefs.setBool('ts_bio_enabled', true);
         if (mounted) setState(() => _bio = true);
         if (mounted) FeedbackService.showSuccess(context, message: 'Biometria ativada');
+      } on PlatformException catch (e) {
+        String msg;
+        switch (e.code) {
+          case 'NotEnrolled':
+            msg = 'Nenhuma biometria registada. Configure nas definições do dispositivo.';
+            break;
+          case 'NotAvailable':
+          case 'OtherOperatingSystem':
+            msg = 'Biometria não disponível neste dispositivo.';
+            break;
+          case 'LockedOut':
+          case 'PermanentlyLockedOut':
+            msg = 'Biometria bloqueada por demasiadas tentativas. Desbloqueie nas definições.';
+            break;
+          default:
+            msg = 'Erro ao activar biometria: ${e.message ?? e.code}';
+        }
+        if (mounted) FeedbackService.showError(context, message: msg);
       } catch (_) {
         if (mounted) FeedbackService.showError(context, message: 'Biometria indisponível');
       }
