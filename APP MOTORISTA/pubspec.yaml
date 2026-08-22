@@ -1,7 +1,7 @@
 name: 'troco_seguro_pro'
 description: Aplicativo do Motorista - Troco Seguro - Pagamento digital para táxis em Luanda, Angola
 publish_to: 'none'
-version: 1.0.6+1
+version: 1.0.7+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
