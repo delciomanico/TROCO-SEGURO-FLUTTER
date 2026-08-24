@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:troco_seguro/utils/constants.dart';
 import 'package:troco_seguro/utils/responsive_helper.dart';
 import 'package:troco_seguro/widgets/custom_widgets.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 
 /// Modal de avaliação pós-pagamento
 class RatingModal extends StatefulWidget {
@@ -53,9 +54,8 @@ class _RatingModalState extends State<RatingModal> {
 
   Future<void> _submitRating() async {
     if (_selectedRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, selecione uma avaliação')),
-      );
+      FeedbackService.showError(context,
+          message: 'Por favor, selecione uma avaliação');
       return;
     }
 
@@ -72,21 +72,17 @@ class _RatingModalState extends State<RatingModal> {
 
       if (success) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avaliação enviada com sucesso!')),
-        );
+        FeedbackService.showSuccess(context,
+            message: 'Avaliação enviada com sucesso!');
       } else {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao enviar avaliação. Tente novamente.')),
-        );
+        FeedbackService.showError(context,
+            message: 'Erro ao enviar avaliação. Tente novamente.');
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e')),
-      );
+      FeedbackService.showError(context, message: 'Erro: $e');
     }
   }
 

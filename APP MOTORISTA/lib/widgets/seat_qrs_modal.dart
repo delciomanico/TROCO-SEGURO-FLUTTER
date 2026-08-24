@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 
 /// Modal completo de gestão dos QR Codes dos assentos individuais.
 /// Permite visualizar, baixar e partilhar o QR de cada assento.
@@ -188,9 +189,7 @@ class _SeatQrsModalState extends State<SeatQrsModal> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red),
-    );
+    FeedbackService.showError(context, message: msg);
   }
 
   @override

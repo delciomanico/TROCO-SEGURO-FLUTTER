@@ -4,6 +4,7 @@ import 'package:troco_seguro_pro/models/qr_config.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:intl/intl.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 
 class QrConfigModal extends StatefulWidget {
   final QrConfig currentConfig;
@@ -63,9 +64,8 @@ class _QrConfigModalState extends State<QrConfigModal> {
   Future<void> _saveConfig() async {
     final fare = int.tryParse(_fareController.text) ?? 0;
     if (fare <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Defina um valor maior que 0 Kz.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Defina um valor maior que 0 Kz.');
       return;
     }
 
@@ -84,9 +84,7 @@ class _QrConfigModalState extends State<QrConfigModal> {
     if (error == null) {
       Navigator.pop(context, newConfig);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
-      );
+      FeedbackService.showError(context, message: error);
     }
   }
 

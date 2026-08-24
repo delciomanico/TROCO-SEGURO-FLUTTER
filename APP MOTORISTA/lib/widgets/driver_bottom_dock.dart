@@ -8,6 +8,7 @@ import 'package:troco_seguro_pro/screens/trips_screen.dart';
 import 'package:troco_seguro_pro/screens/wallet_screen.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 
 enum DriverDockTab {
   home,
@@ -56,10 +57,8 @@ class DriverBottomDock extends StatelessWidget {
     final d = await _getDriverFallback();
     if (!context.mounted) return;
     if (d == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Não foi possível carregar dados do motorista.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Não foi possível carregar dados do motorista.');
       return;
     }
     Navigator.pushReplacement(
@@ -99,10 +98,8 @@ class DriverBottomDock extends StatelessWidget {
     final d = await _getDriverFallback();
     if (!context.mounted) return;
     if (d == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Não foi possível carregar dados do motorista.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Não foi possível carregar dados do motorista.');
       return;
     }
     // Profile screen was removed, go home instead or show drawer

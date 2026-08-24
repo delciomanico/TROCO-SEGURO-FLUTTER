@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/widgets/custom_widgets.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 
 /// Modal de avaliação do passageiro, mostrado ao motorista após um pagamento
 /// concluído com sucesso (Fluxo 2).
@@ -56,9 +57,8 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
 
   Future<void> _submitRating() async {
     if (_selectedRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, selecione uma avaliação')),
-      );
+      FeedbackService.showError(context,
+          message: 'Por favor, selecione uma avaliação');
       return;
     }
 
@@ -82,21 +82,16 @@ class _PassengerRatingModalState extends State<PassengerRatingModal> {
 
     if (!mounted) return;
 
-    // Captura o ScaffoldMessenger antes de fechar o modal — chamá-lo depois
-    // do pop arrisca apanhar o contexto já removido da árvore.
-    final messenger = ScaffoldMessenger.of(context);
-
+    // Mostrar o feedback antes de fechar o modal — chamá-lo depois do pop
+    // arrisca apanhar o contexto já removido da árvore.
     if (success) {
+      FeedbackService.showSuccess(context,
+          message: 'Avaliação enviada com sucesso!');
       Navigator.pop(context);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Avaliação enviada com sucesso!')),
-      );
     } else {
       setState(() => _isSubmitting = false);
-      messenger.showSnackBar(
-        const SnackBar(
-            content: Text('Erro ao enviar avaliação. Tente novamente.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Erro ao enviar avaliação. Tente novamente.');
     }
   }
 

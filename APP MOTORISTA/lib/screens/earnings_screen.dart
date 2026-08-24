@@ -5,6 +5,7 @@ import 'package:troco_seguro_pro/utils/constants.dart';
 import 'package:troco_seguro_pro/utils/responsive_helper.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
 import 'package:troco_seguro_pro/widgets/driver_bottom_dock.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 import 'package:intl/intl.dart';
 
 class EarningsScreen extends StatefulWidget {
@@ -82,13 +83,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
         isLoading = false;
       });
       if (mounted && result.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar ganhos: ${result.error}'),
-            backgroundColor: Colors.red.shade700,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        FeedbackService.showError(context,
+            message: 'Erro ao carregar ganhos: ${result.error}');
       }
     }
   }

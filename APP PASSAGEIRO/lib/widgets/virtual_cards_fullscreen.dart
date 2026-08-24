@@ -154,9 +154,8 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     // Limpar _createdCard para evitar inconsistências de estado
     setState(() => _createdCard = null);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cartão "${card.name}" removido.')),
-    );
+    FeedbackService.showSuccess(context,
+        message: 'Cartão "${card.name}" removido.');
   }
 
   Future<Uint8List?> _captureCardImage(GlobalKey previewKey) async {
@@ -176,10 +175,8 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     final bytes = await _captureCardImage(previewKey);
     if (bytes == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Não foi possível gerar a imagem do cartão.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Não foi possível gerar a imagem do cartão.');
       return;
     }
 
@@ -198,10 +195,8 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     final bytes = await _captureCardImage(previewKey);
     if (bytes == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Não foi possível guardar a imagem do cartão.')),
-      );
+      FeedbackService.showError(context,
+          message: 'Não foi possível guardar a imagem do cartão.');
       return;
     }
 
@@ -214,15 +209,11 @@ class _VirtualCardsFullscreenState extends State<VirtualCardsFullscreen>
     if (result.cancelled) return;
 
     if (result.path != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cartão guardado em: ${result.path}')),
-      );
+      FeedbackService.showSuccess(context,
+          message: 'Cartão guardado em: ${result.path}');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Não foi possível guardar o cartão.'),
-        ),
-      );
+      FeedbackService.showError(context,
+          message: result.error ?? 'Não foi possível guardar o cartão.');
     }
   }
 

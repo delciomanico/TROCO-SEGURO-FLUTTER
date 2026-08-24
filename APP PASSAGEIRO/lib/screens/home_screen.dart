@@ -298,10 +298,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Erro ao activar emergência. Tente novamente.'),
-        backgroundColor: Colors.red,
-      ));
+      FeedbackService.showError(context,
+          message: 'Erro ao activar emergência. Tente novamente.');
       return;
     }
 
@@ -786,9 +784,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Recarga indisponível no momento.')),
-    );
+    FeedbackService.showInfo(context,
+        message: 'Recarga indisponível no momento.');
   }
 
   Widget _buildQrCodePreview(String qrCode) {
@@ -832,13 +829,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!response.isSuccess ||
         response.data == null ||
         response.data!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            response.error ?? 'Não foi possível carregar o seu QR Code.',
-          ),
-        ),
-      );
+      FeedbackService.showError(context,
+          message:
+              response.error ?? 'Não foi possível carregar o seu QR Code.');
       return;
     }
 

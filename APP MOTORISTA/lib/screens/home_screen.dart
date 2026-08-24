@@ -16,6 +16,7 @@ import 'package:troco_seguro_pro/screens/vehicles_screen.dart';
 import 'package:troco_seguro_pro/screens/seats_grid_screen.dart';
 import 'package:troco_seguro_pro/utils/formatters.dart';
 import 'package:troco_seguro_pro/utils/error_messages.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final DriverUser driver;
@@ -240,11 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     if (!response.isSuccess || response.data == null || response.data!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(response.error ?? 'Não foi possível carregar o seu QR Code.'),
-        ),
-      );
+      FeedbackService.showError(context,
+          message:
+              response.error ?? 'Não foi possível carregar o seu QR Code.');
       return;
     }
 
@@ -333,16 +332,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // Sem sessão activa — redirigir para configuração
     if (!_hasActiveSession || qrImage == null || qrImage.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              !_hasActiveSession && qrImage != null && qrImage.isNotEmpty
-                  ? 'Sessão expirada. Defina um novo preço para iniciar.'
-                  : 'Configure o preço para iniciar uma sessão.',
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        FeedbackService.showInfo(context,
+            message:
+                !_hasActiveSession && qrImage != null && qrImage.isNotEmpty
+                    ? 'Sessão expirada. Defina um novo preço para iniciar.'
+                    : 'Configure o preço para iniciar uma sessão.',
+            duration: const Duration(seconds: 2));
       }
       _showQRConfig();
       return;
@@ -371,10 +366,8 @@ class _HomeScreenState extends State<HomeScreen> {
           );
           if (!setupResult.isSuccess || setupResult.data == null) {
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(setupResult.error ?? 'Erro ao actualizar valor'),
-                backgroundColor: Colors.red,
-              ));
+              FeedbackService.showError(context,
+                  message: setupResult.error ?? 'Erro ao actualizar valor');
             }
             return false;
           }
@@ -438,20 +431,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (qrJson == null || qrJson['type'] != 'VIRTUAL_CARD_TRANSFER') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'QR inválido. Peça ao passageiro para mostrar o QR do cartão virtual.'),
-        backgroundColor: Colors.red,
-      ));
+      FeedbackService.showError(context,
+          message:
+              'QR inválido. Peça ao passageiro para mostrar o QR do cartão virtual.');
       return;
     }
 
     final pricePerSeat = _qrConfig?.currentFare ?? 0;
     if (!_hasActiveSession || pricePerSeat <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Defina o preço e inicie uma sessão de viagem antes de cobrar.'),
-        backgroundColor: Colors.orange,
-      ));
+      FeedbackService.showInfo(context,
+          message:
+              'Defina o preço e inicie uma sessão de viagem antes de cobrar.');
       return;
     }
 
@@ -1119,26 +1109,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _seatStatuses = null;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Sessão iniciada — ${_formatCurrency(fare)} por assento. '
-                    '${setup.childQrs.length} QR${setup.childQrs.length != 1 ? "s" : ""} gerados.',
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.adaptiveAccent(context),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-          ),
-        );
+        FeedbackService.showSuccess(context,
+            message: 'Sessão iniciada — ${_formatCurrency(fare)} por assento. '
+                '${setup.childQrs.length} QR${setup.childQrs.length != 1 ? "s" : ""} gerados.');
 
         return null; // sucesso
       },
@@ -1500,19 +1473,11 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _qrConfig = cleared);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sessão encerrada com sucesso.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      FeedbackService.showSuccess(context,
+          message: 'Sessão encerrada com sucesso.');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Erro ao encerrar sessão.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      FeedbackService.showError(context,
+          message: result.error ?? 'Erro ao encerrar sessão.');
     }
   }
 

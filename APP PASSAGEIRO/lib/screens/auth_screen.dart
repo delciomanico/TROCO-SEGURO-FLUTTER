@@ -6,6 +6,7 @@ import 'package:troco_seguro/services/api_service.dart';
 import 'package:troco_seguro/models/user.dart';
 import 'package:troco_seguro/widgets/otp_box_input.dart';
 import 'package:troco_seguro/widgets/fixed_country_code_badge.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 
 enum AuthMode { choice, login, register, otp }
 
@@ -173,9 +174,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } else {
       setState(() => errorMessage = null);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Código reenviado via SMS')),
-        );
+        FeedbackService.showInfo(context, message: 'Código reenviado via SMS');
       }
     }
   }
@@ -979,10 +978,8 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
     if (res.isSuccess) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Senha redefinida com sucesso. Faça login.'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-        ));
+        FeedbackService.showSuccess(context,
+            message: 'Senha redefinida com sucesso. Faça login.');
       }
     } else {
       _err(res.error ?? 'Erro ao redefinir senha');
@@ -991,10 +988,7 @@ class _PasswordRecoveryModalState extends State<_PasswordRecoveryModal> {
 
   void _err(String msg) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red.shade700,
-      ));
+      FeedbackService.showError(context, message: msg);
     }
   }
 

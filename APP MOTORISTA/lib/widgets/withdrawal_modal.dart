@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 
 /// Modal de solicitação de saque — visual e estrutura alinhados com o
@@ -244,12 +245,9 @@ class _WithdrawalModalState extends State<WithdrawalModal> {
                       disabled: true,
                       // Backend ainda não suporta saque por MCX Express
                       // (só aceita IBAN) — ver BACKEND_PENDING_CHANGES.md.
-                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
+                      onTap: () => FeedbackService.showInfo(context,
+                          message:
                               'Saque por Multicaixa Express em desenvolvimento. Por agora, use o saque por IBAN.'),
-                        ),
-                      ),
                     ),
                   ),
                 ],

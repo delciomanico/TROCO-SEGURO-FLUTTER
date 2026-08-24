@@ -8,6 +8,7 @@ import 'package:troco_seguro/providers/app_provider.dart';
 import 'package:troco_seguro/security/pin_guard.dart';
 import 'package:troco_seguro/services/secure_storage_service.dart';
 import 'package:troco_seguro/services/api_service.dart';
+import 'package:troco_seguro/services/feedback_service.dart';
 import 'dart:convert';
 
 class TransferModal extends StatefulWidget {
@@ -190,12 +191,8 @@ class _TransferModalState extends State<TransferModal> {
 
       if (result != null) {
         widget.onClose();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transferência realizada com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        FeedbackService.showSuccess(context,
+            message: 'Transferência realizada com sucesso!');
       } else {
         setState(() => error = appProvider.error ?? 'Erro ao realizar transferência');
       }

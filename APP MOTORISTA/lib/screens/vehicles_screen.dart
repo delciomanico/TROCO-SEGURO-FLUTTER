@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:troco_seguro_pro/models/vehicle.dart';
 import 'package:troco_seguro_pro/services/api_service.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 import 'package:troco_seguro_pro/utils/constants.dart';
 
 /// Números de lugares seleccionáveis ao registar/editar um veículo — de
@@ -78,9 +79,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         if (result.isSuccess) {
           _loadVehicles();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result.error ?? 'Erro ao apagar veículo')),
-          );
+          FeedbackService.showError(context,
+              message: result.error ?? 'Erro ao apagar veículo');
         }
       }
     }
@@ -300,16 +300,12 @@ class _AddVehicleModalState extends State<_AddVehicleModal> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (response.isSuccess) {
+        FeedbackService.showSuccess(context,
+            message: 'Veículo registado com sucesso!');
         Navigator.of(context).pop(true); // Retorna sucesso
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Veículo registado com sucesso!'),
-              backgroundColor: Colors.green),
-        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.error ?? 'Erro ao registar veículo')),
-        );
+        FeedbackService.showError(context,
+            message: response.error ?? 'Erro ao registar veículo');
       }
     }
   }
@@ -484,17 +480,12 @@ class _EditVehicleModalState extends State<_EditVehicleModal> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (response.isSuccess) {
+        FeedbackService.showSuccess(context,
+            message: 'Veículo atualizado com sucesso!');
         Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veículo atualizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.error ?? 'Erro ao atualizar veículo')),
-        );
+        FeedbackService.showError(context,
+            message: response.error ?? 'Erro ao atualizar veículo');
       }
     }
   }

@@ -26,6 +26,7 @@ import 'package:troco_seguro_pro/screens/terms_and_conditions_screen.dart';
 import 'package:troco_seguro_pro/widgets/withdrawal_modal.dart';
 import 'package:troco_seguro_pro/widgets/success_modal.dart';
 import 'package:troco_seguro_pro/widgets/bi_scanner_modal.dart';
+import 'package:troco_seguro_pro/services/feedback_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -410,9 +411,8 @@ class _AppControllerState extends State<AppController>
         // O backend recusou — reverter para não deixar a app a afirmar
         // "online" enquanto os pagamentos continuariam a ser recusados.
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result.error ?? 'Não foi possível ficar online.'),
-        ));
+        FeedbackService.showError(context,
+            message: result.error ?? 'Não foi possível ficar online.');
         await prefs.remove('ts_active_vehicle_id');
         await prefs.setBool('ts_driver_online', false);
         setState(() {
@@ -433,9 +433,8 @@ class _AppControllerState extends State<AppController>
       final result = await _api.updateDriverStatus(isOnline: false);
       if (!result.isSuccess) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result.error ?? 'Não foi possível ficar offline.'),
-        ));
+        FeedbackService.showError(context,
+            message: result.error ?? 'Não foi possível ficar offline.');
         if (previousVehicleId != null) {
           await prefs.setString('ts_active_vehicle_id', previousVehicleId);
         }
@@ -579,21 +578,17 @@ class _AppControllerState extends State<AppController>
           Navigator.pop(scannerCtx);
           final result = await ApiService().verifyBiQr(qrData);
           if (!mounted) return;
-          final messenger = ScaffoldMessenger.of(context);
           if (result.isSuccess) {
             final verifiedName = result.data?['fullName']?.toString() ??
                 result.data?['name']?.toString();
             await _markIdentityVerified(verifiedName);
-            messenger.showSnackBar(const SnackBar(
-              content: Text('Identidade verificada com sucesso!'),
-              backgroundColor: Colors.green,
-            ));
+            if (!mounted) return;
+            FeedbackService.showSuccess(context,
+                message: 'Identidade verificada com sucesso!');
           } else {
-            messenger.showSnackBar(SnackBar(
-              content: Text(result.error ??
-                  'Não foi possível verificar o BI. Tente novamente.'),
-              backgroundColor: Colors.red,
-            ));
+            FeedbackService.showError(context,
+                message: result.error ??
+                    'Não foi possível verificar o BI. Tente novamente.');
           }
         },
       ),
@@ -1659,23 +1654,18 @@ class _ProfileModal extends StatelessWidget {
     );
     if (photo == null || !context.mounted) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final result =
         await ApiService().uploadDocuments(license: File(photo.path));
+    if (!context.mounted) return;
 
     if (result.isSuccess) {
+      FeedbackService.showSuccess(context,
+          message: 'Carta de condução enviada com sucesso!');
       navigator.pop(); // fecha a sheet de Documentos
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Carta de condução enviada com sucesso!'),
-        backgroundColor: Colors.green,
-      ));
     } else {
-      messenger.showSnackBar(SnackBar(
-        content: Text(
-            result.error ?? 'Não foi possível enviar a carta de condução.'),
-        backgroundColor: Colors.red,
-      ));
+      FeedbackService.showError(context,
+          message: result.error ?? 'Não foi possível enviar a carta de condução.');
     }
   }
 
@@ -1693,23 +1683,18 @@ class _ProfileModal extends StatelessWidget {
           Navigator.pop(scannerCtx); // fecha o scanner
           final result = await ApiService().verifyBiQr(qrData);
           if (!context.mounted) return;
-          final messenger = ScaffoldMessenger.of(context);
 
           if (result.isSuccess) {
             final verifiedName = result.data?['fullName']?.toString() ??
                 result.data?['name']?.toString();
             onIdentityVerified?.call(verifiedName);
+            FeedbackService.showSuccess(context,
+                message: 'Identidade verificada com sucesso!');
             Navigator.of(context).pop(); // fecha a sheet de Documentos
-            messenger.showSnackBar(const SnackBar(
-              content: Text('Identidade verificada com sucesso!'),
-              backgroundColor: Colors.green,
-            ));
           } else {
-            messenger.showSnackBar(SnackBar(
-              content: Text(result.error ??
-                  'Não foi possível verificar o BI. Tente novamente.'),
-              backgroundColor: Colors.red,
-            ));
+            FeedbackService.showError(context,
+                message: result.error ??
+                    'Não foi possível verificar o BI. Tente novamente.');
           }
         },
       ),
@@ -2144,9 +2129,8 @@ class _SecurityModalState extends State<_SecurityModal> {
         final isSupported = await auth.isDeviceSupported();
         if (!isSupported) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Este dispositivo não suporta autenticação biométrica.')),
-            );
+            FeedbackService.showError(context,
+                message: 'Este dispositivo não suporta autenticação biométrica.');
           }
           return;
         }
@@ -2156,12 +2140,10 @@ class _SecurityModalState extends State<_SecurityModal> {
         debugPrint('Biometrias disponíveis: $available');
         if (available.isEmpty) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Nenhuma biometria registada. Configure a impressão digital ou Face ID nas definições do dispositivo.'),
-                duration: Duration(seconds: 4),
-              ),
-            );
+            FeedbackService.showError(context,
+                message:
+                    'Nenhuma biometria registada. Configure a impressão digital ou Face ID nas definições do dispositivo.',
+                duration: const Duration(seconds: 4));
           }
           return;
         }
@@ -2177,21 +2159,15 @@ class _SecurityModalState extends State<_SecurityModal> {
         );
         if (!ok) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Autenticação cancelada.')),
-            );
+            FeedbackService.showInfo(context, message: 'Autenticação cancelada.');
           }
           return;
         }
         await prefs.setBool('ts_bio_enabled', true);
         if (mounted) setState(() => _bio = true);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Biometria ativada com sucesso.'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          FeedbackService.showSuccess(context,
+              message: 'Biometria ativada com sucesso.');
         }
       } on PlatformException catch (e) {
         debugPrint('Biometria erro: code=${e.code} msg=${e.message}');
@@ -2212,25 +2188,20 @@ class _SecurityModalState extends State<_SecurityModal> {
             msg = 'Erro ao activar biometria: ${e.message ?? e.code}';
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 4)),
-          );
+          FeedbackService.showError(context,
+              message: msg, duration: const Duration(seconds: 4));
         }
       } catch (e) {
         debugPrint('Biometria erro inesperado: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro inesperado: $e')),
-          );
+          FeedbackService.showError(context, message: 'Erro inesperado: $e');
         }
       }
     } else {
       await prefs.setBool('ts_bio_enabled', false);
       if (mounted) setState(() => _bio = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Biometria desactivada.')),
-        );
+        FeedbackService.showInfo(context, message: 'Biometria desactivada.');
       }
     }
   }
@@ -2309,17 +2280,13 @@ class _SecurityModalState extends State<_SecurityModal> {
                             final nw = newCtrl.text.trim();
                             final cf = cfmCtrl.text.trim();
                             if (!RegExp(r'^\d{6}$').hasMatch(nw)) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('PIN deve ter 6 dígitos')),
-                              );
+                              FeedbackService.showError(context,
+                                  message: 'PIN deve ter 6 dígitos');
                               return;
                             }
                             if (nw != cf) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('PINs não coincidem')),
-                              );
+                              FeedbackService.showError(context,
+                                  message: 'PINs não coincidem');
                               return;
                             }
                             setSheet(() => busy = true);
@@ -2328,10 +2295,8 @@ class _SecurityModalState extends State<_SecurityModal> {
                             if (savedPin != cur) {
                               setSheet(() => busy = false);
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('PIN actual incorreto')),
-                                );
+                                FeedbackService.showError(context,
+                                    message: 'PIN actual incorreto');
                               }
                               return;
                             }
@@ -2344,12 +2309,11 @@ class _SecurityModalState extends State<_SecurityModal> {
                             }
                             await sec.savePin(nw);
                             setSheet(() => busy = false);
-                            if (ctx.mounted) Navigator.pop(ctx);
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('PIN alterado')),
-                              );
+                              FeedbackService.showSuccess(context,
+                                  message: 'PIN alterado');
                             }
+                            if (ctx.mounted) Navigator.pop(ctx);
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accentOf(context),
@@ -2636,10 +2600,8 @@ class _PanicButtonState extends State<_PanicButton> {
 
     setState(() { _sending = false; _active = result.isSuccess; });
     if (!result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'Erro ao activar emergência'),
-        backgroundColor: Colors.red.shade700,
-      ));
+      FeedbackService.showError(context,
+          message: result.error ?? 'Erro ao activar emergência');
       return;
     }
 
@@ -2743,9 +2705,8 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
 
   Future<void> _add() async {
     if (_contacts.length >= 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Máximo de 3 contactos de emergência')),
-      );
+      FeedbackService.showError(context,
+          message: 'Máximo de 3 contactos de emergência');
       return;
     }
 
@@ -2820,11 +2781,8 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
                         setState(() => _contacts.add(result.data!));
                       }
                     } else if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(
-                            result.error ?? 'Erro ao adicionar contacto'),
-                        backgroundColor: Colors.red,
-                      ));
+                      FeedbackService.showError(context,
+                          message: result.error ?? 'Erro ao adicionar contacto');
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -2891,10 +2849,8 @@ class _EmergencyContactsModalState extends State<_EmergencyContactsModal> {
             () => _contacts.removeWhere((c) => c.id == contact.id));
       }
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'Erro ao remover contacto'),
-        backgroundColor: Colors.red,
-      ));
+      FeedbackService.showError(context,
+          message: result.error ?? 'Erro ao remover contacto');
     }
   }
 
@@ -3599,10 +3555,8 @@ class _SettingsModalState extends State<_SettingsModal> {
     if (result.isSuccess) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'Erro ao encerrar conta'),
-        backgroundColor: Colors.red,
-      ));
+      FeedbackService.showError(context,
+          message: result.error ?? 'Erro ao encerrar conta');
     }
   }
 
